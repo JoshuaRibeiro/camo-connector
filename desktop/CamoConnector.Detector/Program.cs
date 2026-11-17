@@ -58,7 +58,7 @@ try
         var challenge = replay ? null : await capture.DetectChallengeBannerAsync(image, stop.Token);
         Console.WriteLine(JsonSerializer.Serialize(new
         {
-            weapon = result.Weapon?.Name, akimbo = result.Weapon?.Akimbo, replay, militaryUnlock = replay ? null : unlock,
+            weapon = result.Weapon?.Name, menuWeapon, akimbo = result.Weapon?.Akimbo, replay, militaryUnlock = replay ? null : unlock,
             camoProgress = await capture.DetectCamoProgressAsync(image, menuWeapon, stop.Token),
             trackedCamos = replay ? [] : await capture.DetectTrackedCamosAsync(image, stop.Token, savedImage: true),
             combat = replay ? null : await capture.DetectCombatAsync(image, stop.Token),
@@ -121,6 +121,8 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     var totalScanMs = 0d;
     var scans = 0;
     var weaponReads = 0;
+    var menuReads = 0;
+    string? lastMenuWeapon = null;
     var camoReads = 0;
     var replayReads = 0;
     var firstFrame = true;
@@ -264,6 +266,13 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             lastProgressScan = DateTimeOffset.UtcNow;
             var menuWeapon = result is { Weapon: null, Replay: false }
                 ? await capture.ReadCamoMenuWeaponAsync(frame, cancel) : null;
+            if (menuWeapon != null)
+            {
+                menuReads++;
+                if (menuWeapon != lastMenuWeapon)
+                    Console.Error.WriteLine($"Recognized camo menu for {menuWeapon}.");
+            }
+            lastMenuWeapon = menuWeapon;
             var goldRead = ReadSnapshotAsync(frame, copy => capture.DetectCompletionistGoldAsync(copy, menuWeapon, cancel));
             var specialRead = ReadSnapshotAsync(frame, copy => capture.DetectSpecialUnlocksAsync(copy, menuWeapon, cancel));
             var progressRead = ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
@@ -301,11 +310,11 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         if (Stopwatch.GetElapsedTime(lastTiming) >= TimeSpan.FromSeconds(10))
         {
             Console.Error.WriteLine($"Scanned {scans} frames ({totalScanMs / scans:F0} ms average). " +
-                $"Read {weaponReads} weapon names and {camoReads} camo counters. Skipped {replayReads} replay frames.");
+                $"HUD weapons {weaponReads}, camo menus {menuReads}, counters {camoReads}, replays {replayReads}.");
             lastTiming = Stopwatch.GetTimestamp();
             totalScanMs = 0;
             scans = 0;
-            weaponReads = camoReads = replayReads = 0;
+            weaponReads = menuReads = camoReads = replayReads = 0;
         }
         await Task.Delay(75, cancel);
     }

@@ -205,9 +205,12 @@ internal sealed class HudCapture
 
     public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel)
     {
-        var heading = string.Join(" ", await ReadAsync(frame, (.070, .043, .182, .045), cancel));
+        // End before the game logo beside CAMO SELECT.
+        var (heading, _) = await ReadTextAsync(frame, (.073, .043, .115, .045), cancel, pageMode: 7);
         if (!CamoMenuRecognition.IsCamoMenu(heading)) return null;
-        var tab = string.Join(" ", await ReadAsync(frame, (.067, .097, .192, .036), cancel));
+        var (tab, _) = await ReadTextAsync(frame, (.067, .097, .127, .036), cancel, pageMode: 7);
+        if (CamoMenuRecognition.ReadProgressionWeapon(tab) is { } shortName) return shortName;
+        tab = string.Join(" ", await ReadAsync(frame, (.067, .097, .192, .036), cancel));
         return CamoMenuRecognition.ReadProgressionWeapon(tab);
     }
 
