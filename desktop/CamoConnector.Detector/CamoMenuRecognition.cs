@@ -12,7 +12,13 @@ public static class CamoMenuRecognition
 {
     private static string Key(string text) => Regex.Replace(text.ToLowerInvariant(), "[^a-z0-9]", "");
 
-    public static bool IsCamoMenu(string text) => Key(text) is "camoselect" or "select";
+    public static bool IsCamoMenu(string text) =>
+        Key(text) is "camoselect" or "select" ||
+        Regex.IsMatch(text, @"\bCAM[O0]\s+SELECT\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+    public static bool IsMilitaryMenuRow(string text) =>
+        Regex.IsMatch(text, @"\bMILITARY\s*\[?\s*[0-8]\s*/\s*8\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public static string? ReadProgressionWeapon(string text)
     {
@@ -20,6 +26,7 @@ public static class CamoMenuRecognition
         const string suffix = "progression";
         if (!key.EndsWith(suffix, StringComparison.Ordinal)) return null;
         var name = key[..^suffix.Length];
+        if (Regex.IsMatch(name, @"\A[5s][0o][g6][s5]\z")) return ".50 GS";
         if (Regex.IsMatch(name, @"\A(?:krait|karit|crate)p[g6][8b]\z")) return "Krait P68";
         return WeaponRecognition.Read(new[] { name }, false)?.Name;
     }

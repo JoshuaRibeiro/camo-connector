@@ -207,11 +207,18 @@ internal sealed class HudCapture
     {
         // End before the game logo beside CAMO SELECT.
         var (heading, _) = await ReadTextAsync(frame, (.073, .043, .115, .045), cancel, pageMode: 7);
-        if (!CamoMenuRecognition.IsCamoMenu(heading)) return null;
         var (tab, _) = await ReadTextAsync(frame, (.067, .097, .127, .036), cancel, pageMode: 7);
-        if (CamoMenuRecognition.ReadProgressionWeapon(tab) is { } shortName) return shortName;
-        tab = string.Join(" ", await ReadAsync(frame, (.067, .097, .192, .036), cancel));
-        return CamoMenuRecognition.ReadProgressionWeapon(tab);
+        var weapon = CamoMenuRecognition.ReadProgressionWeapon(tab);
+        if (weapon == null && CamoMenuRecognition.IsCamoMenu(heading))
+        {
+            tab = string.Join(" ", await ReadAsync(frame, (.067, .097, .192, .036), cancel));
+            weapon = CamoMenuRecognition.ReadProgressionWeapon(tab);
+        }
+        if (weapon == null || CamoMenuRecognition.IsCamoMenu(heading)) return weapon;
+        // The progression tab and a military row together identify the menu
+        // when its heading drops out or is partly obscured.
+        var (military, _) = await ReadTextAsync(frame, (.071, .163, .095, .029), cancel, pageMode: 7);
+        return CamoMenuRecognition.IsMilitaryMenuRow(military) ? weapon : null;
     }
 
     public async Task<CamoProgress[]> DetectTrackedCamosAsync(Bitmap frame, CancellationToken cancel, bool savedImage = false)
