@@ -81,8 +81,9 @@ try
         else
         {
             var menuWeapon = await capture.ReadCamoMenuWeaponAsync(frame, stop.Token, RecordCrop);
+            var militaryProgress = menuWeapon == null ? null : await capture.ReadMilitaryMenuCountAsync(frame, stop.Token, RecordCrop);
             var camoProgress = await capture.DetectCamoProgressAsync(frame, menuWeapon, stop.Token, RecordCrop);
-            result = new { source, frame.Width, frame.Height, menuWeapon, camoProgress, cropDirectory, reads };
+            result = new { source, frame.Width, frame.Height, menuWeapon, militaryProgress, camoProgress, cropDirectory, reads };
         }
         var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = saveMenuCrops });
         if (cropDirectory != null) File.WriteAllText(Path.Combine(cropDirectory, "ocr.json"), json);
@@ -181,6 +182,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     var confirmation = new WeaponConfirmation();
     var menuConfirmation = new WeaponConfirmation();
     var seenUnlocks = new HashSet<MilitaryUnlock>();
+    MilitaryUnlock? previousMenuMilitary = null;
     var progressConfirmation = new CamoProgressConfirmation();
     var combat = new CombatConfirmation();
     var specialConfirmation = new SpecialUnlockConfirmation();
@@ -374,7 +376,20 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             var goldRead = ReadSnapshotAsync(frame, copy => capture.DetectCompletionistGoldAsync(copy, menuWeapon, cancel));
             var specialRead = ReadSnapshotAsync(frame, copy => capture.DetectSpecialUnlocksAsync(copy, menuWeapon, cancel));
             var progressRead = ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
-            await Task.WhenAll(goldRead, specialRead, progressRead);
+            var militaryRead = menuWeapon == null ? Task.FromResult<int?>(null) :
+                ReadSnapshotAsync(frame, copy => capture.ReadMilitaryMenuCountAsync(copy, cancel));
+            await Task.WhenAll(goldRead, specialRead, progressRead, militaryRead);
+            var menuMilitary = menuWeapon != null && await militaryRead is int tier && tier > 0
+                ? new MilitaryUnlock(menuWeapon, tier) : null;
+            if (menuMilitary != null && menuMilitary == previousMenuMilitary && seenUnlocks.Add(menuMilitary))
+            {
+                await AppendAsync(log, new
+                {
+                    kind = "military-unlock", source = "live", mode = "mp", weapon = menuMilitary.Weapon,
+                    tier = menuMilitary.Tier, context = "camo-menu", at = now
+                }, cancel);
+            }
+            previousMenuMilitary = menuMilitary;
             var gold = await goldRead;
             if (gold != null && gold == goldCandidate && goldUnlocked.Add(gold))
                 await AppendAsync(log, new

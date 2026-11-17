@@ -278,9 +278,15 @@ internal sealed class HudCapture : IDisposable
         if (weapon == null || CamoMenuRecognition.IsCamoMenu(heading)) return weapon;
         // The progression tab and a military row together identify the menu
         // when its heading drops out or is partly obscured.
+        return await ReadMilitaryMenuCountAsync(frame, cancel, trace) != null ? weapon : null;
+    }
+
+    public async Task<int?> ReadMilitaryMenuCountAsync(Bitmap frame, CancellationToken cancel,
+        Action<string, string, Bitmap>? trace = null)
+    {
         var (military, _) = await ReadTextAsync(frame, (.071, .163, .095, .029), cancel, pageMode: 7,
             trace: trace, regionName: "militaryRow");
-        return CamoMenuRecognition.IsMilitaryMenuRow(military) ? weapon : null;
+        return CamoMenuRecognition.ReadMilitaryMenuCount(military);
     }
 
     public async Task<CamoProgress[]> DetectTrackedCamosAsync(Bitmap frame, CancellationToken cancel, bool savedImage = false,

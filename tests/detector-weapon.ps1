@@ -47,8 +47,10 @@ if ($reader::ReadMilitaryUnlock(@('Unlocked','Sang 9mm','Military Camo 17'))) { 
 $menu = [CamoConnector.Detector.CamoMenuRecognition]
 $camos = @('Frosted', 'Splatter Ops', 'Red Tiger')
 if (!$menu::IsCamoMenu('CAMO SELECT') -or $menu::IsCamoMenu('CAMOS TRACKED')) { throw 'Camo menu gate failed' }
-if (!$menu::IsCamoMenu('CAMO SELECT MW4') -or !$menu::IsMilitaryMenuRow('MILITARY [8/8]') -or
-    $menu::IsMilitaryMenuRow('MILITARY [8/9]') -or $menu::ReadProgressionWeapon('50 6S PROGRESSION') -ne '.50 GS') {
+if (!$menu::IsCamoMenu('CAMO SELECT MW4') -or $menu::ReadMilitaryMenuCount('MILITARY [8/8]') -ne 8 -or
+    $menu::ReadMilitaryMenuCount('MILITARY [2 / 8]') -ne 2 -or $menu::ReadMilitaryMenuCount('MILITARY [0/8]') -ne 0 -or
+    $null -ne $menu::ReadMilitaryMenuCount('MILITARY [8/9]') -or
+    $null -ne $menu::ReadMilitaryMenuCount('SPECIAL [2/3]') -or $menu::ReadProgressionWeapon('50 6S PROGRESSION') -ne '.50 GS') {
     throw 'Camo menu fallback OCR failed'
 }
 if ($menu::ReadProgressionWeapon('.50 GS PROGRESSION') -ne '.50 GS' -or

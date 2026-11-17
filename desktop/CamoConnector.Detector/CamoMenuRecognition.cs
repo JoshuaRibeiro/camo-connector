@@ -16,9 +16,12 @@ public static class CamoMenuRecognition
         Key(text) is "camoselect" or "select" ||
         Regex.IsMatch(text, @"\bCAM[O0]\s+SELECT\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
-    public static bool IsMilitaryMenuRow(string text) =>
-        Regex.IsMatch(text, @"\bMILITARY\s*\[?\s*[0-8]\s*/\s*8\b",
+    public static int? ReadMilitaryMenuCount(string text)
+    {
+        var match = Regex.Match(text, @"\bMILITARY\s*\[?\s*([0-8])\s*/\s*8\b",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        return match.Success ? match.Groups[1].Value[0] - '0' : null;
+    }
 
     public static string? ReadProgressionWeapon(string text)
     {
