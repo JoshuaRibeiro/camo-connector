@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "MW4 Sunburn Connector",
+  "version": "1.9.34",
+  "description": "Apply new local Signal 50 longshots to the Sunburn tracker.",
+  "permissions": ["storage"],
+  "host_permissions": ["http://127.0.0.1:47150/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{
+    "matches": ["https://mw4.darkmattersolutions.uk/*"],
+    "js": ["tracker.js", "backup.js"]
+  }]
+}
+
+
+
+
+
+
+
+

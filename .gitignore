@@ -1,0 +1,10 @@
+*.log
+*.jsonl
+mw4-camos*.json
+settings.json
+feed-trace/
+.env
+.env.*
+*.zip
+/CamoConnector-Updater-*.ps1
+/ffmpeg.exe
