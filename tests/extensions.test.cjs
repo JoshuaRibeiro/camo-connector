@@ -10,7 +10,8 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
     '  findTarget = globalThis.target; multiplayerSelected = () => true;\n' +
-    '  focusedWeapon = key => key === "signal50"; reportTrackerFocus = () => {}; globalThis.pollOnce = poll;');
+    '  focusedWeapon = key => key === globalThis.focused; reportTrackerFocus = () => {};\n' +
+    '  syncGold = globalThis.syncGold; globalThis.pollOnce = poll;');
   const data = {};
   let trackerCount = 39;
   let clicks = 0;
@@ -26,6 +27,8 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
       get: async () => data, set: async value => Object.assign(data, value)
     } } },
     navigator: { locks: { request: (_, options, callback) => callback({}) } },
+    focused: 'signal50',
+    syncGold: async (_, unlocks) => { page.seenGold = unlocks; return Boolean(unlocks?.length); },
     target: () => trackerCount < 40 ? { count: trackerCount, button } : null,
     setTimeout
   };
@@ -41,6 +44,18 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
   await page.pollOnce();
   assert.equal(clicks, 1);
   assert.equal(data.sunburnCursor.cursor, 2);
+  events.count = 3;
+  events.weapon = 'Krait P68';
+  events.goldUnlocks = ['Krait P68'];
+  page.focused = 'kraitp68';
+  await page.pollOnce();
+  assert.deepEqual(page.seenGold, ['Krait P68']);
+  assert.equal(data.sunburnCursor.cursor, 2);
+  data.sunburnCursor.pending = true;
+  page.seenGold = null;
+  await page.pollOnce();
+  assert.deepEqual(page.seenGold, ['Krait P68']);
+  assert.equal(clicks, 1);
 });
 
 test('the details panel recognizes a completed Special camo by its prefixed title', () => {
@@ -92,14 +107,15 @@ for (const browser of ['Chrome', 'Firefox', 'Edge', 'Opera']) {
     for (const file of fs.readdirSync(folder).filter(file => file.endsWith('.js'))) {
       new vm.Script(fs.readFileSync(path.join(folder, file), 'utf8'), { filename: file });
     }
-    let listener;
+    let listener, connect;
     const stored = {};
     const origin = browser === 'Firefox' ? 'moz-extension://test/' : 'chrome-extension://test/';
     const pairing = { url: origin + 'pairing.html' };
     const tracker = { url: 'https://mw4.darkmattersolutions.uk/', frameId: 0 };
     const fakeKey = 'a'.repeat(64);
     const api = { runtime: { getURL: name => origin + name,
-      onMessage: { addListener: handler => { listener = handler; } } },
+      onMessage: { addListener: handler => { listener = handler; } },
+      onConnect: { addListener: handler => { connect = handler; } } },
     storage: { local: { get: async () => stored, set: async value => Object.assign(stored, value),
       remove: async names => { for (const name of names) delete stored[name]; } } } };
     let online = true;
@@ -127,6 +143,24 @@ for (const browser of ['Chrome', 'Firefox', 'Edge', 'Opera']) {
     const send = (message, sender) => new Promise(resolve => {
       if (!listener(message, sender, resolve)) resolve(null);
     });
+    const openPort = sender => {
+      let release;
+      const port = { sender, name: 'mw4-sync-lock',
+        postMessage: message => { port.acquired = message.acquired; },
+        onDisconnect: { addListener: handler => { release = handler; } },
+        disconnect: () => { port.closed = true; release?.(); } };
+      connect(port);
+      return port;
+    };
+    const first = openPort(tracker);
+    assert.equal(first.acquired, true);
+    assert.equal(openPort(tracker).acquired, false);
+    assert.equal(openPort({ ...tracker, frameId: 1 }).closed, true);
+    assert.equal(openPort({ ...tracker, url: 'https://example.com/' }).closed, true);
+    first.disconnect();
+    const next = openPort(tracker);
+    assert.equal(next.acquired, true);
+    next.disconnect();
     assert.match((await send('sunburn-events', tracker)).error, /Pair/);
     assert.equal(await send({ type: 'pair', key: fakeKey }, tracker), null);
     assert.equal(await send('sunburn-events', { ...tracker, url: tracker.url + '.invalid', frameId: 1 }), null);

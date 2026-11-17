@@ -253,7 +253,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 }, cancel);
             }
         }
-        if (confirmation.Observe(result.Weapon, result.Replay || matchPhase is "match-voting" or "match-ended") is { } weapon)
+        if (confirmation.Observe(result.Weapon, result.Replay || matchPhase is "match-voting" or "match-ended", now) is { } weapon)
         {
             menuConfirmation.Reset();
             confirmedWeapon = weapon.Name;

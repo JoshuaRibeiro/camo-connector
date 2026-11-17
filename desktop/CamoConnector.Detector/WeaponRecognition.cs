@@ -43,7 +43,7 @@ public static class WeaponRecognition
             if (key is "sang9mmakimbo" or "sang9mmakimb0") return new("Sang 9mm", true);
             if (wideRegion) continue;
             if (Roster.TryGetValue(key, out var name)) return new(name, false);
-            if (Regex.IsMatch(key, @"\A5[0o][g6][s5]\z")) return new(".50 GS", false);
+            if (Regex.IsMatch(key, @"\A[5s][0o][g6][s5]\z")) return new(".50 GS", false);
             if (Regex.IsMatch(key, @"\A(?:k[g6]7?)?vu[li1]can\z")) return new("KG-7 Vulcan", false);
         }
         return null;
@@ -77,14 +77,27 @@ public sealed class WeaponConfirmation
 {
     private WeaponRead? previous;
     private WeaponRead? published;
+    private DateTimeOffset? previousAt;
 
-    public void Reset() => previous = published = null;
-
-    public WeaponRead? Observe(WeaponRead? read, bool replay)
+    public void Reset()
     {
-        if (replay || read == null) { previous = null; return null; }
+        previous = published = null;
+        previousAt = null;
+    }
+
+    public WeaponRead? Observe(WeaponRead? read, bool replay, DateTimeOffset? observedAt = null)
+    {
+        // A short HUD dropout can occur when switching weapons or aiming.
+        if (replay || observedAt == null && read == null ||
+            previousAt.HasValue && observedAt.HasValue && observedAt.Value - previousAt.Value > TimeSpan.FromMilliseconds(1750))
+        {
+            previous = null;
+            previousAt = null;
+        }
+        if (replay || read == null) return null;
         var stable = read == previous;
         previous = read;
+        previousAt = observedAt;
         if (!stable || read == published) return null;
         return published = read;
     }

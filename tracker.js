@@ -11,7 +11,7 @@
   });
   document.body.append(banner);
   let matchNotice = '';
-  const show = message => { banner.textContent = 'Sunburn sync · ' + (matchNotice ? matchNotice + ' | ' : '') + message; };
+  const show = message => { banner.textContent = 'Camo Connector · ' + (matchNotice ? matchNotice + ' | ' : '') + message; };
   const label = element => (element.innerText ?? element.textContent).trim().replace(/\s+/g, ' ');
   const visible = element => element.getClientRects().length > 0 &&
     getComputedStyle(element).visibility !== 'hidden';
@@ -564,9 +564,10 @@
       show('Tracked camo update paused after unverified click');
       return true;
     }
-    const snapshot = rows.find(row => row.type === 'camo' && row.camo &&
+    const pending = rows.filter(row => row.type === 'camo' && row.camo &&
       !(weaponKey(row.weapon) === 'signal50' && camoKey(row.camo) === 'sunburn') &&
       !state.handled.includes(row.id));
+    const snapshot = (latestWeapon && pending.find(row => weaponKey(row.weapon) === weaponKey(latestWeapon))) || pending[0];
     if (!snapshot) return false;
     const name = weaponKey(snapshot.weapon);
     const handled = { ...state, handled: [...state.handled, snapshot.id],
@@ -749,6 +750,22 @@
     } catch {}
   }
 
+  async function withSyncLock(work) {
+    if (typeof exportFunction !== 'function') {
+      return navigator.locks.request('mw4-sunburn-sync', { ifAvailable: true },
+        lock => lock ? work() : undefined);
+    }
+    // Firefox cannot await a content-script promise returned to Web Locks.
+    const port = extension.runtime.connect({ name: 'mw4-sync-lock' });
+    try {
+      const acquired = await new Promise(resolve => {
+        port.onMessage.addListener(message => resolve(message?.acquired === true));
+        port.onDisconnect.addListener(() => resolve(false));
+      });
+      if (acquired) await work();
+    } finally { port.disconnect(); }
+  }
+
   async function poll() {
     if (busy) return;
     busy = true;
@@ -769,8 +786,7 @@
       for (const number of Object.keys(akimboTiming || {})) {
         if (!firstReceived.has(number)) firstReceived.set(number, receivedAt);
       }
-      await navigator.locks.request('mw4-sunburn-sync', { ifAvailable: true }, async lock => {
-        if (!lock) return;
+      await withSyncLock(async () => {
         const saved = (await extension.storage.local.get(storageKey))[storageKey];
         let state = saved?.session === session ? saved : { session, cursor: 0 };
         if (weapon !== latestWeapon) {
@@ -780,7 +796,7 @@
           checkedAllWeapons = false;
           lastFocusAttempt = 0;
         }
-        if (needsWeaponFocus && (state.cursor >= count || state.pending) && multiplayerSelected() && !openedDetails) {
+        if (needsWeaponFocus && multiplayerSelected() && !openedDetails) {
           const normalized = weaponKey(weapon);
           const key = aliases.get(normalized) || normalized;
           if (focusedWeapon(key)) {
@@ -790,16 +806,14 @@
             if (focusWeapon(key)) return show('Switching focus to ' + weapon);
           }
         }
-        if (state.pending) {
-          return show('Paused after an unverified click. Check the tracker count before restarting the bridge.');
-        }
         const target = findTarget();
-        if (state.cursor < count && (target?.count === 40 ||
+        const signalIsCurrent = !weapon || weaponKey(weapon) === 'signal50';
+        if (!state.pending && signalIsCurrent && state.cursor < count && (target?.count === 40 ||
             (!target && multiplayerSelected() && focusedWeapon('signal50')))) {
           state = { ...state, cursor: count };
           await extension.storage.local.set({ [storageKey]: state });
         }
-        const sunburnPending = state.cursor < count;
+        const sunburnPending = signalIsCurrent && !state.pending && state.cursor < count;
         if (!sunburnPending && await syncMilitary(session, military)) return;
         if (!sunburnPending) {
           for (const [name, tiers] of catalogMilitary || []) {
@@ -813,9 +827,7 @@
         if (!sunburnPending &&
             await syncAkimbo(session, akimboCount, akimboTiming, firstReceived)) return;
         if (!sunburnPending && await syncChallenges(session, challenges)) return;
-        // Give queued Sunburn events a chance to apply before following the
-        // latest weapon. Return focus to it after the queue has drained.
-        const desired = sunburnPending ? 'Signal 50' : weapon;
+        const desired = weapon || (sunburnPending ? 'Signal 50' : null);
         if (desired && multiplayerSelected()) {
           const normalized = weaponKey(desired);
           const key = aliases.get(normalized) || normalized;
@@ -828,13 +840,12 @@
             return show('Detected ' + desired + ' · waiting for the ' + trackerName +
               ' card (clear search and Hide maxed weapons)');
           }
-          if (key === 'sang9mm') return show('Sang 9mm · waiting for Space Time events');
           if (key !== 'signal50') return show(desired + ' · focus synced');
         }
-        if (!target) return show(focusedWeapon('signal50') ? 'No active Sunburn challenge' :
-          'Open Multiplayer and focus Signal 50 with Sunburn visible');
-        if (target.count === 40) return show('Sunburn complete · 40/40');
-        if (!sunburnPending) return show('Ready · ' + target.count + '/40');
+        if (signalIsCurrent && state.pending && (weapon || target))
+          return show('Sunburn sync paused after an unverified +1. Check the tracker count.');
+        if (!target) return show(weapon ? weapon + ' · focus synced' : 'Ready · waiting for camo detections');
+        if (!sunburnPending) return show(weapon ? weapon + ' · focus synced' : 'Ready · waiting for camo detections');
         if (!target.button) return;
 
         // Persist before clicking so a reload cannot replay an ambiguous write.

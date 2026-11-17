@@ -21,6 +21,20 @@ if ($stability.Observe($weapon,$false) -or $stability.Observe($weapon,$true) -or
     throw 'Detector emitted duplicate or unconfirmed weapon events'
 }
 'Passed weapon OCR normalisation, replay rejection and two-read deduplication.'
+$clock = [DateTimeOffset]::UtcNow
+$pistol = $reader::Read(@('.SO 6S'), $false)
+$astaroth = $reader::Read(@('Astaroth .57'), $false)
+$stability.Reset()
+[void]$stability.Observe($astaroth,$false,$clock)
+[void]$stability.Observe($astaroth,$false,$clock.AddMilliseconds(250))
+if ($stability.Observe($pistol,$false,$clock.AddMilliseconds(500)) -or
+    $stability.Observe($null,$false,$clock.AddMilliseconds(750)) -or
+    $stability.Observe($pistol,$false,$clock.AddSeconds(1)).Name -ne '.50 GS') {
+    throw 'Weapon switch failed across a brief HUD dropout'
+}
+$stability.Reset()
+[void]$stability.Observe($pistol,$false,$clock)
+if ($stability.Observe($pistol,$false,$clock.AddSeconds(2))) { throw 'Stale HUD read confirmed a weapon' }
 $badge = $reader::ReadMilitaryUnlock(@('UNLOCKED','SANG 9MM','MILITARY CAMO 7'))
 if ($badge.Weapon -ne 'Sang 9mm' -or $badge.Tier -ne 7) { throw 'Camo 7 badge recognition failed' }
 $badge = $reader::ReadMilitaryUnlock(@('UNL0CKED','Signal 50','MILITARY CAMO','8'))

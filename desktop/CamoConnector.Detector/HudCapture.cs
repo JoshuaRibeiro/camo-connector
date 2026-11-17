@@ -94,9 +94,13 @@ internal sealed class HudCapture : IDisposable
         var (hudLabel, _) = await ReadTextAsync(frame, (.742, .876, .082, .026), cancel, pageMode: 7);
         if (WeaponRecognition.Read(Lines(hudLabel), false) is { } weapon)
             return await IsReplayAsync(frame, cancel) ? (null, true) : (weapon, false);
-        var (shortHudLabel, _) = await ReadTextAsync(frame, (.782, .877, .048, .026), cancel, pageMode: 7);
-        if (WeaponRecognition.Read(Lines(shortHudLabel), false) is { Name: ".50 GS" } pistol)
-            return await IsReplayAsync(frame, cancel) ? (null, true) : (pistol, false);
+        foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast })
+        {
+            var (shortHudLabel, _) = await ReadTextAsync(frame, (.782, .877, .048, .026), cancel,
+                pageMode: 7, adjustment: adjustment);
+            if (WeaponRecognition.Read(Lines(shortHudLabel), false) is { Name: ".50 GS" } pistol)
+                return await IsReplayAsync(frame, cancel) ? (null, true) : (pistol, false);
+        }
         return (null, false);
     }
 

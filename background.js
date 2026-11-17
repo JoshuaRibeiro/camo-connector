@@ -3,6 +3,28 @@ const trackerOrigin = 'https://mw4.darkmattersolutions.uk';
 const bridge = 'http://127.0.0.1:47150';
 const pairingKey = 'bridgePairingKey';
 const clientHeader = 'bridgeClientOrigin';
+let trackerSyncPort = null;
+
+function isTrackerFrame(sender) {
+  try { return sender.frameId === 0 && new URL(sender.url).origin === trackerOrigin; }
+  catch { return false; }
+}
+
+function onTrackerConnect(port) {
+  if (port.name !== 'mw4-sync-lock' || !isTrackerFrame(port.sender ?? {})) {
+    port.disconnect();
+    return;
+  }
+  if (trackerSyncPort) {
+    port.postMessage({ acquired: false });
+    return;
+  }
+  trackerSyncPort = port;
+  port.onDisconnect.addListener(() => {
+    if (trackerSyncPort === port) trackerSyncPort = null;
+  });
+  port.postMessage({ acquired: true });
+}
 
 async function request(route, key, options = {}, client = null) {
   if (!/^[a-f0-9]{64}$/.test(key || '')) throw Error('Pair Camo Connector using the extension icon.');
@@ -27,7 +49,7 @@ function onMessage(message, sender, reply) {
     runPairing(message).then(reply, error => reply({ error: error.message }));
     return true;
   }
-  if (url.origin !== trackerOrigin || sender.frameId !== 0) return false;
+  if (!isTrackerFrame(sender)) return false;
   const type = typeof message === 'string' ? message : message?.type;
   if (!['sunburn-events', 'mw4-focus', 'mw4-save-backup', 'mw4-read-backup'].includes(type)) return false;
   runTrackerRequest(type, message).then(reply, error => reply({ error: error.message }));
@@ -84,3 +106,4 @@ async function runTrackerRequest(type, message) {
 }
 
 api.runtime.onMessage.addListener(onMessage);
+api.runtime.onConnect.addListener(onTrackerConnect);
