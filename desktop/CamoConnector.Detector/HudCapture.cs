@@ -36,7 +36,9 @@ internal sealed class HudCapture : IDisposable
                     camo.TryGetProperty("artworkRGB12", out var rgb) && rgb.ValueKind == JsonValueKind.String
                     ? Convert.FromBase64String(rgb.GetString()!) : null,
                     camo.TryGetProperty("slot", out var slot) && slot.ValueKind == JsonValueKind.Number && slot.TryGetInt32(out var slotNumber) ? slotNumber : 0,
-                    camo.TryGetProperty("goal", out var goal) && goal.ValueKind == JsonValueKind.Number && goal.TryGetInt32(out var goalNumber) ? goalNumber : null)).ToArray());
+                    camo.TryGetProperty("goal", out var goal) && goal.ValueKind == JsonValueKind.Number && goal.TryGetInt32(out var goalNumber) ? goalNumber : null,
+                    camo.TryGetProperty("bannerArtworkRGB12", out var banner) && banner.ValueKind == JsonValueKind.String
+                    ? Convert.FromBase64String(banner.GetString()!) : null)).ToArray());
         persistentOcr = PersistentOcr.Open(runtime, models);
     }
 
@@ -89,6 +91,9 @@ internal sealed class HudCapture : IDisposable
         }
         // Short labels are right-aligned under the ammo counter. Read that
         // line by itself when the wider crops do not yield a weapon name.
+        var (hudLabel, _) = await ReadTextAsync(frame, (.742, .876, .082, .026), cancel, pageMode: 7);
+        if (WeaponRecognition.Read(Lines(hudLabel), false) is { } weapon)
+            return await IsReplayAsync(frame, cancel) ? (null, true) : (weapon, false);
         var (shortHudLabel, _) = await ReadTextAsync(frame, (.782, .877, .048, .026), cancel, pageMode: 7);
         if (WeaponRecognition.Read(Lines(shortHudLabel), false) is { Name: ".50 GS" } pistol)
             return await IsReplayAsync(frame, cancel) ? (null, true) : (pistol, false);
@@ -176,7 +181,8 @@ internal sealed class HudCapture : IDisposable
         return best;
     }
 
-    public async Task<string?> DetectChallengeBannerAsync(Bitmap frame, CancellationToken cancel)
+    public async Task<(string? Challenge, bool Completed)> DetectChallengeBannerAsync(Bitmap frame, CancellationToken cancel,
+        Action<string, string, Bitmap>? trace = null)
     {
         var warmPixels = 0;
         for (var y = 0; y < 5; y++)
@@ -187,20 +193,48 @@ internal sealed class HudCapture : IDisposable
             if (pixel.R > 90 && pixel.R >= pixel.G + 15 && pixel.R >= pixel.B + 28) warmPixels++;
         }
         var goldTile = warmPixels >= 22;
-        var heading = string.Join(" ", await ReadAsync(frame, (.350, .250, .300, .047), cancel));
-        if (!heading.Contains("COMPLETED", StringComparison.OrdinalIgnoreCase))
-            heading = string.Join(" ", await ReadAsync(frame, (.366, .250, .269, .047), cancel, adjustment: PixelAdjustment.Invert));
-        if (!goldTile && !heading.Contains("COMPLETED", StringComparison.OrdinalIgnoreCase)) return null;
-        var detail = string.Join(" ", await ReadAsync(frame, (.382, .295, .237, .034), cancel));
+        async Task<string> ReadBannerText((double X, double Y, double W, double H) area, string region,
+            PixelAdjustment adjustment = PixelAdjustment.Normal, int pageMode = 7) =>
+            string.Join(" ", Lines((await ReadTextAsync(frame, area, cancel, pageMode: pageMode,
+                adjustment: adjustment, trace: trace, regionName: region)).Text));
+        var heading = await ReadBannerText((.365, .257, .274, .041), "unlockHeading", PixelAdjustment.CyanText);
+        if (!LooksCompleted(heading))
+            heading = await ReadBannerText((.350, .250, .300, .047), "unlockHeadingOriginal", pageMode: 6);
+        var completed = LooksCompleted(heading);
+        if (!goldTile && !completed) return (null, false);
+        var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)
             ? "gold-15" : SpecialUnlocks.ReadBanner(heading, text);
-        if (Match(detail) is { } match) return match;
+        if (Match(detail) is { } match) return (match, true);
         foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast, PixelAdjustment.Invert })
         {
-            detail = string.Join(" ", await ReadAsync(frame, (.382, .301, .237, .022), cancel, adjustment));
-            if (Match(detail) is { } fallback) return fallback;
+            detail = await ReadBannerText((.382, .301, .237, .022), $"unlockObjective{adjustment}", adjustment);
+            if (Match(detail) is { } fallback) return (fallback, true);
         }
-        return null;
+        return (null, completed);
+
+        static bool LooksCompleted(string text) => System.Text.RegularExpressions.Regex.IsMatch(text,
+            @"\bCOMPLETED\b|\bCHALLENGE\w{0,2}\s+LETED\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+    }
+
+    public SpecialUnlock? IdentifySpecialBanner(Bitmap frame, string? weapon)
+    {
+        var sample = Sample(frame, .148, (.471, .058, .102, 0));
+        if (weapon != null && catalog.TryGetValue(weapon, out var entries))
+        {
+            var name = MatchBannerArtwork(entries);
+            return name != null && entries.Any(entry => entry.Name == name && entry.Goal is > 0)
+                ? new(weapon, name, "catalog-special-unlocked") : null;
+        }
+        var unique = MatchBannerArtwork(catalog.Values.SelectMany(entries => entries));
+        if (unique == null) return null;
+        var weapons = catalog.Where(pair => pair.Value.Any(entry => entry.Name == unique)).Take(2).ToArray();
+        return weapons.Length == 1 && weapons[0].Value.Any(entry => entry.Name == unique && entry.Goal is > 0)
+            ? new(weapons[0].Key, unique, "catalog-special-unlocked") : null;
+
+        string? MatchBannerArtwork(IEnumerable<CamoReference> candidates) => TrackedCamoRecognition.MatchArtwork(sample,
+            candidates.Select(entry => entry.BannerRgb == null ? entry : entry with { Rgb = entry.BannerRgb }).ToArray());
     }
 
     public async Task<CamoProgress?> DetectCamoProgressAsync(Bitmap frame, string? weapon, CancellationToken cancel,
@@ -245,7 +279,8 @@ internal sealed class HudCapture : IDisposable
         return CamoMenuRecognition.IsMilitaryMenuRow(military) ? weapon : null;
     }
 
-    public async Task<CamoProgress[]> DetectTrackedCamosAsync(Bitmap frame, CancellationToken cancel, bool savedImage = false)
+    public async Task<CamoProgress[]> DetectTrackedCamosAsync(Bitmap frame, CancellationToken cancel, bool savedImage = false,
+        Action<string, string, Bitmap>? trace = null)
     {
         var layouts = savedImage && (double)frame.Width / frame.Height < 1.4
             ? new[] { (Heading: (.02, .01, .36, .09), Area: (.25, .14, .52, .69), Thumbnail: (.075, .155, .168, .007)) }
@@ -254,18 +289,20 @@ internal sealed class HudCapture : IDisposable
                 (Heading: (.740, .117, .110, .037), Area: (.792, .159, .172, .335), Thumbnail: (.760, .039, .069, .004)),
                 (Heading: (.067, .114, .110, .038), Area: (.121, .156, .169, .335), Thumbnail: (.084, .039, .069, .004))
             };
-        foreach (var layout in layouts)
+        for (var i = 0; i < layouts.Length; i++)
         {
-            var heading = string.Join(" ", await ReadAsync(frame, layout.Heading, cancel));
+            var layout = layouts[i];
+            var (heading, _) = await ReadTextAsync(frame, layout.Heading, cancel, trace: trace, regionName: $"trackedHeading{i + 1}");
             if (!TrackedCamoRecognition.IsPanel(heading)) continue;
-            var (text, height) = await ReadTextAsync(frame, layout.Area, cancel, positioned: true, pageMode: 11);
+            var (text, height) = await ReadTextAsync(frame, layout.Area, cancel, positioned: true, pageMode: 11,
+                trace: trace, regionName: "trackedRows");
             var lines = TrackedCamoRecognition.ReadTsv(text, height);
             byte[]? Thumbnail(double y) => Sample(frame, layout.Area.Item2 + y * layout.Area.Item4, layout.Thumbnail);
             var rows = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail);
             var (x, y, w, h) = layout.Area;
             var counterArea = (x + w * .61, y, w * .35, h);
             var (counterText, counterHeight) = await ReadTextAsync(frame, counterArea, cancel,
-                positioned: true, pageMode: 11, countersOnly: true);
+                positioned: true, pageMode: 11, countersOnly: true, trace: trace, regionName: "trackedCounters");
             var counters = TrackedCamoRecognition.ReadTsv(counterText, counterHeight)
                 .Where(line => System.Text.RegularExpressions.Regex.IsMatch(line.Text, @"\A[0-9]{1,4}\s*/\s*[0-9]{1,4}\z"))
                 .ToArray();
@@ -301,7 +338,7 @@ internal sealed class HudCapture : IDisposable
         return rgb;
     }
 
-    private enum PixelAdjustment { Normal, Contrast, Invert }
+    private enum PixelAdjustment { Normal, Contrast, Invert, CyanText }
 
     private async Task<string[]> ReadAsync(Bitmap frame, (double X, double Y, double W, double H) area,
         CancellationToken cancel, PixelAdjustment adjustment = PixelAdjustment.Normal)
@@ -323,7 +360,7 @@ internal sealed class HudCapture : IDisposable
         {
             graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
             var destination = new Rectangle(Point.Empty, crop.Size);
-            if (adjustment == PixelAdjustment.Normal)
+            if (adjustment is PixelAdjustment.Normal or PixelAdjustment.CyanText)
                 graphics.DrawImage(frame, destination, region, GraphicsUnit.Pixel);
             else
             {
@@ -337,6 +374,27 @@ internal sealed class HudCapture : IDisposable
                 });
                 graphics.DrawImage(frame, destination, region.X, region.Y, region.Width, region.Height, GraphicsUnit.Pixel, attributes);
             }
+        }
+        if (adjustment == PixelAdjustment.CyanText)
+        {
+            var pixels = crop.LockBits(new Rectangle(Point.Empty, crop.Size), ImageLockMode.ReadWrite, crop.PixelFormat);
+            try
+            {
+                var row = new byte[crop.Width * 3];
+                for (var y = 0; y < crop.Height; y++)
+                {
+                    var address = pixels.Scan0 + y * pixels.Stride;
+                    Marshal.Copy(address, row, 0, row.Length);
+                    for (var x = 0; x < row.Length; x += 3)
+                    {
+                        var ink = row[x] >= 165 && row[x + 1] >= 165 &&
+                            Math.Min(row[x], row[x + 1]) - row[x + 2] >= 22;
+                        row[x] = row[x + 1] = row[x + 2] = ink ? (byte)0 : (byte)255;
+                    }
+                    Marshal.Copy(row, 0, address, row.Length);
+                }
+            }
+            finally { crop.UnlockBits(pixels); }
         }
         using var png = new MemoryStream();
         crop.Save(png, ImageFormat.Png);

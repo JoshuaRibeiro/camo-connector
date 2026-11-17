@@ -104,14 +104,31 @@ internal sealed partial class ConnectorWindow
 
     private static void SetLog(TextBox box, string text)
     {
-        if (box.Text == text) return;
-        var follow = box.SelectionStart + box.SelectionLength >= box.TextLength;
+        var previous = box.Text;
+        if (previous == text) return;
+        const int getFirstVisibleLine = 0x00CE, lineScroll = 0x00B6;
+        var firstLine = (int)SendMessage(box.Handle, getFirstVisibleLine, 0, 0);
         var offset = box.SelectionStart;
         var length = box.SelectionLength;
+        var lastVisible = box.GetCharIndexFromPosition(new Point(0, Math.Max(0, box.ClientSize.Height - 2)));
+        var follow = previous.Length == 0 || length == 0 &&
+            box.GetLineFromCharIndex(lastVisible) >= box.GetLineFromCharIndex(box.TextLength);
+        var anchorStart = box.GetFirstCharIndexFromLine(firstLine);
+        var anchorEnd = anchorStart >= 0 ? previous.IndexOf('\n', anchorStart) : -1;
+        var anchor = anchorEnd > anchorStart ? previous[anchorStart..anchorEnd].TrimEnd('\r') : "";
         box.Text = text;
-        box.SelectionStart = follow ? box.TextLength : Math.Min(offset, box.TextLength);
-        box.SelectionLength = follow ? 0 : Math.Min(length, box.TextLength - box.SelectionStart);
-        box.ScrollToCaret();
+        if (follow)
+        {
+            box.Select(box.TextLength, 0);
+            box.ScrollToCaret();
+            return;
+        }
+        var anchorIndex = anchor.Length > 0 ? text.IndexOf(anchor, StringComparison.Ordinal) : -1;
+        if (anchorIndex >= 0) offset += anchorIndex - anchorStart;
+        var selection = Math.Clamp(offset, 0, box.TextLength);
+        box.Select(selection, Math.Min(length, box.TextLength - selection));
+        var newFirstLine = anchorIndex >= 0 ? box.GetLineFromCharIndex(anchorIndex) : firstLine;
+        SendMessage(box.Handle, lineScroll, 0, newFirstLine - SendMessage(box.Handle, getFirstVisibleLine, 0, 0));
     }
 
     private void RefreshTheme()
@@ -162,4 +179,7 @@ internal sealed partial class ConnectorWindow
 
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern nint SendMessage(IntPtr window, int message, nint wParam, nint lParam);
 }

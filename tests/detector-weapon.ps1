@@ -119,6 +119,8 @@ if (!$combat::IsLongshot('L0NG-SHOT') -or $combat::IsLongshot('Longshotting') -o
 }
 'Passed combat banner deduplication, streak resets, match end, longshots and completionist menu parsing.'
 if (!$combat::IsGoldBanner('CHALLENGE COMPLETED','Get 15 player kills in a single match',$false) -or
+    !$combat::IsGoldBanner('', 'moe! 15 PLAYER KILES) IN A SINGLE MATCH', $true) -or
+    $combat::IsGoldBanner('', 'moe! 15 PLAYER KILES) IN A SINGLE MATCH', $false) -or
     !$combat::IsGoldBanner('', 'Get 15 player in a single match', $true) -or
     $combat::IsGoldBanner('', 'Get 15 player kills in a single match', $false) -or
     $combat::IsGoldBanner('CHALLENGE COMPLETED','Get 15 longshot kills',$true)) {

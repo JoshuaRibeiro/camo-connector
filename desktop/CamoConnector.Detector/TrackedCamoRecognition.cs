@@ -8,7 +8,7 @@ using System.Text.RegularExpressions;
 namespace CamoConnector.Detector;
 
 public sealed record HudLine(string Text, double Y);
-public sealed record CamoReference(string Name, byte[]? Rgb, int Slot = 0, int? Goal = null)
+public sealed record CamoReference(string Name, byte[]? Rgb, int Slot = 0, int? Goal = null, byte[]? BannerRgb = null)
 {
     public CamoReference(string name, byte[]? rgb) : this(name, rgb, 0, null) { }
 }

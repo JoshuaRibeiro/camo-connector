@@ -40,10 +40,10 @@ public static class CombatRecognition
     {
         string Compact(string text) => Regex.Replace(text.ToUpperInvariant(), "[^A-Z0-9]", "");
         var objective = Compact(detail);
-        return (Compact(heading).Contains("CHALLENGECOMPLETED", StringComparison.Ordinal) ||
-            Regex.IsMatch(heading, @"\bCOMPLETED\b", IgnoreCase)) &&
-            objective.Contains("15PLAYERKILLSINASINGLEMATCH", StringComparison.Ordinal) ||
-            goldTile && Regex.IsMatch(objective, @"\AGET15PLAYER(?:KILLS)?(?:IN)?ASINGLEMATCH\z");
+        const string goldGoal = @"15PLAYERKIL[LIE][S5]P?INASINGLEMATCH";
+        return (goldTile || Compact(heading).Contains("CHALLENGECOMPLETED", StringComparison.Ordinal) ||
+            Regex.IsMatch(heading, @"\bCOMPLETED\b", IgnoreCase)) && Regex.IsMatch(objective, goldGoal) ||
+            goldTile && Regex.IsMatch(objective, @"\A(?:GET)?15PLAYER(?:KILLS)?(?:IN)?ASINGLEMATCH\z");
     }
 }
 

@@ -6,6 +6,43 @@ const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '..');
 const base = require('../manifest.json');
+test('Sunburn ignores absolute reads and applies queued longshots only with +1', async () => {
+  const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
+    /  poll\(\);\s*setInterval\(poll, 500\);/,
+    '  findTarget = globalThis.target; multiplayerSelected = () => true;\n' +
+    '  focusedWeapon = key => key === "signal50"; reportTrackerFocus = () => {}; globalThis.pollOnce = poll;');
+  const data = {};
+  let trackerCount = 39;
+  let clicks = 0;
+  const button = { click() { clicks++; trackerCount++; } };
+  const events = { session: 'session', count: 0, progress: { id: 1, value: 4, through: 0 }, trackedRows: [
+    { id: 2, type: 'camo', weapon: 'Signal 50', camo: 'Sunburn', value: 4, goal: 40 },
+    { id: 3, type: 'weapon-level', weapon: 'Signal 50', value: 0, goal: 4 },
+    { id: 4, type: 'camo', weapon: 'Signal 50', camo: 'Sunburn', value: 40, goal: 40, confirmed: true }
+  ] };
+  const page = {
+    document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
+    chrome: { runtime: { sendMessage: async () => ({ events }) }, storage: { local: {
+      get: async () => data, set: async value => Object.assign(data, value)
+    } } },
+    navigator: { locks: { request: (_, options, callback) => callback({}) } },
+    target: () => trackerCount < 40 ? { count: trackerCount, button } : null,
+    setTimeout
+  };
+  vm.runInNewContext(tracker, page);
+  await page.pollOnce();
+  assert.equal(trackerCount, 39);
+  assert.equal(clicks, 0);
+  events.count = 1;
+  await page.pollOnce();
+  assert.equal(trackerCount, 40);
+  assert.equal(clicks, 1);
+  events.count = 2;
+  await page.pollOnce();
+  assert.equal(clicks, 1);
+  assert.equal(data.sunburnCursor.cursor, 2);
+});
+
 test('the details panel recognizes a completed Special camo by its prefixed title', () => {
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8')
     .replace(/  poll\(\);\s*setInterval\(poll, 500\);/, '  globalThis.detailCounter = detailCounter;');

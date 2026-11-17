@@ -564,7 +564,9 @@
       show('Tracked camo update paused after unverified click');
       return true;
     }
-    const snapshot = rows.find(row => row.type === 'camo' && row.camo && !state.handled.includes(row.id));
+    const snapshot = rows.find(row => row.type === 'camo' && row.camo &&
+      !(weaponKey(row.weapon) === 'signal50' && camoKey(row.camo) === 'sunburn') &&
+      !state.handled.includes(row.id));
     if (!snapshot) return false;
     const name = weaponKey(snapshot.weapon);
     const handled = { ...state, handled: [...state.handled, snapshot.id],
@@ -755,7 +757,7 @@
       if (!result?.events) return show(result?.error || 'Waiting for local bridge');
       reportTrackerFocus();
       const receivedAt = new Date().toISOString();
-      const { session, count, akimboCount, akimboTiming, weapon, military, challenges, progress, trackedRows, catalogMilitary,
+      const { session, count, akimboCount, akimboTiming, weapon, military, challenges, trackedRows, catalogMilitary,
         goldUnlocks, matchState } = result.events;
       matchNotice = matchState?.kind === 'match-voting' ? 'Map voting: match counters reset' :
         matchState?.kind === 'match-confirmed' ? 'Next: ' + (matchState.matchMode || 'Match about to begin (mode unreadable)') +
@@ -792,36 +794,28 @@
           return show('Paused after an unverified click. Check the tracker count before restarting the bridge.');
         }
         const target = findTarget();
-        let snapshotPending = progress && progress.id !== state.progressId;
-        if (snapshotPending && target && (target.count === progress.value || target.count === 40)) {
-          state = { ...state, progressId: progress.id, cursor: Math.max(state.cursor, progress.through) };
-          await extension.storage.local.set({ [storageKey]: state });
-          snapshotPending = false;
-        }
-        if (snapshotPending && (target || weaponDetails('signal50') || focusedWeapon('signal50'))) {
-          return reconcileDetails({ weapon: 'Signal 50', camo: 'Sunburn', objective: 'Longshot kills', goal: 40, value: progress.value },
-            storageKey, state, { ...state, progressId: progress.id, cursor: Math.max(state.cursor, progress.through) });
-        }
-        if (target?.count === 40 && state.cursor < count) {
+        if (state.cursor < count && (target?.count === 40 ||
+            (!target && multiplayerSelected() && focusedWeapon('signal50')))) {
           state = { ...state, cursor: count };
           await extension.storage.local.set({ [storageKey]: state });
         }
-        if (!snapshotPending && state.cursor >= count && await syncMilitary(session, military)) return;
-        if (!snapshotPending && state.cursor >= count) {
+        const sunburnPending = state.cursor < count;
+        if (!sunburnPending && await syncMilitary(session, military)) return;
+        if (!sunburnPending) {
           for (const [name, tiers] of catalogMilitary || []) {
             if (await syncMilitary(session, tiers, name)) return;
           }
         }
-        if (!snapshotPending && state.cursor >= count && await syncTrackedRows(session, trackedRows)) return;
-        if (!snapshotPending && state.cursor >= count && await syncGold(session, goldUnlocks)) return;
-        if (!snapshotPending && state.cursor >= count && challenges?.includes('menu-space-time') &&
+        if (!sunburnPending && await syncTrackedRows(session, trackedRows)) return;
+        if (!sunburnPending && await syncGold(session, goldUnlocks)) return;
+        if (!sunburnPending && challenges?.includes('menu-space-time') &&
             await syncChallenges(session, ['menu-space-time'], 'spaceTimeCompletion')) return;
-        if (!snapshotPending && state.cursor >= count &&
+        if (!sunburnPending &&
             await syncAkimbo(session, akimboCount, akimboTiming, firstReceived)) return;
-        if (!snapshotPending && state.cursor >= count && await syncChallenges(session, challenges)) return;
+        if (!sunburnPending && await syncChallenges(session, challenges)) return;
         // Give queued Sunburn events a chance to apply before following the
         // latest weapon. Return focus to it after the queue has drained.
-        const desired = snapshotPending || state.cursor < count ? 'Signal 50' : weapon;
+        const desired = sunburnPending ? 'Signal 50' : weapon;
         if (desired && multiplayerSelected()) {
           const normalized = weaponKey(desired);
           const key = aliases.get(normalized) || normalized;
@@ -837,9 +831,10 @@
           if (key === 'sang9mm') return show('Sang 9mm · waiting for Space Time events');
           if (key !== 'signal50') return show(desired + ' · focus synced');
         }
-        if (!target) return show('Open Multiplayer and focus Signal 50 with Sunburn visible');
+        if (!target) return show(focusedWeapon('signal50') ? 'No active Sunburn challenge' :
+          'Open Multiplayer and focus Signal 50 with Sunburn visible');
         if (target.count === 40) return show('Sunburn complete · 40/40');
-        if (!snapshotPending && state.cursor >= count) return show('Ready · ' + target.count + '/40');
+        if (!sunburnPending) return show('Ready · ' + target.count + '/40');
         if (!target.button) return;
 
         // Persist before clicking so a reload cannot replay an ambiguous write.
@@ -854,7 +849,9 @@
         current.button.click();
         for (let attempt = 0; attempt < 8; attempt++) {
           await pause(150);
-          if (findTarget()?.count === target.count + 1) {
+          const observed = findTarget();
+          if (observed?.count === target.count + 1 ||
+              (!observed && target.count === 39 && multiplayerSelected() && focusedWeapon('signal50'))) {
             const next = { ...state, cursor: state.cursor + 1 };
             await extension.storage.local.set({ [storageKey]: next });
             return show('Applied +1 · ' + (target.count + 1) + '/40');

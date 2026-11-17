@@ -7,13 +7,15 @@ Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
 var listDevices = args.Length == 1 && args[0] == "--list-devices";
 var previewOnly = args.Length == 2 && args[0] is "--preview-monitor" or "--preview-device";
 var saveMenuCrops = args.Length == 4 && args[2] == "--save-crops";
-var menuProbe = (args.Length == 2 || saveMenuCrops) && args[0] is "--probe-menu-monitor" or "--probe-menu-image";
+var probe = (args.Length == 2 || saveMenuCrops) &&
+    args[0] is "--probe-menu-monitor" or "--probe-menu-image" or "--probe-tracked-monitor" or "--probe-tracked-image" or "--probe-unlock-image";
 var publishPreview = args.Length == 4 && args[3] == "--preview" && args[0] is "--monitor" or "--device";
-if (!listDevices && !previewOnly && !publishPreview && !menuProbe &&
+if (!listDevices && !previewOnly && !publishPreview && !probe &&
     (args.Length != 3 || args[0] is not ("--image" or "--monitor" or "--device" or "--device-frame" or "--video")))
 {
     Console.Error.WriteLine("CamoConnector.Detector --list-devices | (--image <capture> | --video <file> | --monitor <index> | --device <input> | --device-frame <input>) <data-directory>");
     Console.Error.WriteLine("CamoConnector.Detector (--probe-menu-monitor <display> | --probe-menu-image <capture>) [--save-crops <directory>]");
+    Console.Error.WriteLine("CamoConnector.Detector (--probe-tracked-monitor <display> | --probe-tracked-image <capture>) [--save-crops <directory>]");
     return 2;
 }
 
@@ -47,9 +49,9 @@ try
     }
     var runtime = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Ocr"));
     using var capture = new HudCapture(runtime);
-    if (menuProbe)
+    if (probe)
     {
-        var monitor = args[0] == "--probe-menu-monitor" ? FindMonitor(args[1]) : null;
+        var monitor = args[0].EndsWith("-monitor", StringComparison.Ordinal) ? FindMonitor(args[1]) : null;
         using var frame = monitor == null ? new Bitmap(args[1]) : HudCapture.Desktop(monitor);
         var cropDirectory = saveMenuCrops
             ? Directory.CreateDirectory(Path.Combine(Path.GetFullPath(args[3]), $"camo-probe-{Guid.NewGuid():N}")).FullName
@@ -61,13 +63,28 @@ try
             if (cropDirectory != null)
                 crop.Save(Path.Combine(cropDirectory, region + ".png"), System.Drawing.Imaging.ImageFormat.Png);
         }
-        var weapon = await capture.ReadCamoMenuWeaponAsync(frame, stop.Token, RecordCrop);
-        var camoProgress = await capture.DetectCamoProgressAsync(frame, weapon, stop.Token, RecordCrop);
-        var json = JsonSerializer.Serialize(new
+        object result;
+        var source = monitor?.DeviceName ?? Path.GetFullPath(args[1]);
+        if (args[0].StartsWith("--probe-tracked-", StringComparison.Ordinal))
         {
-            source = monitor?.DeviceName ?? Path.GetFullPath(args[1]), frame.Width, frame.Height,
-            menuWeapon = weapon, camoProgress, cropDirectory, reads
-        }, new JsonSerializerOptions { WriteIndented = saveMenuCrops });
+            var trackedCamos = await capture.DetectTrackedCamosAsync(frame, stop.Token, savedImage: monitor == null, trace: RecordCrop);
+            result = new { source, frame.Width, frame.Height, trackedCamos, cropDirectory, reads };
+        }
+        else if (args[0] == "--probe-unlock-image")
+        {
+            var (weapon, replay) = await capture.DetectAsync(frame, stop.Token);
+            var banner = await capture.DetectChallengeBannerAsync(frame, stop.Token, RecordCrop);
+            var special = banner.Completed && banner.Challenge == null && !replay
+                ? capture.IdentifySpecialBanner(frame, weapon?.Name) : null;
+            result = new { source, weapon, replay, banner.Challenge, banner.Completed, special, cropDirectory, reads };
+        }
+        else
+        {
+            var menuWeapon = await capture.ReadCamoMenuWeaponAsync(frame, stop.Token, RecordCrop);
+            var camoProgress = await capture.DetectCamoProgressAsync(frame, menuWeapon, stop.Token, RecordCrop);
+            result = new { source, frame.Width, frame.Height, menuWeapon, camoProgress, cropDirectory, reads };
+        }
+        var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = saveMenuCrops });
         if (cropDirectory != null) File.WriteAllText(Path.Combine(cropDirectory, "ocr.json"), json);
         Console.WriteLine(json);
         return 0;
@@ -85,7 +102,8 @@ try
         var unlock = result.Replay ? null : await capture.DetectMilitaryUnlockAsync(image, stop.Token, allowCroppedImage: true);
         var replay = result.Replay || unlock != null && result.Weapon == null && await capture.IsReplayAsync(image, stop.Token);
         var menuWeapon = replay ? null : await capture.ReadCamoMenuWeaponAsync(image, stop.Token);
-        var challenge = replay ? null : await capture.DetectChallengeBannerAsync(image, stop.Token);
+        var banner = replay ? default : await capture.DetectChallengeBannerAsync(image, stop.Token);
+        var challenge = banner.Challenge;
         Console.WriteLine(JsonSerializer.Serialize(new
         {
             weapon = result.Weapon?.Name, menuWeapon, akimbo = result.Weapon?.Akimbo, replay, militaryUnlock = replay ? null : unlock,
@@ -95,6 +113,7 @@ try
             longshot = !replay && await capture.DetectLongshotAsync(image, stop.Token),
             goldWeapon = await capture.DetectCompletionistGoldAsync(image, menuWeapon, stop.Token),
             goldBanner = challenge == "gold-15", challenge,
+            specialBanner = banner.Completed && challenge == null ? capture.IdentifySpecialBanner(image, result.Weapon?.Name) : null,
             specialUnlocks = await capture.DetectSpecialUnlocksAsync(image, menuWeapon, stop.Token)
         }));
         return 0;
@@ -160,12 +179,14 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     var data = Directory.CreateDirectory(Path.GetFullPath(dataDirectory)).FullName;
     var log = Path.Combine(data, "sunburn-events.jsonl");
     var confirmation = new WeaponConfirmation();
+    var menuConfirmation = new WeaponConfirmation();
     var seenUnlocks = new HashSet<MilitaryUnlock>();
     var progressConfirmation = new CamoProgressConfirmation();
     var combat = new CombatConfirmation();
     var specialConfirmation = new SpecialUnlockConfirmation();
     var goldUnlocked = new HashSet<string>();
     var seenChallenges = new HashSet<string>();
+    var seenSpecialBanners = new HashSet<SpecialUnlock>();
     string? goldCandidate = null, matchPhase = null;
     string? confirmedWeapon = null;
     var lastConfirmedWeapon = DateTimeOffset.MinValue;
@@ -197,7 +218,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         var now = DateTimeOffset.UtcNow;
         var scanStarted = Stopwatch.GetTimestamp();
         var scanLobby = now - lastLobbyScan >= TimeSpan.FromSeconds(1);
-        var scanChallenge = now - lastChallengeScan >= TimeSpan.FromMilliseconds(400);
+        var scanChallenge = now - lastChallengeScan >= TimeSpan.FromMilliseconds(200);
         var unlockRead = ReadSnapshotAsync(frame, copy => capture.DetectMilitaryUnlockAsync(copy, cancel));
         var lobbyRead = scanLobby ? ReadSnapshotAsync(frame, copy => capture.DetectMatchNoticeAsync(copy, cancel)) : null;
         var challengeRead = scanChallenge ? ReadSnapshotAsync(frame, copy => capture.DetectChallengeBannerAsync(copy, cancel)) : null;
@@ -234,6 +255,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         }
         if (confirmation.Observe(result.Weapon, result.Replay || matchPhase is "match-voting" or "match-ended") is { } weapon)
         {
+            menuConfirmation.Reset();
             confirmedWeapon = weapon.Name;
             var record = JsonSerializer.Serialize(new
             {
@@ -293,19 +315,26 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             if (challengeRead != null)
             {
                 lastChallengeScan = now;
-                var challenge = await challengeRead;
-                if (challenge != null && (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
+                var banner = await challengeRead;
+                var challenge = banner.Challenge;
+                if (banner.Completed && (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
                 {
                     if (challenge == "gold-15" && candidate != null && goldUnlocked.Add(candidate))
                         await AppendAsync(log, new
                         {
                             kind = "completionist-unlock", source = "live", mode = "mp", weapon = candidate, challenge = "Gold", at = now
                         }, cancel);
-                    else if (challenge != "gold-15" && (candidate == "Sang 9mm" || candidate == null && challenge != "menu-space-time") &&
+                    else if (challenge != null && challenge != "gold-15" && (candidate == "Sang 9mm" || candidate == null && challenge != "menu-space-time") &&
                         seenChallenges.Add((candidate ?? "") + "|" + challenge))
                         await AppendAsync(log, new
                         {
                             kind = "challenge-completed", source = "live", mode = "mp", weapon = candidate, challenge, at = now
+                        }, cancel);
+                    else if (challenge == null && capture.IdentifySpecialBanner(frame, candidate) is { } special &&
+                        seenSpecialBanners.Add(special))
+                        await AppendAsync(log, new
+                        {
+                            kind = special.Kind, source = "live", mode = "mp", weapon = special.Weapon, challenge = special.Challenge, at = now
                         }, cancel);
                 }
             }
@@ -333,6 +362,15 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     Console.Error.WriteLine($"Recognized camo menu for {menuWeapon}.");
             }
             lastMenuWeapon = menuWeapon;
+            if (menuConfirmation.Observe(menuWeapon == null ? null : new WeaponRead(menuWeapon, false), result.Replay) is { } selected)
+            {
+                confirmation.Reset();
+                await AppendAsync(log, new
+                {
+                    kind = "weapon", source = "live", mode = "mp", weapon = selected.Name,
+                    context = "camo-menu", at = now
+                }, cancel);
+            }
             var goldRead = ReadSnapshotAsync(frame, copy => capture.DetectCompletionistGoldAsync(copy, menuWeapon, cancel));
             var specialRead = ReadSnapshotAsync(frame, copy => capture.DetectSpecialUnlocksAsync(copy, menuWeapon, cancel));
             var progressRead = ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
