@@ -1,6 +1,8 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 
 namespace CamoConnector.Detector;
@@ -42,11 +44,35 @@ internal sealed class HudCapture
         try
         {
             using var graphics = Graphics.FromImage(frame);
-            graphics.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size);
+            var desktop = GetDC(IntPtr.Zero);
+            if (desktop == IntPtr.Zero) throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not open the desktop capture context.");
+            try
+            {
+                var destination = graphics.GetHdc();
+                try
+                {
+                    const uint copyLayeredDesktop = (uint)(CopyPixelOperation.SourceCopy | CopyPixelOperation.CaptureBlt);
+                    if (!BitBlt(destination, 0, 0, bounds.Width, bounds.Height, desktop, bounds.X, bounds.Y, copyLayeredDesktop))
+                        throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not capture the composited desktop.");
+                }
+                finally { graphics.ReleaseHdc(destination); }
+            }
+            finally { ReleaseDC(IntPtr.Zero, desktop); }
             return frame;
         }
         catch { frame.Dispose(); throw; }
     }
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr GetDC(IntPtr window);
+
+    [DllImport("user32.dll")]
+    private static extern int ReleaseDC(IntPtr window, IntPtr deviceContext);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool BitBlt(IntPtr destination, int x, int y, int width, int height,
+        IntPtr source, int sourceX, int sourceY, uint rasterOperation);
 
     public async Task<(WeaponRead? Weapon, bool Replay)> DetectAsync(Bitmap frame, CancellationToken cancel)
     {

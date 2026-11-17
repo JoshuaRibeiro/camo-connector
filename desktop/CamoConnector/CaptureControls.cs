@@ -32,6 +32,7 @@ internal sealed partial class ConnectorWindow
     private string DataDirectory => Path.Combine(root, "Data");
     private string SourceSettings => Path.Combine(DataDirectory, "capture-source.json");
     private Process? detector;
+    private bool detectorStopRequested;
     private bool scanning, bridgeReady;
 
     private void AddCaptureControls(FlowLayoutPanel layout)
@@ -152,6 +153,7 @@ internal sealed partial class ConnectorWindow
                 File.Move(staging, SourceSettings, true);
             }
             finally { File.Delete(staging); }
+            detectorStopRequested = false;
             child = detector = LaunchDetector(source.Mode, source.MonitorId ?? source.Input, DataDirectory, "--preview");
             var lastError = "";
             child.ErrorDataReceived += (_, item) =>
@@ -169,7 +171,8 @@ internal sealed partial class ConnectorWindow
             await output;
             var error = lastError.Trim();
             if (!IsDisposed)
-                detectorStatus.Text = child.ExitCode == 0 || error.Length == 0 ? "Detector stopped." : error;
+                detectorStatus.Text = detectorStopRequested || child.ExitCode == 0 ? "Detector stopped." :
+                    error.Length == 0 ? $"Detector exited with code {child.ExitCode}. See the Detector log." : error;
         }
         catch (Exception error) { if (!IsDisposed) detectorStatus.Text = error.Message; }
         finally
@@ -286,7 +289,9 @@ internal sealed partial class ConnectorWindow
 
     private void StopDetector()
     {
-        if (detector != null) StopProcess(detector);
+        if (detector == null) return;
+        detectorStopRequested = true;
+        StopProcess(detector);
     }
 
     private static void StopProcess(Process process)
