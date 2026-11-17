@@ -158,6 +158,7 @@ internal sealed partial class ConnectorWindow
             var lastError = "";
             child.ErrorDataReceived += (_, item) =>
             {
+                if (LogPreviewDiagnostic(item.Data)) return;
                 if (!string.IsNullOrWhiteSpace(item.Data)) lastError = item.Data;
                 LogLine(detectorMessages, item.Data);
                 if (source.Mode == "--device") LogLine(captureMessages, item.Data);
@@ -205,15 +206,36 @@ internal sealed partial class ConnectorWindow
             var mode = source.Mode == "--device" ? "--preview-device" : "--preview-monitor";
             previewWorker = LaunchDetector(mode, source.MonitorId ?? source.Input);
             _ = StartReadingPreview(previewWorker);
-            previewErrors = previewWorker.StandardError.ReadToEndAsync();
             previewStatus.Text = "Waiting for a frame from " + source.Name;
             LogLine(captureMessages, previewStatus.Text);
+            previewErrors = ReadPreviewDiagnosticsAsync(previewWorker.StandardError);
         }
         catch (Exception error)
         {
             previewStatus.Text = "Could not start capture preview. See the Capture log.";
             LogLine(captureMessages, $"Could not start capture preview using {DetectorPath}: {error.Message}");
         }
+    }
+
+    private bool LogPreviewDiagnostic(string? line)
+    {
+        const string prefix = "Capture preview: ";
+        if (line?.StartsWith(prefix, StringComparison.Ordinal) != true) return false;
+        LogLine(captureMessages, line[prefix.Length..]);
+        return true;
+    }
+
+    private async Task<string> ReadPreviewDiagnosticsAsync(StreamReader stderr)
+    {
+        var lastError = "";
+        try
+        {
+            while (await stderr.ReadLineAsync().ConfigureAwait(false) is { } line)
+                if (!LogPreviewDiagnostic(line) && !string.IsNullOrWhiteSpace(line)) lastError = line;
+        }
+        catch (IOException error) { lastError = error.Message; }
+        catch (ObjectDisposedException) { }
+        return lastError;
     }
 
     private void StopPreview()

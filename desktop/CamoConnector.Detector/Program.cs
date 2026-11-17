@@ -37,7 +37,8 @@ try
         await using var source = args[0] == "--preview-device" ? ExternalCapture.Open(ffmpeg, args[1]) : null;
         var monitor = source == null ? FindMonitor(args[1]) : null;
         await CapturePreview.RunAsync(token => source == null
-            ? Task.FromResult(HudCapture.Desktop(monitor!)) : source.NextAsync(token), stop.Token);
+            ? Task.FromResult(HudCapture.Desktop(monitor!)) : source.NextAsync(token), stop.Token,
+            filterIsolatedFrames: source == null);
         return 0;
     }
     var runtime = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Ocr"));
@@ -72,7 +73,8 @@ try
     var screen = external == null ? FindMonitor(args[1]) : null;
     using var previewStop = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
     var previewTask = publishPreview ? Task.Run(() => CapturePreview.RunAsync(token => external == null
-        ? Task.FromResult(HudCapture.Desktop(screen!)) : external.NextAsync(token, forPreview: true), previewStop.Token)) : null;
+        ? Task.FromResult(HudCapture.Desktop(screen!)) : external.NextAsync(token, forPreview: true), previewStop.Token,
+        filterIsolatedFrames: external == null)) : null;
     try
     {
         await DetectLiveAsync(args[2], capture, external, screen, stop.Token);
