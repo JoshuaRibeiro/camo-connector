@@ -11,8 +11,13 @@ function Quote-Argument([string]$Value) {
 function Start-LoggedProcess($program, [string[]]$arguments, [string]$name) {
     $stdout = Join-Path $runFolder "$name.log"
     $stderr = Join-Path $runFolder "$name-errors.log"
-    Start-Process -FilePath $program -ArgumentList (($arguments | ForEach-Object { Quote-Argument $_ }) -join ' ') `
+    $process = Start-Process -FilePath $program -ArgumentList (($arguments | ForEach-Object { Quote-Argument $_ }) -join ' ') `
         -WorkingDirectory $PSScriptRoot -RedirectStandardOutput $stdout -RedirectStandardError $stderr -WindowStyle Hidden -PassThru
+    if ($name -eq 'update-check') {
+        # Keep the Windows process handle open so ExitCode remains readable after exit.
+        [void]$process.Handle
+    }
+    return $process
 }
 
 function Stop-Child($child) {
@@ -352,6 +357,93 @@ $start = Add-OptionButton 'Start connector'
 $stop = Add-OptionButton 'Stop connector'
 Set-Running $false
 
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class ConnectorWindowTheme
+{
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+
+    public static void Apply(IntPtr window, bool dark)
+    {
+        int value = dark ? 1 : 0;
+        const int UseImmersiveDarkMode = 20;
+        DwmSetWindowAttribute(window, UseImmersiveDarkMode, ref value, sizeof(int));
+    }
+}
+'@
+
+function Get-WindowsAppTheme {
+    if ([Windows.Forms.SystemInformation]::HighContrast) { return 'Light' }
+    $personalize = Get-ItemProperty -LiteralPath 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize' -Name AppsUseLightTheme -ErrorAction SilentlyContinue
+    if ($personalize -and $personalize.AppsUseLightTheme -eq 0) { return 'Dark' }
+    return 'Light'
+}
+
+function Set-ThemeColors($control, $palette, [bool]$dark) {
+    if ($control -eq $preview) { return }
+    $control.BackColor = $palette.Background
+    $control.ForeColor = $palette.Text
+    if ($control -is [Windows.Forms.TextBoxBase] -or $control -is [Windows.Forms.ComboBox]) {
+        $control.BackColor = if ($control -eq $pin) { $palette.Button } else { $palette.Field }
+        if ($control -is [Windows.Forms.ComboBox]) {
+            $control.FlatStyle = if ($dark) { 'Flat' } else { 'Standard' }
+        }
+    } elseif ($control -is [Windows.Forms.Button]) {
+        $control.FlatStyle = if ($dark) { 'Flat' } else { 'Standard' }
+        $control.UseVisualStyleBackColor = !$dark
+        if ($dark) {
+            $control.BackColor = $palette.Button
+            $control.FlatAppearance.BorderColor = $palette.Border
+        }
+    } elseif ($control -is [Windows.Forms.TabPage]) {
+        $control.UseVisualStyleBackColor = !$dark
+    }
+    foreach ($child in $control.Controls) { Set-ThemeColors $child $palette $dark }
+}
+
+function Set-WindowsAppTheme([string]$theme) {
+    if ($script:currentTheme -eq $theme) { return }
+    $script:currentTheme = $theme
+    $dark = $theme -eq 'Dark'
+    $script:themePalette = if ($dark) {
+        @{
+            Background = [Drawing.Color]::FromArgb(30,32,36)
+            Field = [Drawing.Color]::FromArgb(22,24,27)
+            Button = [Drawing.Color]::FromArgb(48,51,57)
+            Border = [Drawing.Color]::FromArgb(90,95,104)
+            Text = [Drawing.Color]::FromArgb(234,236,240)
+        }
+    } else {
+        @{
+            Background = [Drawing.SystemColors]::Control
+            Field = [Drawing.SystemColors]::Window
+            Button = [Drawing.SystemColors]::Control
+            Text = [Drawing.SystemColors]::ControlText
+        }
+    }
+    Set-ThemeColors $form $script:themePalette $dark
+    $tabs.DrawMode = if ($dark) { 'OwnerDrawFixed' } else { 'Normal' }
+    [ConnectorWindowTheme]::Apply($form.Handle, $dark)
+    $form.Invalidate($true)
+}
+
+$tabs.Add_DrawItem({
+    param($sender, $eventArgs)
+    $tab = $sender.TabPages[$eventArgs.Index]
+    $color = if ($eventArgs.Index -eq $sender.SelectedIndex) { $script:themePalette.Button }
+        else { $script:themePalette.Background }
+    $brush = [Drawing.SolidBrush]::new($color)
+    try {
+        $eventArgs.Graphics.FillRectangle($brush, $eventArgs.Bounds)
+        [Windows.Forms.TextRenderer]::DrawText($eventArgs.Graphics, $tab.Text, $sender.Font,
+            $eventArgs.Bounds, $script:themePalette.Text, [Windows.Forms.TextFormatFlags]'HorizontalCenter, VerticalCenter')
+    } finally { $brush.Dispose() }
+})
+$script:nextThemeRead = [DateTime]::MinValue
+
 function Save-Settings {
     [void][IO.Directory]::CreateDirectory($settingsFolder)
     $selected = if ($script:preferredSource) { $script:preferredSource } else { $sources.SelectedItem.Label }
@@ -435,6 +527,10 @@ $timer = [Windows.Forms.Timer]::new()
 $timer.Interval = 250
 $timer.Add_Tick({
     try {
+        if ([DateTime]::UtcNow -ge $script:nextThemeRead) {
+            $script:nextThemeRead = [DateTime]::UtcNow.AddSeconds(1)
+            Set-WindowsAppTheme (Get-WindowsAppTheme)
+        }
         if ($script:discovery -and $script:discovery.HasExited) {
             Stop-Child $script:discovery
             $script:discovery = $null
@@ -514,6 +610,7 @@ $timer.Add_Tick({
     }
 })
 try {
+    Set-WindowsAppTheme (Get-WindowsAppTheme)
     Find-Sources
     if ($SmokeTest) {
         if (!$sources.Items.Count) { throw 'No desktop monitors enumerated.' }
@@ -527,7 +624,15 @@ try {
         if ($tabs.TabPages.Count -ne 2 -or $updateButton.Text -ne 'Check for updates' -or $script:updateCheck) {
             throw 'The manual update control is missing or started an automatic check.'
         }
-        'Monitor preview, capture-device parsing, log panes, and read-only tracker focus passed.'
+        Set-WindowsAppTheme 'Dark'
+        if ($tabs.DrawMode -ne 'OwnerDrawFixed' -or $detectorLog.BackColor -ne $script:themePalette.Field) {
+            throw 'Dark theme was not applied.'
+        }
+        Set-WindowsAppTheme 'Light'
+        if ($tabs.DrawMode -ne 'Normal' -or $detectorLog.BackColor -ne [Drawing.SystemColors]::Window) {
+            throw 'Light theme was not restored.'
+        }
+        'Monitor preview, capture-device parsing, log panes, tracker focus, and both app themes passed.'
     } else {
         $timer.Start()
         [void]$form.ShowDialog()
