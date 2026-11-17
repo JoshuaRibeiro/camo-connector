@@ -224,17 +224,39 @@
       show('Sang 9mm challenge queued · locating weapon card');
       return true;
     }
-    const control = sangChallengeControl(confirmedName);
+    if (!confirmedName) return false;
+    const readControl = () => {
+      const details = weaponDetails('sang9mm');
+      if (!details) return sangChallengeControl(confirmedName);
+      const target = detailCounter(details, { camo: confirmedName });
+      return target ? { name: confirmedName, done: target.completed, button: target.checkbox } : null;
+    };
+    const control = readControl();
     if (!control) {
-      show('Sang 9mm · could not find the ' + confirmedName + ' camo row');
+      if (!weaponDetails('sang9mm') && Date.now() - lastFocusAttempt >= 3500) {
+        lastFocusAttempt = Date.now();
+        openWeaponDetails('sang9mm');
+      }
+      show('Sang 9mm · looking for ' + confirmedName + ' in weapon details');
       return true;
     }
+    const closeOwnedDetails = () => {
+      if (openedDetails !== 'sang9mm') return;
+      weaponDetails('sang9mm')?.close.click();
+      openedDetails = null;
+    };
     if (control.done) {
       await extension.storage.local.set({ [key]: { session, cursor: state.cursor + 1 } });
+      closeOwnedDetails();
       return false;
     }
+    if (!control.button?.isConnected || control.button.disabled) {
+      show('Sang 9mm · no available completion control for ' + confirmedName);
+      return true;
+    }
     await extension.storage.local.set({ [key]: { ...state, pending: true } });
-    if (!multiplayerSelected() || sangChallengeControl(confirmedName)?.button !== control.button ||
+    const current = readControl();
+    if (!multiplayerSelected() || !focusedWeapon('sang9mm') || current?.button !== control.button || current.done ||
         !control.button.isConnected || control.button.disabled) {
       await extension.storage.local.set({ [key]: state });
       return true;
@@ -242,8 +264,9 @@
     control.button.click();
     for (let attempt = 0; attempt < 8; attempt++) {
       await pause(150);
-      if (multiplayerSelected() && sangChallengeControl(control.name)?.done) {
+      if (multiplayerSelected() && focusedWeapon('sang9mm') && readControl()?.done) {
         await extension.storage.local.set({ [key]: { session, cursor: state.cursor + 1 } });
+        closeOwnedDetails();
         show('Sang 9mm · ' + control.name + ' ticked');
         return true;
       }
@@ -306,7 +329,8 @@
     const title = text => camoKey(text.split(/[·•:]|\s+[-–—]\s+/, 1)[0]);
     const nodes = [row, ...row.querySelectorAll('h2,h3,h4,h5,span,strong,b,p,div,label')];
     if (nodes.some(node => {
-      const text = label(node);
+      // Details rows prefix the camo title with its category.
+      const text = label(node).replace(/^Special\s*[\u00b7\u2022:]\s*/i, '');
       return camoKey(text) === expected || title(text) === expected;
     })) return 2;
     for (const image of row.querySelectorAll('img,[role="img"]')) {
@@ -427,15 +451,18 @@
           inputs.length === 0 && numberText.length === 1 ? label(numberText[0]) : null;
         if (meter === null) continue;
         const maximum = Number(inputs[0]?.getAttribute('max')) || null;
+        const checkboxes = [...row.querySelectorAll('input[type="checkbox"],[role="checkbox"]')].filter(visible);
         const completed = (maximum !== null && Number(meter) >= maximum) ||
-          [...row.querySelectorAll('input,[role="checkbox"]')].some(box =>
+          checkboxes.some(box =>
             box.checked || box.getAttribute('aria-checked') === 'true');
         const input = inputs.length === 1 && !inputs[0].disabled && !inputs[0].readOnly ? inputs[0] : null;
         const editor = !input && numberText.length === 1 && numberText[0].tagName === 'BUTTON' &&
           !numberText[0].disabled ? numberText[0] : null;
         const prior = matches.get(minus);
         if (!prior || identity > prior.identity) {
-          matches.set(minus, { identity, input, editor, button: plus[0], count: Number(meter), completed, maximum });
+          matches.set(minus, { identity, input, editor, button: plus[0], count: Number(meter), completed, maximum,
+            checkbox: checkboxes.length === 1 && checkboxes[0].getAttribute('aria-disabled') !== 'true'
+              ? checkboxes[0] : null });
         }
         if (identity === 2) break;
       }

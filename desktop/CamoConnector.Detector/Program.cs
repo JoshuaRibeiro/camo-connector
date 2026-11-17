@@ -46,7 +46,7 @@ try
         return 0;
     }
     var runtime = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Ocr"));
-    var capture = new HudCapture(runtime);
+    using var capture = new HudCapture(runtime);
     if (menuProbe)
     {
         var monitor = args[0] == "--probe-menu-monitor" ? FindMonitor(args[1]) : null;
@@ -156,6 +156,7 @@ catch (Exception error)
 static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, ExternalCapture? external, Screen? screen,
     ChannelReader<Bitmap>? acceptedFrames, CancellationToken cancel)
 {
+    Console.Error.WriteLine("OCR engine: " + capture.OcrMode + ".");
     var data = Directory.CreateDirectory(Path.GetFullPath(dataDirectory)).FullName;
     var log = Path.Combine(data, "sunburn-events.jsonl");
     var confirmation = new WeaponConfirmation();

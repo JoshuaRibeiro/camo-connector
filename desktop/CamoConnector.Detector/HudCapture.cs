@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace CamoConnector.Detector;
 
-internal sealed class HudCapture
+internal sealed class HudCapture : IDisposable
 {
     private static readonly byte[] Padlock = Convert.FromBase64String(
         "fX2AVi+Af35+e3194fv5+frjIRd9wuOAMixf3GkWfcytTVAxILxxLX3Mz9XGyNDy5FN8zPz///////56fuz////////+ZoT+///5+P///ml8/v//x6n///5phf7//8Wn///+doT+//+0lf///oZJ/v//6+D///dsK/7+/v7///1uLSz7+/v7/PyfTRY=");
@@ -15,6 +15,8 @@ internal sealed class HudCapture
         { (.705, .864, .205, .053), (.727, .875, .098, .031), (.747, .869, .077, .044) };
     private readonly string ocr;
     private readonly string models;
+    private readonly PersistentOcr? persistentOcr;
+    public string OcrMode => persistentOcr != null ? "persistent Tesseract" : "Tesseract command line";
     private readonly Dictionary<string, CamoReference[]> catalog;
 
     public HudCapture(string runtime)
@@ -35,7 +37,10 @@ internal sealed class HudCapture
                     ? Convert.FromBase64String(rgb.GetString()!) : null,
                     camo.TryGetProperty("slot", out var slot) && slot.ValueKind == JsonValueKind.Number && slot.TryGetInt32(out var slotNumber) ? slotNumber : 0,
                     camo.TryGetProperty("goal", out var goal) && goal.ValueKind == JsonValueKind.Number && goal.TryGetInt32(out var goalNumber) ? goalNumber : null)).ToArray());
+        persistentOcr = PersistentOcr.Open(runtime, models);
     }
+
+    public void Dispose() => persistentOcr?.Dispose();
 
     public static Bitmap Desktop(Screen screen)
     {
@@ -82,6 +87,11 @@ internal sealed class HudCapture
             if (read == null) continue;
             return await IsReplayAsync(frame, cancel) ? (null, true) : (read, false);
         }
+        // Short labels are right-aligned under the ammo counter. Read that
+        // line by itself when the wider crops do not yield a weapon name.
+        var (shortHudLabel, _) = await ReadTextAsync(frame, (.782, .877, .048, .026), cancel, pageMode: 7);
+        if (WeaponRecognition.Read(Lines(shortHudLabel), false) is { Name: ".50 GS" } pistol)
+            return await IsReplayAsync(frame, cancel) ? (null, true) : (pistol, false);
         return (null, false);
     }
 
@@ -238,7 +248,7 @@ internal sealed class HudCapture
     public async Task<CamoProgress[]> DetectTrackedCamosAsync(Bitmap frame, CancellationToken cancel, bool savedImage = false)
     {
         var layouts = savedImage && (double)frame.Width / frame.Height < 1.4
-            ? new[] { (Heading: (.02, .01, .36, .09), Area: (.24, .13, .50, .70), Thumbnail: (.095, .145, .155, .005)) }
+            ? new[] { (Heading: (.02, .01, .36, .09), Area: (.25, .14, .52, .69), Thumbnail: (.075, .155, .168, .007)) }
             : new[]
             {
                 (Heading: (.740, .117, .110, .037), Area: (.792, .159, .172, .335), Thumbnail: (.760, .039, .069, .004)),
@@ -253,13 +263,13 @@ internal sealed class HudCapture
             byte[]? Thumbnail(double y) => Sample(frame, layout.Area.Item2 + y * layout.Area.Item4, layout.Thumbnail);
             var rows = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail);
             var (x, y, w, h) = layout.Area;
-            var counterArea = (x + w * .61, y, w * .22, h);
+            var counterArea = (x + w * .61, y, w * .35, h);
             var (counterText, counterHeight) = await ReadTextAsync(frame, counterArea, cancel,
                 positioned: true, pageMode: 11, countersOnly: true);
             var counters = TrackedCamoRecognition.ReadTsv(counterText, counterHeight)
-                .Where(line => System.Text.RegularExpressions.Regex.IsMatch(line.Text, @"\A[0-9]{1,4}\s*/\s*[0-9]{1,4}\z"));
-            var fallback = TrackedCamoRecognition.ReadRows(lines.Concat(counters).OrderBy(line => line.Y).ToArray(),
-                catalog, Thumbnail);
+                .Where(line => System.Text.RegularExpressions.Regex.IsMatch(line.Text, @"\A[0-9]{1,4}\s*/\s*[0-9]{1,4}\z"))
+                .ToArray();
+            var fallback = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail, counters);
             return rows.Concat(fallback.Where(candidate => !rows.Any(confirmed => confirmed.Weapon == candidate.Weapon))).ToArray();
         }
         return [];
@@ -330,6 +340,12 @@ internal sealed class HudCapture
         }
         using var png = new MemoryStream();
         crop.Save(png, ImageFormat.Png);
+        if (persistentOcr != null && !positioned && !countersOnly && png.TryGetBuffer(out var image))
+        {
+            var text = await persistentOcr.ReadAsync(image, pageMode, cancel);
+            trace?.Invoke(regionName, text.Trim(), crop);
+            return (text, crop.Height);
+        }
         png.Position = 0;
         var start = new ProcessStartInfo(ocr)
         {

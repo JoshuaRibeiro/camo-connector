@@ -10,6 +10,10 @@ if ($weapon.Name -ne 'Sang 9mm' -or !$weapon.Akimbo) { throw 'Akimbo OCR failed'
 if ($reader::Read(@('Signal 50'), $true)) { throw 'Wide HUD accepted an ordinary name' }
 if ($reader::Read(@('Signal 50'), $false).Name -ne 'Signal 50') { throw 'Narrow HUD failed' }
 if ($reader::Read(@('KG-7 VU1CAN'), $false).Name -ne 'KG-7 Vulcan') { throw 'Known OCR substitution failed' }
+if ($reader::Read(@('.50 6S'), $false).Name -ne '.50 GS' -or
+    $reader::Read(@('021 .50 6S'), $false) -or $reader::Read(@('.50 6S'), $true)) {
+    throw 'Short pistol HUD OCR matched incorrectly'
+}
 if ($reader::Read(@('Unknown weapon'), $false)) { throw 'Unlisted OCR text was accepted' }
 if (!$reader::IsReplay('FINAL KILL') -or $reader::IsReplay('3 kills remaining')) { throw 'Replay recognition failed' }
 if ($stability.Observe($weapon,$false) -or $stability.Observe($weapon,$true) -or
@@ -71,6 +75,20 @@ $redReference = ($catalog['.50 GS'] | Where-Object Name -eq 'Red Tiger').Rgb
 $rows = $tracked::ReadRows($lines, $catalog, [Func[double,byte[]]]{ param($y) return ,$redReference })
 if ($rows.Length -ne 1 -or $rows[0].Camo -ne 'Red Tiger' -or $rows[0].Identity -ne 'artwork') {
     throw 'Thumbnail fallback failed.'
+}
+$trackedLines = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('Signal 50', .02)
+    [CamoConnector.Detector.HudLine]::new('32 / 40', .22)
+    [CamoConnector.Detector.HudLine]::new('.50 GS', .34)
+    [CamoConnector.Detector.HudLine]::new('Get 20 Headshot Kills against Players', .42)
+    [CamoConnector.Detector.HudLine]::new('8 / 20 1000', .56)
+    [CamoConnector.Detector.HudLine]::new('Mojave .357', .68)
+)
+$counterLines = [CamoConnector.Detector.HudLine[]]@([CamoConnector.Detector.HudLine]::new('8 / 20', .56))
+$rows = $tracked::ReadRows($trackedLines, $catalog, [Func[double,byte[]]]{ param($y) return ,$wrongThumbnail }, $counterLines)
+if ($rows.Length -ne 1 -or $rows[0].Camo -ne 'Frosted' -or $rows[0].Count -ne 8 -or $rows[0].Goal -ne 20 -or
+    $rows[0].Identity -ne 'artwork') {
+    throw 'The counter-only pass did not recover the .50 GS row independently.'
 }
 $ambiguous = [CamoConnector.Detector.CamoReference[]]@(
     [CamoConnector.Detector.CamoReference]::new('A', $redReference)

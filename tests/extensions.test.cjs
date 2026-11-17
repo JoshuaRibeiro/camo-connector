@@ -6,6 +6,39 @@ const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '..');
 const base = require('../manifest.json');
+test('the details panel recognizes a completed Special camo by its prefixed title', () => {
+  const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8')
+    .replace(/  poll\(\);\s*setInterval\(poll, 500\);/, '  globalThis.detailCounter = detailCounter;');
+  const page = {
+    document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
+    getComputedStyle: () => ({ visibility: 'visible' })
+  };
+  vm.runInNewContext(tracker, page);
+  const node = (tagName, textContent, properties = {}) => ({
+    tagName, textContent, children: [], getClientRects: () => [{}],
+    querySelectorAll: () => [], getAttribute: () => null, ...properties
+  });
+  const title = node('DIV', 'Special \u00b7 Off Grid');
+  const minus = node('BUTTON', '\u2212');
+  const plus = node('BUTTON', '+');
+  const count = node('BUTTON', '15');
+  const checkbox = node('INPUT', '', { type: 'checkbox', checked: true });
+  const panel = node('DIV', '', { querySelectorAll: () => [minus, plus, count] });
+  const row = node('DIV', '', { parentElement: panel, querySelectorAll: selector => ({
+    button: [minus, plus, count],
+    'h2,h3,h4,h5,span,strong,b,p,div,label': [title],
+    'span,div,button,output': [title, minus, plus, count],
+    input: [checkbox], 'input[type="checkbox"],[role="checkbox"]': [checkbox]
+  })[selector] ?? [] });
+  minus.parentElement = row;
+  const match = page.detailCounter({ panel }, { camo: 'Off Grid' });
+  assert.equal(match?.count, 15);
+  assert.equal(match?.completed, true);
+  assert.equal(match?.identity, 2);
+  assert.equal(match?.checkbox, checkbox);
+  assert.equal(page.detailCounter({ panel }, { camo: 'Urban Flamingo' }), null);
+});
+
 for (const browser of ['Chrome', 'Firefox', 'Edge', 'Opera']) {
   test(browser + ' build and pairing message boundaries', async () => {
     const folder = path.join(root, 'dist', browser);

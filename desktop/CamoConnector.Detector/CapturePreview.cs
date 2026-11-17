@@ -11,7 +11,7 @@ internal static class CapturePreview
         bool filterIsolatedFrames = false, Action<Bitmap>? onAccepted = null)
     {
         using var output = Console.OpenStandardOutput();
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(66));
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(filterIsolatedFrames ? 33 : 66));
         using var encoded = new MemoryStream();
         var header = new byte[4];
         byte[]? pending = null;

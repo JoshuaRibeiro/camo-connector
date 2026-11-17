@@ -36,7 +36,7 @@ public static class TrackedCamoRecognition
     }
 
     public static CamoProgress[] ReadRows(HudLine[] lines, IReadOnlyDictionary<string, CamoReference[]> catalog,
-        Func<double, byte[]?> thumbnail)
+        Func<double, byte[]?> thumbnail, HudLine[]? counterLines = null)
     {
         var headers = lines.Select(line => (line.Y, Name: ReadWeapon(line.Text))).Where(row => row.Name != null).ToArray();
         var result = new List<CamoProgress>();
@@ -48,7 +48,9 @@ public static class TrackedCamoRecognition
             var rows = lines.Where(line => line.Y > y && line.Y < limit).Select(line => line.Text).ToArray();
             var text = string.Join(" ", rows);
             if (Regex.IsMatch(text, @"\bReach Weapon Level\b", RegexOptions.IgnoreCase)) continue;
-            var counters = Regex.Matches(text, @"(?<![0-9/])([0-9]{1,4})\s*[/|]\s*([0-9]{1,4})(?![0-9/])");
+            var counterText = counterLines == null ? text :
+                string.Join(" ", counterLines.Where(line => line.Y > y && line.Y < limit).Select(line => line.Text));
+            var counters = Regex.Matches(counterText, @"(?<![0-9/])([0-9]{1,4})\s*[/|]\s*([0-9]{1,4})(?![0-9/])");
             if (counters.Count != 1) continue;
             var count = int.Parse(counters[0].Groups[1].Value, CultureInfo.InvariantCulture);
             var goal = int.Parse(counters[0].Groups[2].Value, CultureInfo.InvariantCulture);

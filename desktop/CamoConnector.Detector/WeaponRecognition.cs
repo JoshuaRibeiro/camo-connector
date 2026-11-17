@@ -43,6 +43,7 @@ public static class WeaponRecognition
             if (key is "sang9mmakimbo" or "sang9mmakimb0") return new("Sang 9mm", true);
             if (wideRegion) continue;
             if (Roster.TryGetValue(key, out var name)) return new(name, false);
+            if (Regex.IsMatch(key, @"\A5[0o][g6][s5]\z")) return new(".50 GS", false);
             if (Regex.IsMatch(key, @"\A(?:k[g6]7?)?vu[li1]can\z")) return new("KG-7 Vulcan", false);
         }
         return null;
