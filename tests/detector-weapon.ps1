@@ -46,6 +46,10 @@ if ($reader::ReadMilitaryUnlock(@('Unlocked','Sang 9mm','Military Camo 17'))) { 
 
 $menu = [CamoConnector.Detector.CamoMenuRecognition]
 $camos = @('Frosted', 'Splatter Ops', 'Red Tiger')
+if ($menu::ReadKnownCamoTitle("ID 034`n+ FROSTED", $camos) -ne 'Frosted' -or
+    $null -ne $menu::ReadKnownCamoTitle("FROSTED`nRED TIGER", $camos)) {
+    throw 'Hovered camo title was missed or ambiguous'
+}
 if (!$menu::IsCamoMenu('CAMO SELECT') -or $menu::IsCamoMenu('CAMOS TRACKED')) { throw 'Camo menu gate failed' }
 if (!$menu::IsCamoMenu('CAMO SELECT MW4') -or $menu::ReadMilitaryMenuCount('MILITARY [8/8]') -ne 8 -or
     $menu::ReadMilitaryMenuCount('MILITARY [2 / 8]') -ne 2 -or $menu::ReadMilitaryMenuCount('MILITARY [0/8]') -ne 0 -or

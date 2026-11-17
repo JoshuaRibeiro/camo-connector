@@ -245,14 +245,27 @@ internal sealed class HudCapture : IDisposable
         Action<string, string, Bitmap>? trace = null)
     {
         if (weapon == null) return null;
-        var (titleText, _) = await ReadTextAsync(frame, (.312, .614, .472, .064), cancel,
+        var names = catalog.GetValueOrDefault(weapon)?.Select(camo => camo.Name).ToArray() ?? [];
+        var (titleText, _) = await ReadTextAsync(frame, (.344, .628, .310, .041), cancel, pageMode: 7,
             trace: trace, regionName: "camoTitle");
-        var title = string.Join(" ", Lines(titleText));
+        var title = CamoMenuRecognition.ReadKnownCamoTitle(titleText, names);
+        if (title == null)
+        {
+            var (wideTitle, _) = await ReadTextAsync(frame, (.312, .614, .472, .064), cancel,
+                trace: trace, regionName: "wideCamoTitle");
+            title = CamoMenuRecognition.ReadKnownCamoTitle(wideTitle, names) ?? string.Join(" ", Lines(wideTitle));
+        }
         if (title.Length == 0) return null;
         var (objectives, _) = await ReadTextAsync(frame, (.313, .679, .342, .181), cancel,
             trace: trace, regionName: "camoObjectives");
-        var names = catalog.GetValueOrDefault(weapon)?.Select(camo => camo.Name).ToArray() ?? [];
-        return CamoMenuRecognition.ReadProgress(weapon, title, Lines(objectives), names);
+        var progress = CamoMenuRecognition.ReadProgress(weapon, title, Lines(objectives), names);
+        if (progress != null || !names.Contains(title) ||
+            System.Text.RegularExpressions.Regex.IsMatch(objectives, @"\d\s*/\s*\d")) return progress;
+        // The Special counter is at the right end of the objective's progress bar.
+        var (counter, _) = await ReadTextAsync(frame, (.512, .795, .060, .045), cancel, pageMode: 7,
+            countersOnly: true, trace: trace, regionName: "camoCounter");
+        return System.Text.RegularExpressions.Regex.IsMatch(counter.Trim(), @"\A[0-9]+\s*/\s*[0-9]+\z")
+            ? CamoMenuRecognition.ReadProgress(weapon, title, [counter], names) : null;
     }
 
     public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null)

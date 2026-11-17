@@ -34,6 +34,13 @@ public static class CamoMenuRecognition
         return WeaponRecognition.Read(new[] { name }, false)?.Name;
     }
 
+    public static string? ReadKnownCamoTitle(string text, string[] knownCamos)
+    {
+        var lines = text.Split('\n').Select(Key).ToHashSet(StringComparer.Ordinal);
+        var matches = knownCamos.Where(name => lines.Contains(Key(name))).Distinct().Take(2).ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
     public static CamoProgress? ReadProgress(string weapon, string title, string[] lines, string[] knownCamos)
     {
         title = title.Trim();
