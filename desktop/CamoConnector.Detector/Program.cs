@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Threading.Channels;
 using CamoConnector.Detector;
 
 Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
@@ -72,21 +73,47 @@ try
     }
     var screen = external == null ? FindMonitor(args[1]) : null;
     using var previewStop = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
-    var previewTask = publishPreview ? Task.Run(() => CapturePreview.RunAsync(token => external == null
-        ? Task.FromResult(HudCapture.Desktop(screen!)) : external.NextAsync(token, forPreview: true), previewStop.Token,
-        filterIsolatedFrames: external == null)) : null;
+    var acceptedFrames = publishPreview && external == null
+        ? Channel.CreateBounded<Bitmap>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest },
+            dropped => dropped.Dispose())
+        : null;
+    var previewTask = publishPreview ? Task.Run(async () =>
+    {
+        try
+        {
+            await CapturePreview.RunAsync(token => external == null
+                ? Task.FromResult(HudCapture.Desktop(screen!)) : external.NextAsync(token, forPreview: true),
+                previewStop.Token, filterIsolatedFrames: external == null,
+                onAccepted: acceptedFrames == null ? null : frame =>
+                {
+                    var copy = (Bitmap)frame.Clone();
+                    if (!acceptedFrames.Writer.TryWrite(copy)) copy.Dispose();
+                });
+        }
+        catch (Exception error)
+        {
+            acceptedFrames?.Writer.TryComplete(error);
+            throw;
+        }
+        finally { acceptedFrames?.Writer.TryComplete(); }
+    }) : null;
     try
     {
-        await DetectLiveAsync(args[2], capture, external, screen, stop.Token);
+        await DetectLiveAsync(args[2], capture, external, screen, acceptedFrames?.Reader, stop.Token);
     }
     finally
     {
         previewStop.Cancel();
-        if (previewTask != null)
+        try
         {
-            try { await previewTask; }
-            catch (OperationCanceledException) when (previewStop.IsCancellationRequested) { }
-            catch (IOException error) { Console.Error.WriteLine("Preview stopped: " + error.Message); }
+            if (previewTask != null) await previewTask;
+        }
+        catch (OperationCanceledException) when (previewStop.IsCancellationRequested) { }
+        catch (IOException error) { Console.Error.WriteLine("Preview stopped: " + error.Message); }
+        finally
+        {
+            if (acceptedFrames != null)
+                while (acceptedFrames.Reader.TryRead(out var frame)) frame.Dispose();
         }
     }
     return 0;
@@ -98,7 +125,8 @@ catch (Exception error)
     return 1;
 }
 
-static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, ExternalCapture? external, Screen? screen, CancellationToken cancel)
+static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, ExternalCapture? external, Screen? screen,
+    ChannelReader<Bitmap>? acceptedFrames, CancellationToken cancel)
 {
     var data = Directory.CreateDirectory(Path.GetFullPath(dataDirectory)).FullName;
     var log = Path.Combine(data, "sunburn-events.jsonl");
@@ -130,7 +158,8 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     var firstFrame = true;
     while (!cancel.IsCancellationRequested)
     {
-        using var frame = external == null ? HudCapture.Desktop(screen!) : await external.NextAsync(cancel);
+        using var frame = acceptedFrames != null ? await acceptedFrames.ReadAsync(cancel) :
+            external == null ? HudCapture.Desktop(screen!) : await external.NextAsync(cancel);
         if (firstFrame)
         {
             Console.Error.WriteLine($"First frame from {screen?.DeviceName ?? "capture device"}: {frame.Width} × {frame.Height}.");

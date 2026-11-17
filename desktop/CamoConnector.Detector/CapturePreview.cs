@@ -8,7 +8,7 @@ namespace CamoConnector.Detector;
 internal static class CapturePreview
 {
     public static async Task RunAsync(Func<CancellationToken, Task<Bitmap>> next, CancellationToken cancel,
-        bool filterIsolatedFrames = false)
+        bool filterIsolatedFrames = false, Action<Bitmap>? onAccepted = null)
     {
         using var output = Console.OpenStandardOutput();
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(66));
@@ -19,48 +19,56 @@ internal static class CapturePreview
         var sentFirstFrame = false;
         var suppressed = 0;
         var lastReport = Stopwatch.GetTimestamp();
-        do
+        Bitmap? pendingFrame = null;
+        try
         {
-            using var frame = await next(cancel);
-            var width = Math.Min(640, frame.Width);
-            var height = Math.Max(1, (int)Math.Round(frame.Height * (double)width / frame.Width));
-            using var reduced = new Bitmap(width, height, PixelFormat.Format24bppRgb);
-            using (var graphics = Graphics.FromImage(reduced))
+            do
             {
-                graphics.InterpolationMode = InterpolationMode.Bilinear;
-                graphics.DrawImage(frame, 0, 0, width, height);
-            }
-            encoded.SetLength(0);
-            reduced.Save(encoded, ImageFormat.Jpeg);
-            var bytes = encoded.GetBuffer().AsMemory(0, (int)encoded.Length);
-            if (!filterIsolatedFrames)
-            {
-                await SendAsync(bytes);
-                continue;
-            }
-
-            // Wait one frame before displaying. If the next frame returns to
-            // the previous scene, hold the displayed frame through the flash.
-            var sample = Sample(reduced);
-            if (pending != null && pendingSample != null)
-            {
-                if (previous == null || !IsIsolatedChange(previous, pendingSample, sample))
+                using var frame = await next(cancel);
+                var width = Math.Min(640, frame.Width);
+                var height = Math.Max(1, (int)Math.Round(frame.Height * (double)width / frame.Width));
+                using var reduced = new Bitmap(width, height, PixelFormat.Format24bppRgb);
+                using (var graphics = Graphics.FromImage(reduced))
                 {
-                    await SendAsync(pending);
-                    previous = pendingSample;
+                    graphics.InterpolationMode = InterpolationMode.Bilinear;
+                    graphics.DrawImage(frame, 0, 0, width, height);
                 }
-                else suppressed++;
-            }
-            if (Stopwatch.GetElapsedTime(lastReport) >= TimeSpan.FromSeconds(5))
-            {
-                if (suppressed > 0)
-                    Console.Error.WriteLine($"Capture preview: suppressed {suppressed} isolated frame(s) in the last five seconds.");
-                lastReport = Stopwatch.GetTimestamp();
-                suppressed = 0;
-            }
-            pending = bytes.ToArray();
-            pendingSample = sample;
-        } while (await timer.WaitForNextTickAsync(cancel));
+                encoded.SetLength(0);
+                reduced.Save(encoded, ImageFormat.Jpeg);
+                var bytes = encoded.GetBuffer().AsMemory(0, (int)encoded.Length);
+                if (!filterIsolatedFrames)
+                {
+                    await SendAsync(bytes);
+                    continue;
+                }
+
+                // Wait one frame before displaying. If the next frame returns to
+                // the previous scene, hold the displayed frame through the flash.
+                var sample = Sample(reduced);
+                if (pending != null && pendingSample != null)
+                {
+                    if (previous == null || !IsIsolatedChange(previous, pendingSample, sample))
+                    {
+                        await SendAsync(pending);
+                        previous = pendingSample;
+                        if (pendingFrame != null) onAccepted!(pendingFrame);
+                    }
+                    else suppressed++;
+                }
+                if (Stopwatch.GetElapsedTime(lastReport) >= TimeSpan.FromSeconds(5))
+                {
+                    if (suppressed > 0)
+                        Console.Error.WriteLine($"Capture preview: suppressed {suppressed} isolated frame(s) in the last five seconds.");
+                    lastReport = Stopwatch.GetTimestamp();
+                    suppressed = 0;
+                }
+                pendingFrame?.Dispose();
+                pendingFrame = onAccepted == null ? null : (Bitmap)frame.Clone();
+                pending = bytes.ToArray();
+                pendingSample = sample;
+            } while (await timer.WaitForNextTickAsync(cancel));
+        }
+        finally { pendingFrame?.Dispose(); }
 
         async Task SendAsync(ReadOnlyMemory<byte> bytes)
         {
