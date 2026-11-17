@@ -284,6 +284,7 @@ internal sealed class HudCapture
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true,
             RedirectStandardOutput = true, RedirectStandardError = true
         };
+        start.Environment["OMP_THREAD_LIMIT"] = "1";
         foreach (var argument in new[] { "stdin", "stdout", "--tessdata-dir", models, "-l", "eng", "--psm", pageMode.ToString(System.Globalization.CultureInfo.InvariantCulture) })
             start.ArgumentList.Add(argument);
         if (countersOnly)

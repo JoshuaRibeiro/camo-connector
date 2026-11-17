@@ -19,8 +19,31 @@ jobs:
           dotnet-version: '10.0.x'
       - run: ./tests/portable-replacement.ps1
       - run: ./tests/detector-weapon.ps1
-      - run: ./scripts/build-detector-development.ps1
-      - run: ./scripts/build-desktop-preview.ps1
+      - name: Prepare DirectShow capture runtime
+        run: |
+          choco install ffmpeg --yes --no-progress
+          if ($LASTEXITCODE) { throw 'Could not install FFmpeg on the build runner.' }
+          $ffmpeg = Get-ChildItem "$env:ChocolateyInstall/lib/ffmpeg/tools" -Filter ffmpeg.exe -File -Recurse | Select-Object -First 1
+          if (!$ffmpeg) { throw 'Could not find the FFmpeg package executable.' }
+          "CAMO_CAPTURE_DIRECTORY=$($ffmpeg.DirectoryName)" >> $env:GITHUB_ENV
+      - name: Prepare OCR runtime
+        run: |
+          choco install tesseract --yes --no-progress
+          if ($LASTEXITCODE) { throw 'Could not install Tesseract on the build runner.' }
+          $ocr = Join-Path $env:ProgramFiles 'Tesseract-OCR'
+          if (!(Test-Path (Join-Path $ocr 'tesseract.exe')) -or !(Test-Path (Join-Path $ocr 'tessdata/eng.traineddata'))) {
+            throw 'Could not find Tesseract and the English OCR model.'
+          }
+          "CAMO_OCR_DIRECTORY=$ocr" >> $env:GITHUB_ENV
+      - run: ./scripts/build-detector-development.ps1 -CaptureDirectory $env:CAMO_CAPTURE_DIRECTORY -OcrDirectory $env:CAMO_OCR_DIRECTORY
+      - run: ./scripts/build-desktop-preview.ps1 -CaptureDirectory $env:CAMO_CAPTURE_DIRECTORY -OcrDirectory $env:CAMO_OCR_DIRECTORY
+      - name: Check bundled capture and OCR runtimes
+        run: |
+          $runtime = Join-Path $PWD 'dist/desktop-preview/Runtime'
+          $languages = & "$runtime/Ocr/tesseract.exe" --tessdata-dir "$runtime/Ocr/tessdata" --list-langs
+          if ($LASTEXITCODE -or $languages -notcontains 'eng') { throw 'Bundled OCR cannot load the English model.' }
+          $devices = & "$runtime/Capture/ffmpeg.exe" -hide_banner -devices
+          if ($LASTEXITCODE -or !($devices -match '\bdshow\b')) { throw 'Bundled FFmpeg lacks DirectShow support.' }
       - run: ./tests/native-bridge.ps1
       - uses: actions/upload-artifact@v4
         with:

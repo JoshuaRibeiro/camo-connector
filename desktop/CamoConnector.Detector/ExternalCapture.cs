@@ -12,7 +12,7 @@ internal sealed class ExternalCapture : IAsyncDisposable
     private readonly Task reader, errorReader;
     private readonly object gate = new();
     private byte[]? latest;
-    private long serial, consumed;
+    private long serial, consumed, previewConsumed;
     private DateTimeOffset timestamp;
     private string error = "";
 
@@ -40,7 +40,7 @@ internal sealed class ExternalCapture : IAsyncDisposable
     public static ExternalCapture Open(string executable, string input) => new(Launch(executable,
         ["-hide_banner", "-loglevel", "warning", "-nostdin", "-f", "dshow", "-rtbufsize", "128M",
             "-i", "video=" + input, "-an", "-vf",
-            "fps=12,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
+            "fps=15,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
             "-threads", "1", "-pix_fmt", "bgr24", "-f", "rawvideo", "pipe:1"]));
 
     public static ExternalCapture OpenVideoForTest(string executable, string input) => new(Launch(executable,
@@ -59,7 +59,7 @@ internal sealed class ExternalCapture : IAsyncDisposable
         return Process.Start(start) ?? throw new IOException("Could not start the capture runtime.");
     }
 
-    public async Task<Bitmap> NextAsync(CancellationToken cancel)
+    public async Task<Bitmap> NextAsync(CancellationToken cancel, bool forPreview = false)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(8);
         while (DateTimeOffset.UtcNow < deadline)
@@ -67,7 +67,7 @@ internal sealed class ExternalCapture : IAsyncDisposable
             cancel.ThrowIfCancellationRequested();
             lock (gate)
             {
-                if (latest != null && serial != consumed && DateTimeOffset.UtcNow - timestamp < TimeSpan.FromSeconds(3))
+                if (latest != null && serial != (forPreview ? previewConsumed : consumed) && DateTimeOffset.UtcNow - timestamp < TimeSpan.FromSeconds(3))
                 {
                     var result = new Bitmap(Width, Height, PixelFormat.Format24bppRgb);
                     try
@@ -79,7 +79,8 @@ internal sealed class ExternalCapture : IAsyncDisposable
                                 Marshal.Copy(latest, row * Stride, bitmap.Scan0 + row * bitmap.Stride, Stride);
                         }
                         finally { result.UnlockBits(bitmap); }
-                        consumed = serial;
+                        if (forPreview) previewConsumed = serial;
+                        else consumed = serial;
                         return result;
                     }
                     catch { result.Dispose(); throw; }
@@ -91,7 +92,7 @@ internal sealed class ExternalCapture : IAsyncDisposable
                 await errorReader;
                 throw new IOException("Capture stopped. " + error);
             }
-            await Task.Delay(40, cancel);
+            await Task.Delay(12, cancel);
         }
         throw new IOException("No fresh capture frame. Check the device and its video signal. " + error);
     }

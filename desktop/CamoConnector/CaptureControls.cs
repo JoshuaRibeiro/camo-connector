@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text.Json;
 
@@ -18,13 +19,16 @@ internal sealed partial class ConnectorWindow
     private readonly Label detectorStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly PictureBox preview = new() { Width = 510, Height = 230, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
     private readonly Label previewStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
-    private readonly System.Windows.Forms.Timer previewTimer = new() { Interval = 300 };
-    private readonly string previewDirectory = Path.Combine(Path.GetTempPath(), "CamoConnector-Preview-" + Guid.NewGuid().ToString("N"));
-    private string PreviewFile => Path.Combine(previewDirectory, "preview.jpg");
-    private DateTime lastPreviewWrite;
+    private readonly System.Windows.Forms.Timer previewTimer = new() { Interval = 66 };
+    private byte[]? pendingPreview;
+    private CancellationTokenSource? previewRead;
     private Process? previewWorker;
     private Task<string>? previewErrors;
     private string DetectorPath => Path.Combine(root, "Runtime", "Detector", "CamoConnector.Detector.exe");
+    private string OcrDirectory => Path.Combine(root, "Runtime", "Ocr");
+    private string? MissingDetectionComponent => !File.Exists(DetectorPath) ? "Detector executable" :
+        !File.Exists(Path.Combine(OcrDirectory, "tesseract.exe")) ? "Tesseract OCR executable" :
+        !File.Exists(Path.Combine(OcrDirectory, "tessdata", "eng.traineddata")) ? "English OCR model" : null;
     private string DataDirectory => Path.Combine(root, "Data");
     private string SourceSettings => Path.Combine(DataDirectory, "capture-source.json");
     private Process? detector;
@@ -60,8 +64,7 @@ internal sealed partial class ConnectorWindow
         sources.Enabled = detector == null && !scanning;
         refreshSources.Enabled = detector == null && !scanning;
         startDetection.Enabled = bridgeReady && detector == null && !scanning && sources.SelectedItem != null &&
-            File.Exists(DetectorPath) && File.Exists(Path.Combine(root, "Runtime", "Ocr", "tesseract.exe")) &&
-            File.Exists(Path.Combine(root, "Runtime", "Ocr", "tessdata", "eng.traineddata"));
+            MissingDetectionComponent == null;
         stopDetection.Enabled = detector != null;
     }
 
@@ -81,11 +84,10 @@ internal sealed partial class ConnectorWindow
                 try { selected = JsonSerializer.Deserialize<Source>(File.ReadAllText(SourceSettings)); }
                 catch (JsonException) { }
             }
-            if (!File.Exists(DetectorPath) || !File.Exists(Path.Combine(root, "Runtime", "Ocr", "tesseract.exe")) ||
-                !File.Exists(Path.Combine(root, "Runtime", "Ocr", "tessdata", "eng.traineddata")))
-                detectorStatus.Text = "This build needs the detector and OCR runtime to capture gameplay.";
-            else detectorStatus.Text = "";
-            if (File.Exists(DetectorPath) && File.Exists(Path.Combine(root, "Runtime", "Capture", "ffmpeg.exe")))
+            detectorStatus.Text = MissingDetectionComponent is { } missing
+                ? missing + " missing. Extract the complete desktop preview ZIP."
+                : "";
+            if (File.Exists(DetectorPath))
             {
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
                 deadline.CancelAfter(TimeSpan.FromSeconds(10));
@@ -103,7 +105,12 @@ internal sealed partial class ConnectorWindow
             }
         }
         catch (OperationCanceledException) when (closing.IsCancellationRequested) { return; }
-        catch (Exception error) { if (!IsDisposed) detectorStatus.Text = "Device scan failed: " + error.Message; }
+        catch (Exception error)
+        {
+            if (!IsDisposed && MissingDetectionComponent == null)
+                detectorStatus.Text = "Capture device scan failed: " + error.Message;
+            LogLine(captureMessages, "Capture device scan failed: " + error.Message);
+        }
         finally
         {
             scanning = false;
@@ -145,7 +152,7 @@ internal sealed partial class ConnectorWindow
                 File.Move(staging, SourceSettings, true);
             }
             finally { File.Delete(staging); }
-            child = detector = LaunchDetector(source.Mode, source.Input, DataDirectory, previewDirectory);
+            child = detector = LaunchDetector(source.Mode, source.Input, DataDirectory, "--preview");
             var lastError = "";
             child.ErrorDataReceived += (_, item) =>
             {
@@ -154,7 +161,7 @@ internal sealed partial class ConnectorWindow
                 if (source.Mode == "--device") LogLine(captureMessages, item.Data);
             };
             child.BeginErrorReadLine();
-            var output = child.StandardOutput.BaseStream.CopyToAsync(Stream.Null);
+            var output = StartReadingPreview(child);
             detectorStatus.Text = "Detecting from " + source.Name;
             LogLine(detectorMessages, detectorStatus.Text);
             UpdateCaptureButtons();
@@ -193,12 +200,17 @@ internal sealed partial class ConnectorWindow
             if (scanning || detector != null || closing.IsCancellationRequested ||
                 sources.SelectedItem is not Source source || !File.Exists(DetectorPath)) return;
             var mode = source.Mode == "--device" ? "--preview-device" : "--preview-monitor";
-            previewWorker = LaunchDetector(mode, source.Input, previewDirectory);
+            previewWorker = LaunchDetector(mode, source.Input);
+            _ = StartReadingPreview(previewWorker);
             previewErrors = previewWorker.StandardError.ReadToEndAsync();
             previewStatus.Text = "Waiting for a frame from " + source.Name;
             LogLine(captureMessages, previewStatus.Text);
         }
-        catch (Exception error) { previewStatus.Text = error.Message; }
+        catch (Exception error)
+        {
+            previewStatus.Text = "Could not start capture preview. See the Capture log.";
+            LogLine(captureMessages, $"Could not start capture preview using {DetectorPath}: {error.Message}");
+        }
     }
 
     private void StopPreview()
@@ -209,8 +221,37 @@ internal sealed partial class ConnectorWindow
             finally { previewWorker.Dispose(); previewWorker = null; previewErrors = null; }
         }
         SetPreview(null);
-        lastPreviewWrite = default;
-        if (File.Exists(PreviewFile)) File.Delete(PreviewFile);
+        previewRead?.Cancel();
+        previewRead?.Dispose();
+        previewRead = null;
+        Interlocked.Exchange(ref pendingPreview, null);
+    }
+
+    private Task StartReadingPreview(Process process)
+    {
+        previewRead = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
+        return ReadPreviewAsync(process.StandardOutput.BaseStream, previewRead.Token);
+    }
+
+    private async Task ReadPreviewAsync(Stream input, CancellationToken cancel)
+    {
+        var header = new byte[4];
+        try
+        {
+            while (!cancel.IsCancellationRequested)
+            {
+                await input.ReadExactlyAsync(header, cancel).ConfigureAwait(false);
+                var length = BinaryPrimitives.ReadInt32LittleEndian(header);
+                if (length is <= 0 or > 1024 * 1024)
+                    throw new IOException("Invalid preview frame length.");
+                var frame = new byte[length];
+                await input.ReadExactlyAsync(frame, cancel).ConfigureAwait(false);
+                if (!cancel.IsCancellationRequested) Interlocked.Exchange(ref pendingPreview, frame);
+            }
+        }
+        catch (EndOfStreamException) { }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested) { }
+        catch (IOException error) { LogLine(captureMessages, error.Message); }
     }
 
     private void ReadPreview()
@@ -224,22 +265,15 @@ internal sealed partial class ConnectorWindow
             previewWorker = null;
             previewErrors = null;
         }
+        var frame = Interlocked.Exchange(ref pendingPreview, null);
+        if (frame == null) return;
         try
         {
-            var stamp = File.GetLastWriteTimeUtc(PreviewFile);
-            if (DateTime.UtcNow - stamp > TimeSpan.FromSeconds(4))
-            {
-                SetPreview(null);
-                return;
-            }
-            if (stamp == lastPreviewWrite) return;
-            using var stream = new FileStream(PreviewFile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var stream = new MemoryStream(frame, writable: false);
             using var image = Image.FromStream(stream);
             SetPreview(new Bitmap(image));
-            lastPreviewWrite = stamp;
             previewStatus.Text = "";
         }
-        catch (IOException) { }
         catch (ArgumentException) { }
     }
 

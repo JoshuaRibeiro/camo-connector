@@ -56,6 +56,7 @@ internal sealed partial class ConnectorWindow : Form
     private readonly Label status = new() { Text = "Starting the local bridge…", AutoSize = true };
     private readonly Button update = new() { Text = "Check for updates", AutoSize = true };
     private readonly Label updateStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
+    private readonly string? updateKey = UpdateEnvironment.TrustedKey();
     private ReleaseVerification.Manifest? available;
     private Process? bridge;
     private readonly CancellationTokenSource closing = new();
@@ -75,7 +76,9 @@ internal sealed partial class ConnectorWindow : Form
         {
             Width = 510, Height = 34, FlowDirection = FlowDirection.RightToLeft, WrapContents = false
         };
-        updateBar.Controls.AddRange([update, updateStatus]);
+        if (updateKey != null) updateBar.Controls.Add(update);
+        else updateStatus.Text = "Automatic updates are available in signed releases.";
+        updateBar.Controls.Add(updateStatus);
         layout.Controls.Add(updateBar);
         layout.Controls.Add(status);
         AddCaptureControls(layout);
@@ -92,6 +95,7 @@ internal sealed partial class ConnectorWindow : Form
 
     private async Task UpdateAsync()
     {
+        if (updateKey == null) return;
         update.Enabled = false;
         try
         {
@@ -101,15 +105,13 @@ internal sealed partial class ConnectorWindow : Form
                 Close();
                 return;
             }
-            var key = UpdateEnvironment.TrustedKey();
-            if (key == null) { updateStatus.Text = "This preview has no trusted release key."; return; }
             var version = typeof(Program).Assembly.GetName().Version!;
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
             timeout.CancelAfter(TimeSpan.FromSeconds(30));
             using var http = new HttpClient();
             updateStatus.Text = "Checking GitHub…";
             available = await new GitHubRelease(http).CheckAsync(
-                new Version(version.Major, version.Minor, version.Build), key, timeout.Token);
+                new Version(version.Major, version.Minor, version.Build), updateKey, timeout.Token);
             updateStatus.Text = available == null ? "Up to date!" : "Version " + available.Version + " is available.";
             if (available != null) update.Text = "Update and restart";
         }
@@ -176,9 +178,6 @@ internal sealed partial class ConnectorWindow : Form
         catch (Exception error) { MessageBox.Show(error.Message, "Could not stop preview"); }
         try { StopDetector(); }
         catch (Exception error) { MessageBox.Show(error.Message, "Could not stop detection"); }
-        try { if (Directory.Exists(previewDirectory)) Directory.Delete(previewDirectory, recursive: true); }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
         if (bridge != null)
         {
             try { if (!bridge.HasExited) bridge.Kill(entireProcessTree: true); }

@@ -26,8 +26,10 @@ together. The detector's event log is retained in `Data`.
 The bridge creates a `Data` folder beside the launcher. It follows new records
 written to `Data/sunburn-events.jsonl` and stores a local backup there.
 
-The GitHub Actions preview workflow builds the same unsigned files as an
-artifact. It does not create a public release or an updater asset.
+The GitHub Actions preview workflow bundles Tesseract, the English OCR model
+and FFmpeg in the unsigned desktop artifact. Download the full desktop preview
+ZIP and extract it before launching. Automatic updates require a build with a
+trusted release key. The workflow does not publish a GitHub Release.
 
 For a signed update test, pass `-UpdatePublicKeyFile <PEM file>` to the
 build script. The build embeds that public key in both programs. Keep the
@@ -42,9 +44,9 @@ replay rejection. The detector needs a Windows
 x64 Tesseract distribution in the sibling `Ocr` directory, including its
 dependent DLLs and `tessdata/eng.traineddata`. Set up a test directory with
 `Runtime/Detector/CamoConnector.Detector.exe` and `Runtime/Ocr/tesseract.exe`.
-The development CI artifact contains the detector executable. It does not
-bundle OCR or enable detection in the preview host. For a local build with
-a trusted Windows x64 OCR runtime, run the following from the repository:
+The detector-only CI artifact includes the detector and its runtimes for
+command-line testing. For a local build with a trusted Windows x64 OCR runtime,
+run the following from the repository:
 
 ```powershell
 ./scripts/build-detector-development.ps1 -OcrDirectory 'C:\Program Files\Tesseract-OCR' -CaptureDirectory '<FFmpeg binary directory>'
@@ -62,7 +64,7 @@ On a development build with FFmpeg in `Runtime/Capture`, run
 `CamoConnector.Detector.exe --list-devices` to list DirectShow sources. Use
 `CamoConnector.Detector.exe --device "<Input>" Data` with the returned Input
 value. The detector normalises the incoming signal to a 1280×720 frame at
-up to 12 fps. Use an uncropped 16:9 game feed for the existing OCR regions.
+up to 15 fps. Use an uncropped 16:9 game feed for the existing OCR regions.
 `--video clip.mp4 Data` reads a decoded frame for diagnostics without writing
 tracker data.
 The detector reads Special slots from the camo menu. It requires two
