@@ -64,3 +64,6 @@ try {
 } finally {
     if (Test-Path -LiteralPath $root) { [IO.Directory]::Delete($root, $true) }
 }
+
+# GitHub Actions propagates the last native exit code. The child exit was expected.
+exit 0
