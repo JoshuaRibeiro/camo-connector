@@ -63,6 +63,10 @@ if ($menu::ReadProgressionWeapon('.50 GS PROGRESSION') -ne '.50 GS' -or
     throw 'The .50 GS progression tab OCR fallback failed'
 }
 if ($menu::ReadProgressionWeapon('UNKNOWN PROGRESSION')) { throw 'Progression weapon gate failed' }
+if ($menu::ReadProgressionWeapon('SIGNAL 50 PROGRESSION MODE MASTERY') -ne 'Signal 50' -or
+    $menu::ReadProgressionWeapon('UNKNOWN PROGRESSION MODE MASTERY')) {
+    throw 'Neighboring menu tab affected weapon identity'
+}
 $redTiger = $menu::ReadProgress('.50 GS','RED-TIGER', @('Complete 3 Special Camos','2/3','Point blank kills','3/30'),$camos)
 if ($redTiger.Camo -ne 'Red Tiger' -or $redTiger.Count -ne 3 -or $redTiger.Goal -ne 30) { throw 'Named camo count failed' }
 $differentGoal = $menu::ReadProgress('.50 GS','Frosted', @('Different wording 5/10'),$camos)

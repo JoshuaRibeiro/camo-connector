@@ -284,6 +284,12 @@ internal sealed class HudCapture : IDisposable
         }
         if (weapon == null && CamoMenuRecognition.IsCamoMenu(heading))
         {
+            var (standardTab, _) = await ReadTextAsync(frame, (.073, .102, .133, .033), cancel, pageMode: 7,
+                trace: trace, regionName: "standardProgressionTab");
+            weapon = CamoMenuRecognition.ReadProgressionWeapon(standardTab);
+        }
+        if (weapon == null && CamoMenuRecognition.IsCamoMenu(heading))
+        {
             var (wideTab, _) = await ReadTextAsync(frame, (.071, .102, .202, .033), cancel, pageMode: 7,
                 trace: trace, regionName: "wideProgressionTab");
             weapon = CamoMenuRecognition.ReadProgressionWeapon(wideTab);

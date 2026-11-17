@@ -27,6 +27,10 @@ public static class CamoMenuRecognition
     {
         var key = Key(text);
         const string suffix = "progression";
+        // Longer tabs sometimes share the OCR line with the next navigation label.
+        const string adjacentTab = "modemastery";
+        if (key.EndsWith(suffix + adjacentTab, StringComparison.Ordinal))
+            key = key[..^adjacentTab.Length];
         if (!key.EndsWith(suffix, StringComparison.Ordinal)) return null;
         var name = key[..^suffix.Length];
         if (name == "08gs" || Regex.IsMatch(name, @"\A[5s][0o][g6][s5]\z")) return ".50 GS";
