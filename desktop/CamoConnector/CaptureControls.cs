@@ -152,7 +152,7 @@ internal sealed partial class ConnectorWindow
                 File.Move(staging, SourceSettings, true);
             }
             finally { File.Delete(staging); }
-            child = detector = LaunchDetector(source.Mode, source.Input, DataDirectory, "--preview");
+            child = detector = LaunchDetector(source.Mode, source.MonitorId ?? source.Input, DataDirectory, "--preview");
             var lastError = "";
             child.ErrorDataReceived += (_, item) =>
             {
@@ -200,7 +200,7 @@ internal sealed partial class ConnectorWindow
             if (scanning || detector != null || closing.IsCancellationRequested ||
                 sources.SelectedItem is not Source source || !File.Exists(DetectorPath)) return;
             var mode = source.Mode == "--device" ? "--preview-device" : "--preview-monitor";
-            previewWorker = LaunchDetector(mode, source.Input);
+            previewWorker = LaunchDetector(mode, source.MonitorId ?? source.Input);
             _ = StartReadingPreview(previewWorker);
             previewErrors = previewWorker.StandardError.ReadToEndAsync();
             previewStatus.Text = "Waiting for a frame from " + source.Name;

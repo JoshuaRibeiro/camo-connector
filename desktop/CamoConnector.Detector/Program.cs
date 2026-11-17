@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using CamoConnector.Detector;
 
+Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
 var listDevices = args.Length == 1 && args[0] == "--list-devices";
 var previewOnly = args.Length == 2 && args[0] is "--preview-monitor" or "--preview-device";
 var publishPreview = args.Length == 4 && args[3] == "--preview" && args[0] is "--monitor" or "--device";
@@ -119,20 +120,36 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     var lastTiming = Stopwatch.GetTimestamp();
     var totalScanMs = 0d;
     var scans = 0;
+    var weaponReads = 0;
+    var camoReads = 0;
+    var replayReads = 0;
+    var firstFrame = true;
     while (!cancel.IsCancellationRequested)
     {
         using var frame = external == null ? HudCapture.Desktop(screen!) : await external.NextAsync(cancel);
+        if (firstFrame)
+        {
+            Console.Error.WriteLine($"First frame from {screen?.DeviceName ?? "capture device"}: {frame.Width} × {frame.Height}.");
+            firstFrame = false;
+        }
         var now = DateTimeOffset.UtcNow;
         var scanStarted = Stopwatch.GetTimestamp();
-        using var unlockFrame = (Bitmap)frame.Clone();
-        var unlockRead = capture.DetectMilitaryUnlockAsync(unlockFrame, cancel);
+        var scanLobby = now - lastLobbyScan >= TimeSpan.FromSeconds(1);
+        var scanChallenge = now - lastChallengeScan >= TimeSpan.FromMilliseconds(400);
+        var unlockRead = ReadSnapshotAsync(frame, copy => capture.DetectMilitaryUnlockAsync(copy, cancel));
+        var lobbyRead = scanLobby ? ReadSnapshotAsync(frame, copy => capture.DetectMatchNoticeAsync(copy, cancel)) : null;
+        var challengeRead = scanChallenge ? ReadSnapshotAsync(frame, copy => capture.DetectChallengeBannerAsync(copy, cancel)) : null;
+        var combatRead = ReadSnapshotAsync(frame, copy => capture.DetectCombatAsync(copy, cancel));
         var weaponRead = capture.DetectAsync(frame, cancel);
-        await Task.WhenAll(unlockRead, weaponRead);
+        await Task.WhenAll(unlockRead, (Task?)lobbyRead ?? Task.CompletedTask,
+            (Task?)challengeRead ?? Task.CompletedTask, combatRead, weaponRead);
         var result = await weaponRead;
-        if (!result.Replay && now - lastLobbyScan >= TimeSpan.FromSeconds(1))
+        if (result.Weapon != null) weaponReads++;
+        if (result.Replay) replayReads++;
+        if (!result.Replay && lobbyRead != null)
         {
             lastLobbyScan = now;
-            var notice = await capture.DetectMatchNoticeAsync(frame, cancel);
+            var notice = await lobbyRead;
             if (notice != null && notice != matchPhase)
             {
                 if (notice == "match-voting" || notice == "match-confirmed" && matchPhase != "match-voting")
@@ -169,7 +186,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         else if (result.Weapon != null) lastAkimbo = DateTimeOffset.MinValue;
         if (!result.Replay && matchPhase is not ("match-ended" or "match-voting"))
         {
-            var read = await capture.DetectCombatAsync(frame, cancel);
+            var read = await combatRead;
             if (!(read.Kill || read.Death) || result.Weapon != null || !await capture.IsReplayAsync(frame, cancel))
             {
                 foreach (var entry in combat.Observe(read, now))
@@ -211,10 +228,10 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             else if (result.Weapon?.Name == "Signal 50" && now - lastLongshot >= TimeSpan.FromMilliseconds(650))
                 longshotCounted = false;
             var candidate = result.Weapon?.Name ?? (now - lastConfirmedWeapon <= TimeSpan.FromSeconds(5) ? confirmedWeapon : null);
-            if (now - lastChallengeScan >= TimeSpan.FromMilliseconds(400))
+            if (challengeRead != null)
             {
                 lastChallengeScan = now;
-                var challenge = await capture.DetectChallengeBannerAsync(frame, cancel);
+                var challenge = await challengeRead;
                 if (challenge != null && (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
                 {
                     if (challenge == "gold-15" && candidate != null && goldUnlocked.Add(candidate))
@@ -247,23 +264,26 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             lastProgressScan = DateTimeOffset.UtcNow;
             var menuWeapon = result is { Weapon: null, Replay: false }
                 ? await capture.ReadCamoMenuWeaponAsync(frame, cancel) : null;
-            var hovered = result.Replay ? null : await capture.DetectCamoProgressAsync(frame, menuWeapon, cancel);
-            var gold = await capture.DetectCompletionistGoldAsync(frame, menuWeapon, cancel);
+            var goldRead = ReadSnapshotAsync(frame, copy => capture.DetectCompletionistGoldAsync(copy, menuWeapon, cancel));
+            var specialRead = ReadSnapshotAsync(frame, copy => capture.DetectSpecialUnlocksAsync(copy, menuWeapon, cancel));
+            var progressRead = ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
+            await Task.WhenAll(goldRead, specialRead, progressRead);
+            var gold = await goldRead;
             if (gold != null && gold == goldCandidate && goldUnlocked.Add(gold))
                 await AppendAsync(log, new
                 {
                     kind = "completionist-unlock", source = "live", mode = "mp", weapon = gold, challenge = "Gold", at = now
                 }, cancel);
             goldCandidate = gold;
-            var specials = await capture.DetectSpecialUnlocksAsync(frame, menuWeapon, cancel);
+            var specials = await specialRead;
             foreach (var special in specialConfirmation.Observe(specials))
                 await AppendAsync(log, new
                 {
                     kind = special.Kind, source = "live", mode = "mp",
                     weapon = special.Weapon, challenge = special.Challenge, at = now
                 }, cancel);
-            CamoProgress[] reads = result.Replay ? [] : hovered != null ? [hovered] :
-                await capture.DetectTrackedCamosAsync(frame, cancel);
+            var reads = await progressRead;
+            camoReads += reads.Length;
             foreach (var progress in progressConfirmation.ObserveRows(reads))
             {
                 var record = JsonSerializer.Serialize(new
@@ -280,13 +300,28 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         scans++;
         if (Stopwatch.GetElapsedTime(lastTiming) >= TimeSpan.FromSeconds(10))
         {
-            Console.Error.WriteLine($"Detection scan averaged {totalScanMs / scans:F0} ms across {scans} frames.");
+            Console.Error.WriteLine($"Scanned {scans} frames ({totalScanMs / scans:F0} ms average). " +
+                $"Read {weaponReads} weapon names and {camoReads} camo counters. Skipped {replayReads} replay frames.");
             lastTiming = Stopwatch.GetTimestamp();
             totalScanMs = 0;
             scans = 0;
+            weaponReads = camoReads = replayReads = 0;
         }
         await Task.Delay(75, cancel);
     }
+}
+
+static async Task<T> ReadSnapshotAsync<T>(Bitmap frame, Func<Bitmap, Task<T>> read)
+{
+    using var copy = (Bitmap)frame.Clone();
+    return await read(copy);
+}
+
+static async Task<CamoProgress[]> ReadProgressAsync(Bitmap frame, HudCapture capture, string? menuWeapon, bool replay, CancellationToken cancel)
+{
+    if (replay) return [];
+    var hovered = await capture.DetectCamoProgressAsync(frame, menuWeapon, cancel);
+    return hovered != null ? [hovered] : await capture.DetectTrackedCamosAsync(frame, cancel);
 }
 
 static Task AppendAsync(string log, object record, CancellationToken stop) =>
@@ -295,6 +330,8 @@ static Task AppendAsync(string log, object record, CancellationToken stop) =>
 static Screen FindMonitor(string value)
 {
     var screens = Screen.AllScreens;
+    var selected = screens.FirstOrDefault(screen => screen.DeviceName.Equals(value, StringComparison.OrdinalIgnoreCase));
+    if (selected != null) return selected;
     if (!int.TryParse(value, out var index) || index < 0 || index >= screens.Length)
         throw new ArgumentException("Select an available monitor, using a zero-based index.");
     return screens[index];

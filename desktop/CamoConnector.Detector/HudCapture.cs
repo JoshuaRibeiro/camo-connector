@@ -170,9 +170,9 @@ internal sealed class HudCapture
     public async Task<CamoProgress?> DetectCamoProgressAsync(Bitmap frame, string? weapon, CancellationToken cancel)
     {
         if (weapon == null) return null;
-        var title = string.Join(" ", await ReadAsync(frame, (.344, .614, .440, .064), cancel));
+        var title = string.Join(" ", await ReadAsync(frame, (.312, .614, .472, .064), cancel));
         if (title.Length == 0) return null;
-        var lines = await ReadAsync(frame, (.345, .709, .310, .151), cancel);
+        var lines = await ReadAsync(frame, (.313, .679, .342, .181), cancel);
         var names = catalog.GetValueOrDefault(weapon)?.Select(camo => camo.Name).ToArray() ?? [];
         return CamoMenuRecognition.ReadProgress(weapon, title, lines, names);
     }
@@ -181,7 +181,7 @@ internal sealed class HudCapture
     {
         var heading = string.Join(" ", await ReadAsync(frame, (.070, .043, .182, .045), cancel));
         if (!CamoMenuRecognition.IsCamoMenu(heading)) return null;
-        var tab = string.Join(" ", await ReadAsync(frame, (.082, .106, .177, .027), cancel));
+        var tab = string.Join(" ", await ReadAsync(frame, (.067, .097, .192, .036), cancel));
         return CamoMenuRecognition.ReadProgressionWeapon(tab);
     }
 
