@@ -8,3 +8,6 @@ feed-trace/
 *.zip
 /CamoConnector-Updater-*.ps1
 /ffmpeg.exe
+bridge-pairing.key
+/dist/
+/node_modules/

@@ -2,6 +2,13 @@ MW4 Sunburn Connector
 
 Windows app
 
+The repository also builds Chrome, Firefox, Edge and Opera extension packages.
+See docs/extension-release.md for build, test and publication instructions.
+For these builds, start the matching desktop app, click Copy browser
+pairing key, then paste the key into the extension popup and click Connect.
+For command-line use the bridge creates bridge-pairing.key alongside the
+event log. Keep that key private and use it only with your local extension.
+
 Open Launch Camo Connector.cmd in the extracted folder. Choose a monitor or
 capture device and check its live preview. Use Start connector to launch the
 detector and tunnel. The Logs tab shows detector, tunnel, and capture output

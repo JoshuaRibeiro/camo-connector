@@ -1,0 +1,54 @@
+name: Browser extensions
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['extension-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/bridge.test.cjs
+      - run: ./scripts/build-extensions.ps1
+      - name: Validate manifests and package contents
+        run: node --test tests/extensions.test.cjs
+      - name: Lint Firefox extension
+        run: npx --yes web-ext@9 lint --source-dir dist/Firefox --warnings-as-errors
+      - uses: actions/upload-artifact@v4
+        with:
+          name: browser-extension-packages
+          path: dist/*.zip
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/extension-v')
+    needs: build
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: browser-extension-packages
+          path: dist
+      - name: Publish submission packages on GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $version = (Get-Content manifest.json -Raw | ConvertFrom-Json).version
+          if ($env:RELEASE_TAG -cne "extension-v$version") { throw 'Tag and extension version differ.' }
+          $assets = @(Get-ChildItem dist -Filter '*.zip' | ForEach-Object FullName)
+          if ($assets.Count -ne 4) { throw 'Expected four browser packages.' }
+          gh release create $env:RELEASE_TAG @assets --verify-tag --title "Camo Connector extensions $version" --generate-notes --prerelease --latest=false
+          if ($LASTEXITCODE) { throw 'GitHub release creation failed.' }

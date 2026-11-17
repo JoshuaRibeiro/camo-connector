@@ -1,4 +1,5 @@
 (() => {
+  const extension = globalThis.browser ?? globalThis.chrome;
   const storageKey = 'sunburnCursor';
   const banner = document.createElement('div');
   banner.setAttribute('role', 'status');
@@ -98,7 +99,7 @@
     if (!tiers?.length || !multiplayerSelected()) return false;
     const weapon = weaponKey(weaponName);
     const key = weapon === 'sang9mm' ? 'sangMilitaryCursor' : 'militaryCursor-' + weapon;
-    const saved = (await chrome.storage.local.get(key))[key];
+    const saved = (await extension.storage.local.get(key))[key];
     const state = saved?.session === session ? saved : { session, cursor: 0 };
     const remaining = tiers.slice(state.cursor);
     if (!remaining.length) return false;
@@ -114,19 +115,19 @@
     const cursor = state.pendingCursor ?? (state.pending ? state.cursor : tiers.length);
     const done = { session, cursor };
     if (!control || control.count >= tier) {
-      await chrome.storage.local.set({ [key]: control ? done : { session, cursor: tiers.length } });
+      await extension.storage.local.set({ [key]: control ? done : { session, cursor: tiers.length } });
       if (!control) show(weaponName + ' | Military row already complete');
       return false;
     }
     if (state.pending) return false;
-    await chrome.storage.local.set({ [key]: { ...state, pending: true, pendingTier: tier, pendingCursor: cursor } });
+    await extension.storage.local.set({ [key]: { ...state, pending: true, pendingTier: tier, pendingCursor: cursor } });
     const current = militaryControl(weapon, tier);
     if (!multiplayerSelected() || !focusedWeapon(weapon) || current?.button !== control.button ||
         current.count !== control.count ||
         control.button.getAttribute('aria-label') !== 'Tick up to Military ' + tier ||
         !control.button.isConnected || control.button.disabled ||
         control.button.closest('[aria-disabled="true"],button:disabled')) {
-      await chrome.storage.local.set({ [key]: state });
+      await extension.storage.local.set({ [key]: state });
       return true;
     }
     control.button.click();
@@ -135,7 +136,7 @@
       if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
       const observed = militaryControl(weapon, tier);
       if (!observed || observed.count >= tier) {
-        await chrome.storage.local.set({ [key]: observed ? done : { session, cursor: tiers.length } });
+        await extension.storage.local.set({ [key]: observed ? done : { session, cursor: tiers.length } });
         show(weaponName + ' | Military ' + tier + '/8 synced');
         return true;
       }
@@ -197,7 +198,7 @@
 
   async function syncChallenges(session, challenges, key = 'sangChallengeCursor') {
     if (!challenges?.length || !multiplayerSelected()) return false;
-    const saved = (await chrome.storage.local.get(key))[key];
+    const saved = (await extension.storage.local.get(key))[key];
     const state = saved?.session === session ? saved : { session, cursor: 0 };
     if (state.pending) {
       show('Paused after an unverified challenge tick · check the tracker before restarting the bridge');
@@ -229,20 +230,20 @@
       return true;
     }
     if (control.done) {
-      await chrome.storage.local.set({ [key]: { session, cursor: state.cursor + 1 } });
+      await extension.storage.local.set({ [key]: { session, cursor: state.cursor + 1 } });
       return false;
     }
-    await chrome.storage.local.set({ [key]: { ...state, pending: true } });
+    await extension.storage.local.set({ [key]: { ...state, pending: true } });
     if (!multiplayerSelected() || sangChallengeControl(confirmedName)?.button !== control.button ||
         !control.button.isConnected || control.button.disabled) {
-      await chrome.storage.local.set({ [key]: state });
+      await extension.storage.local.set({ [key]: state });
       return true;
     }
     control.button.click();
     for (let attempt = 0; attempt < 8; attempt++) {
       await pause(150);
       if (multiplayerSelected() && sangChallengeControl(control.name)?.done) {
-        await chrome.storage.local.set({ [key]: { session, cursor: state.cursor + 1 } });
+        await extension.storage.local.set({ [key]: { session, cursor: state.cursor + 1 } });
         show('Sang 9mm · ' + control.name + ' ticked');
         return true;
       }
@@ -456,7 +457,7 @@
       return true;
     }
     if (target.count === snapshot.value || target.completed) {
-      await chrome.storage.local.set({ [storage]: done });
+      await extension.storage.local.set({ [storage]: done });
       if (openedDetails === weapon) {
         details.close.click();
         openedDetails = null;
@@ -479,13 +480,13 @@
     }
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     if (!setValue) return show('Could not access the editable count field');
-    await chrome.storage.local.set({ [storage]: { ...state, pending: true } });
+    await extension.storage.local.set({ [storage]: { ...state, pending: true } });
     const currentDetails = weaponDetails(weapon);
     const current = currentDetails && detailCounter(currentDetails, snapshot);
     if (!multiplayerSelected() || !current || current.completed ||
         current.count !== target.count || current.maximum !== target.maximum || current.input !== target.input ||
         !current.input.isConnected || current.input.disabled || current.input.readOnly) {
-      await chrome.storage.local.set({ [storage]: state });
+      await extension.storage.local.set({ [storage]: state });
       return true;
     }
     current.input.focus({ preventScroll: true });
@@ -498,7 +499,7 @@
       const summary = snapshot.weapon === 'Signal 50' && snapshot.camo === 'Sunburn' ?
         findTarget() : trackedControl(snapshot, snapshot.camo);
       if (summary?.count === snapshot.value) {
-        await chrome.storage.local.set({ [storage]: done });
+        await extension.storage.local.set({ [storage]: done });
         if (openedDetails === weapon) {
           weaponDetails(weapon)?.close.click();
           openedDetails = null;
@@ -516,7 +517,7 @@
         await pause(150);
         const reopened = weaponDetails(weapon);
         if (reopened && detailCounter(reopened, snapshot)?.count === snapshot.value) {
-          await chrome.storage.local.set({ [storage]: done });
+          await extension.storage.local.set({ [storage]: done });
           reopened.close.click();
           openedDetails = null;
           show(snapshot.weapon + ' · synced ' + snapshot.value + '/' + snapshot.goal);
@@ -530,7 +531,7 @@
   async function syncTrackedRows(session, rows) {
     if (!rows?.length || !multiplayerSelected()) return false;
     const key = 'trackedProgress';
-    const saved = (await chrome.storage.local.get(key))[key];
+    const saved = (await extension.storage.local.get(key))[key];
     const state = saved?.session === session ? saved : { session, handled: [] };
     if (state.pending) {
       show('Tracked camo update paused after unverified click');
@@ -552,7 +553,7 @@
     }
     const target = trackedControl(snapshot);
     if (target && (target.completed || target.count === snapshot.value)) {
-      await chrome.storage.local.set({ [key]: handled });
+      await extension.storage.local.set({ [key]: handled });
       show(snapshot.weapon + ' · ' + snapshot.camo + ' progress verified');
       return true;
     }
@@ -561,7 +562,7 @@
   async function syncAkimbo(session, count, timing, receivedTimes) {
     if (!count || !multiplayerSelected()) return false;
     const key = 'akimboCursor';
-    const saved = await chrome.storage.local.get([key, 'trackedProgress']);
+    const saved = await extension.storage.local.get([key, 'trackedProgress']);
     const state = saved[key]?.session === session ? saved[key] : { session, cursor: 0 };
     const tracked = saved.trackedProgress;
     const baseline = Math.max(state.cursor, tracked?.session === session ? tracked.akimboThrough || 0 : 0);
@@ -601,7 +602,7 @@
       return true;
     }
     if (target.completed || target.count === snapshot.goal) {
-      await chrome.storage.local.set({ [key]: { session, cursor: count } });
+      await extension.storage.local.set({ [key]: { session, cursor: count } });
       if (openedDetails === weapon) {
         weaponDetails(weapon)?.close.click();
         openedDetails = null;
@@ -613,18 +614,18 @@
       show('Space Time: ' + (count - baseline) + ' queued · +1 is unavailable');
       return true;
     }
-    await chrome.storage.local.set({ [key]: { ...state, pending: true } });
+    await extension.storage.local.set({ [key]: { ...state, pending: true } });
     const current = readTarget();
     if (current?.button !== target.button || current?.count !== target.count ||
         current.completed || !target.button.isConnected || target.button.disabled) {
-      await chrome.storage.local.set({ [key]: state });
+      await extension.storage.local.set({ [key]: state });
       return false;
     }
     current.button.click();
     for (let attempt = 0; attempt < 8; attempt++) {
       const updated = readTarget();
       if (updated?.count === target.count + 1) {
-        await chrome.storage.local.set({ [key]: { session, cursor: baseline + 1 } });
+        await extension.storage.local.set({ [key]: { session, cursor: baseline + 1 } });
         if (openedDetails === weapon && baseline + 1 >= count) {
           weaponDetails(weapon)?.close.click();
           openedDetails = null;
@@ -660,7 +661,7 @@
   async function syncGold(session, names) {
     if (!names?.length || !multiplayerSelected()) return false;
     const key = 'goldProgress';
-    const saved = (await chrome.storage.local.get(key))[key];
+    const saved = (await extension.storage.local.get(key))[key];
     const state = saved?.session === session ? saved : { session, handled: [] };
     if (state.pending) return false;
     const name = names.find(name => !state.handled.includes(name));
@@ -678,9 +679,9 @@
     const checked = node => node?.checked || node?.getAttribute('aria-checked') === 'true';
     if (!checked(box)) {
       if (box.disabled || box.getAttribute('aria-disabled') === 'true') return false;
-      await chrome.storage.local.set({ [key]: { ...state, pending: true } });
+      await extension.storage.local.set({ [key]: { ...state, pending: true } });
       if (!box.isConnected || checked(box) || goldCheckbox(details.panel) !== box) {
-        await chrome.storage.local.set({ [key]: state });
+        await extension.storage.local.set({ [key]: state });
         return false;
       }
       box.click();
@@ -690,7 +691,7 @@
         return true;
       }
     }
-    await chrome.storage.local.set({ [key]: { ...state, handled: [...state.handled, name] } });
+    await extension.storage.local.set({ [key]: { ...state, handled: [...state.handled, name] } });
     if (openedDetails === weapon) {
       details.close.click();
       openedDetails = null;
@@ -714,7 +715,8 @@
       const focus = JSON.parse(localStorage.getItem('mw4-camo-progress'))?.focus;
       if (typeof focus !== 'string' || !focusedWeapon(weaponKey(focus))) return;
       const heading = weaponHeadings().find(node => weaponKey(label(node)) === weaponKey(focus));
-      void chrome.runtime.sendMessage({ type: 'mw4-focus', weapon: heading ? label(heading) : focus }).catch(() => {});
+      void extension.runtime.sendMessage({ type: 'mw4-focus', weapon: heading ? label(heading) : focus }).catch(() => {
+  const extension = globalThis.browser ?? globalThis.chrome;});
     } catch {}
   }
 
@@ -722,7 +724,7 @@
     if (busy) return;
     busy = true;
     try {
-      const result = await chrome.runtime.sendMessage('sunburn-events');
+      const result = await extension.runtime.sendMessage('sunburn-events');
       if (!result?.events) return show(result?.error || 'Waiting for local bridge');
       reportTrackerFocus();
       const receivedAt = new Date().toISOString();
@@ -740,7 +742,7 @@
       }
       await navigator.locks.request('mw4-sunburn-sync', { ifAvailable: true }, async lock => {
         if (!lock) return;
-        const saved = (await chrome.storage.local.get(storageKey))[storageKey];
+        const saved = (await extension.storage.local.get(storageKey))[storageKey];
         let state = saved?.session === session ? saved : { session, cursor: 0 };
         if (weapon !== latestWeapon) {
           latestWeapon = weapon;
@@ -766,7 +768,7 @@
         let snapshotPending = progress && progress.id !== state.progressId;
         if (snapshotPending && target && (target.count === progress.value || target.count === 40)) {
           state = { ...state, progressId: progress.id, cursor: Math.max(state.cursor, progress.through) };
-          await chrome.storage.local.set({ [storageKey]: state });
+          await extension.storage.local.set({ [storageKey]: state });
           snapshotPending = false;
         }
         if (snapshotPending && (target || weaponDetails('signal50') || focusedWeapon('signal50'))) {
@@ -775,7 +777,7 @@
         }
         if (target?.count === 40 && state.cursor < count) {
           state = { ...state, cursor: count };
-          await chrome.storage.local.set({ [storageKey]: state });
+          await extension.storage.local.set({ [storageKey]: state });
         }
         if (!snapshotPending && state.cursor >= count && await syncMilitary(session, military)) return;
         if (!snapshotPending && state.cursor >= count) {
@@ -814,12 +816,12 @@
         if (!target.button) return;
 
         // Persist before clicking so a reload cannot replay an ambiguous write.
-        await chrome.storage.local.set({
+        await extension.storage.local.set({
           [storageKey]: { ...state, pending: true }
         });
         const current = findTarget();
         if (current?.button !== target.button || current.count !== target.count) {
-          await chrome.storage.local.set({ [storageKey]: state });
+          await extension.storage.local.set({ [storageKey]: state });
           return show('Tracker changed. Checking again.');
         }
         current.button.click();
@@ -827,7 +829,7 @@
           await pause(150);
           if (findTarget()?.count === target.count + 1) {
             const next = { ...state, cursor: state.cursor + 1 };
-            await chrome.storage.local.set({ [storageKey]: next });
+            await extension.storage.local.set({ [storageKey]: next });
             return show('Applied +1 · ' + (target.count + 1) + '/40');
           }
         }

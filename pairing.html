@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Camo Connector</title>
+<link rel="stylesheet" href="pairing.css">
+<main>
+  <h1>Camo Connector</h1>
+  <p>Start the desktop connector. Approve the connection on your desktop when prompted.</p>
+  <button type="button" id="auto-pair">Connect automatically</button>
+  <details>
+  <summary>Pair with an older desktop build</summary>
+  <form>
+    <label for="key">Browser pairing key</label>
+    <input id="key" type="password" autocomplete="off" spellcheck="false" required minlength="64" maxlength="64">
+    <button>Connect with key</button>
+  </form>
+  </details>
+  <button type="button" id="disconnect">Disconnect</button>
+  <p role="status" id="status">Checking connection…</p>
+</main>
+<script src="pairing.js"></script>
+</html>

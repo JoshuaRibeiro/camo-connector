@@ -1,11 +1,12 @@
 (() => {
+  const extension = globalThis.browser ?? globalThis.chrome;
   const storageKey = 'mw4-camo-progress';
   let lastBackup;
   let saving = false;
   let restoring = false;
 
   async function request(message) {
-    const result = await chrome.runtime.sendMessage(message);
+    const result = await extension.runtime.sendMessage(message);
     if (!result || result.error) throw Error(result?.error || 'Local backup unavailable');
     return result;
   }

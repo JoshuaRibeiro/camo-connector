@@ -135,6 +135,7 @@ function Stop-Connector {
     Stop-Child $script:detector
     Stop-Child $script:tunnel
     $script:detector = $script:tunnel = $null
+    $copyPairing.Enabled = $false
     $pin.Text = 'Waiting for tracker'
     Remove-Item -LiteralPath $pinFile -ErrorAction SilentlyContinue
     $script:focusRequest = $null
@@ -155,6 +156,7 @@ function Start-Connector {
     if (![IO.Path]::IsPathRooted($dataPath.Text)) { throw 'Choose an absolute data folder.' }
     $folder = [IO.Directory]::CreateDirectory($dataPath.Text).FullName
     $eventLog = Join-Path $folder 'sunburn-events.jsonl'
+    $script:bridgePairingFile = Join-Path $folder 'bridge-pairing.key'
     $detectorArgs = @('-NoProfile','-File',(Join-Path $PSScriptRoot 'sunburn.ps1'),'-Live','-Log',$eventLog,'-TrackerPinFile',$pinFile)
     if ($source.Kind -eq 'device') { $detectorArgs += @('-CaptureFrame',$script:framePath) }
     else { $detectorArgs += @('-Monitor',[string]$source.Index) }
@@ -355,6 +357,14 @@ $ocr.Checked = [bool]$settings.ocr
 $trace.Checked = [bool]$settings.trace
 $start = Add-OptionButton 'Start connector'
 $stop = Add-OptionButton 'Stop connector'
+$copyPairing = Add-OptionButton 'Copy browser pairing key'
+$copyPairing.Enabled = $false
+$copyPairing.Add_Click({
+    $key = $focusClient.DefaultRequestHeaders.Authorization.Parameter
+    if (!$key) { return }
+    [Windows.Forms.Clipboard]::SetText($key)
+    $status.Text = 'Paste the pairing key into the Camo Connector browser extension.'
+})
 Set-Running $false
 
 Add-Type @'
@@ -596,6 +606,11 @@ $timer.Add_Tick({
                 $ready = Get-Content (Join-Path $runFolder 'tunnel.log') -ErrorAction SilentlyContinue |
                     Select-String -SimpleMatch 'Camo bridge ready'
                 if ($ready) {
+                    $key = [IO.File]::ReadAllText($script:bridgePairingFile).Trim()
+                    if ($key -cnotmatch '^[0-9a-f]{64}$') { throw 'The browser pairing key is invalid.' }
+                    $focusClient.DefaultRequestHeaders.Authorization =
+                        [Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer', $key)
+                    $copyPairing.Enabled = $true
                     $script:detector = Start-LoggedProcess 'powershell.exe' $script:detectorArguments 'detector'
                     $status.Text = 'Running | ' + $source.Label
                 } elseif ([DateTime]::UtcNow -ge $script:startupDeadline) {

@@ -1,9 +1,22 @@
 const fs = require('node:fs');
 const http = require('node:http');
-const { randomUUID } = require('node:crypto');
+const path = require('node:path');
+const { randomUUID, randomBytes, timingSafeEqual } = require('node:crypto');
 const specialCatalog = require('./special-catalog.json');
 
 const log = process.argv[2] || 'sunburn-events.jsonl';
+const pairingFile = path.join(path.dirname(path.resolve(log)), 'bridge-pairing.key');
+function loadPairingKey() {
+  try {
+    fs.writeFileSync(pairingFile, randomBytes(32).toString('hex'), { flag: 'wx', mode: 0o600 });
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+  }
+  const key = fs.readFileSync(pairingFile, 'utf8').trim();
+  if (!/^[0-9a-f]{64}$/.test(key)) throw Error('Bridge pairing key is invalid.');
+  return Buffer.from('Bearer ' + key);
+}
+const pairingKey = loadPairingKey();
 const handleBackup = require('./backup.cjs')(log);
 const session = randomUUID();
 let count = 0;
@@ -162,7 +175,29 @@ let trackerFocus = null;
 let trackerFocusAt = 0;
 
 const server = http.createServer((request, response) => {
-  const url = new URL(request.url, 'http://127.0.0.1:47150');
+  if (request.headers.host !== '127.0.0.1:47150' || !request.url.startsWith('/') ||
+      request.url.startsWith('//')) return response.writeHead(403).end();
+  const origin = request.headers.origin;
+  if (origin) {
+    if (!/^(?:chrome-extension:\/\/[a-p]{32}|moz-extension:\/\/[0-9a-f-]{36})$/i.test(origin)) {
+      return response.writeHead(403).end();
+    }
+    response.setHeader('Access-Control-Allow-Origin', origin);
+    response.setHeader('Vary', 'Origin');
+    if (request.method === 'OPTIONS') {
+      response.setHeader('Access-Control-Allow-Methods', 'GET, POST');
+      response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-MW4-Connector');
+      return response.writeHead(204).end();
+    }
+  }
+  response.setHeader('Cache-Control', 'no-store');
+  const supplied = Buffer.from(request.headers.authorization || '');
+  if (supplied.length !== pairingKey.length || !timingSafeEqual(supplied, pairingKey)) {
+    return response.writeHead(401).end();
+  }
+  let url;
+  try { url = new URL(request.url, 'http://127.0.0.1:47150'); }
+  catch { return response.writeHead(400).end(); }
   if (request.headers.host === '127.0.0.1:47150' && url.pathname === '/focus') {
     if (request.method === 'POST' && request.headers['x-mw4-connector'] === 'focus-v1') {
       const name = url.searchParams.get('weapon');

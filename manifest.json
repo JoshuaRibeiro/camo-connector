@@ -1,8 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "MW4 Sunburn Connector",
-  "version": "1.9.36",
-  "description": "Apply new local Signal 50 longshots to the Sunburn tracker.",
+  "name": "Camo Connector",
+  "version": "1.9.37",
+  "description": "Sync Call of Duty camo progress to the MW4 tracker using the local Camo Connector desktop app.",
+  "icons": { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" },
+  "action": { "default_title": "Camo Connector", "default_popup": "pairing.html" },
   "permissions": ["storage"],
   "host_permissions": ["http://127.0.0.1:47150/*"],
   "background": { "service_worker": "background.js" },
