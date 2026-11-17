@@ -31,13 +31,24 @@ for (const browser of ['Chrome', 'Firefox', 'Edge', 'Opera']) {
     const api = { runtime: { getURL: name => origin + name,
       onMessage: { addListener: handler => { listener = handler; } } },
     storage: { local: { get: async () => stored, set: async value => Object.assign(stored, value),
-      remove: async name => { delete stored[name]; } } } };
+      remove: async names => { for (const name of names) delete stored[name]; } } } };
     let online = true;
+    let approved = false;
     vm.runInNewContext(fs.readFileSync(path.join(folder, 'background.js'), 'utf8'), {
       [browser === 'Firefox' ? 'browser' : 'chrome']: api, URL, URLSearchParams, AbortSignal,
       fetch: async (url, options) => {
+        if (url.endsWith('/pair')) {
+          assert.equal(url, 'http://127.0.0.1:47150/pair');
+          assert.equal(options.method, 'POST');
+          assert.equal(options.headers['X-MW4-Connector'], 'pair-v1');
+          assert.equal(options.headers['X-Camo-Client'], origin.slice(0, -1));
+          assert.equal(options.headers.Authorization, undefined);
+          return approved ? { ok: true, status: 200, json: async () => ({ token: fakeKey }) } :
+            { ok: false, status: 403 };
+        }
         assert.equal(url, 'http://127.0.0.1:47150/events');
         assert.equal(options.headers.Authorization, 'Bearer ' + fakeKey);
+        if (approved) assert.equal(options.headers['X-Camo-Client'], origin.slice(0, -1));
         assert.equal(options.redirect, 'error');
         if (!online) throw Error('offline');
         return { ok: true, status: 200, json: async () => ({ session: 'fixture' }) };
@@ -56,5 +67,13 @@ for (const browser of ['Chrome', 'Firefox', 'Edge', 'Opera']) {
     online = true;
     assert.equal((await send('sunburn-events', tracker)).events.session, 'fixture');
     assert.equal((await send({ type: 'disconnect' }, pairing)).connected, false);
+    assert.equal(await send({ type: 'auto-pair' }, tracker), null);
+    assert.match((await send({ type: 'auto-pair' }, pairing)).error, /declined/);
+    assert.equal(stored.bridgePairingKey, undefined);
+    approved = true;
+    assert.equal((await send({ type: 'auto-pair' }, pairing)).connected, true);
+    assert.equal((await send('sunburn-events', tracker)).events.session, 'fixture');
+    assert.equal((await send({ type: 'disconnect' }, pairing)).connected, false);
+    assert.equal(stored.bridgeClientOrigin, undefined);
   });
 }

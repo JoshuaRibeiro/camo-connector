@@ -1,0 +1,34 @@
+name: Portable desktop preview
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: ./tests/portable-replacement.ps1
+      - run: ./tests/detector-weapon.ps1
+      - run: ./scripts/build-detector-development.ps1
+      - run: ./scripts/build-desktop-preview.ps1
+      - run: ./tests/native-bridge.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CamoConnector-detector-development-win-x64
+          path: dist/detector-development/
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CamoConnector-desktop-preview-win-x64
+          path: dist/desktop-preview/
+          if-no-files-found: error

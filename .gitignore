@@ -11,3 +11,5 @@ feed-trace/
 bridge-pairing.key
 /dist/
 /node_modules/
+/desktop/**/bin/
+/desktop/**/obj/

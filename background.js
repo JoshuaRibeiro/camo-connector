@@ -40,17 +40,17 @@ async function runPairing(message) {
     return { connected: false };
   }
   if (message.type === 'auto-pair') {
+    const client = api.runtime.getURL('').replace(/\/$/, '');
     let response;
     try {
       response = await fetch(bridge + '/pair', {
-        method: 'POST', headers: { 'X-MW4-Connector': 'pair-v1' },
-        cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(90000)
+        method: 'POST', headers: { 'X-MW4-Connector': 'pair-v1', 'X-Camo-Client': client },
+        cache: 'no-store', redirect: 'error', signal: AbortSignal.timeout(25000)
       });
     } catch { throw Error('Start the new desktop app and try again.'); }
     if (response.status === 401 || response.status === 404) throw Error('This desktop build uses a pairing key.');
     if (!response.ok) throw Error('Desktop approval was declined or is already pending.');
     const { token } = await response.json();
-    const client = api.runtime.getURL('').replace(/\/$/, '');
     await request('/events', token, {}, client);
     await api.storage.local.set({ [pairingKey]: token, [clientHeader]: client });
     return { connected: true };

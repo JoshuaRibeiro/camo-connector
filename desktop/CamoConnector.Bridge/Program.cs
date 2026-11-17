@@ -58,7 +58,11 @@ app.Run(async context =>
 
     if (request.Path == "/pair" && HttpMethods.IsPost(request.Method))
     {
-        if (origin.Length == 0 || request.Headers["X-MW4-Connector"] != "pair-v1")
+        // Privileged extension requests can omit Origin. A web page cannot
+        // send the custom headers without a preflight, which rejects web origins.
+        var client = request.Headers["X-Camo-Client"].ToString();
+        if (!ValidOrigin(client) || origin.Length > 0 && origin != client ||
+            request.Headers["X-MW4-Connector"] != "pair-v1")
         {
             response.StatusCode = 403;
             return;
@@ -76,12 +80,12 @@ app.Run(async context =>
                 return;
             }
             lastPrompt = DateTimeOffset.UtcNow;
-            if (!await ApproveBrowserAsync(origin))
+            if (!await ApproveBrowserAsync(client) || context.RequestAborted.IsCancellationRequested)
             {
                 response.StatusCode = 403;
                 return;
             }
-            await response.WriteAsJsonAsync(new { token = ClientToken(secret, origin) });
+            await response.WriteAsJsonAsync(new { token = ClientToken(secret, client) });
         }
         finally { pairing.Release(); }
         return;
@@ -92,7 +96,8 @@ app.Run(async context =>
         ? ClientToken(secret, claimed) : null;
     var authorization = Encoding.ASCII.GetBytes(request.Headers.Authorization.ToString());
     var expected = token != null ? Encoding.ASCII.GetBytes("Bearer " + token)
-        : claimed.Length == 0 ? Encoding.ASCII.GetBytes("Bearer " + Convert.ToHexStringLower(secret)) : Array.Empty<byte>();
+        : claimed.Length == 0 && origin.Length == 0
+            ? Encoding.ASCII.GetBytes("Bearer " + Convert.ToHexStringLower(secret)) : Array.Empty<byte>();
     if (expected.Length == 0 || !CryptographicOperations.FixedTimeEquals(authorization, expected))
     {
         response.StatusCode = 401;

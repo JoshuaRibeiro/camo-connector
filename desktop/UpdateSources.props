@@ -1,0 +1,7 @@
+<Project>
+  <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)CamoConnector.Update/*.cs" Link="Update/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(UpdatePublicKeyFile)" LogicalName="CamoConnector.Update.PublicKey"
+                      Condition="'$(UpdatePublicKeyFile)' != ''" />
+  </ItemGroup>
+</Project>

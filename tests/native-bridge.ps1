@@ -1,0 +1,76 @@
+param([string]$Executable = "$PSScriptRoot/../dist/desktop-preview/Runtime/Bridge/CamoConnector.Bridge.exe")
+
+$ErrorActionPreference = 'Stop'
+$application = (Resolve-Path -LiteralPath $Executable).Path
+$data = [IO.Directory]::CreateTempSubdirectory('camo bridge ').FullName
+$stdout = Join-Path $data 'stdout.log'
+$stderr = Join-Path $data 'stderr.log'
+$secret = [Security.Cryptography.RandomNumberGenerator]::GetBytes(32)
+$key = [Convert]::ToHexString($secret).ToLowerInvariant()
+$eventLog = Join-Path $data 'sunburn-events.jsonl'
+$event = '{"source":"live","mode":"mp","key":"signal-50:sp-3","delta":1}' + [Environment]::NewLine
+$handler = [Net.Http.HttpClientHandler]::new()
+$handler.UseProxy = $false
+$client = [Net.Http.HttpClient]::new($handler)
+$client.Timeout = [TimeSpan]::FromSeconds(2)
+$process = $null
+
+function Check-Events($Status, $Headers = @{}) {
+    $request = [Net.Http.HttpRequestMessage]::new('GET', 'http://127.0.0.1:47150/events')
+    try {
+        foreach ($header in $Headers.GetEnumerator()) {
+            [void]$request.Headers.TryAddWithoutValidation($header.Key, $header.Value)
+        }
+        $response = $client.Send($request)
+        try {
+            if ([int]$response.StatusCode -ne $Status) {
+                throw "Expected HTTP $Status, received $($response.StatusCode)."
+            }
+            if ($Status -eq 200) {
+                $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+            }
+        } finally { $response.Dispose() }
+    } finally { $request.Dispose() }
+}
+
+try {
+    [IO.File]::WriteAllText((Join-Path $data 'bridge-pairing.key'), $key)
+    [IO.File]::WriteAllText($eventLog, $event)
+    $process = Start-Process -FilePath $application -ArgumentList ('"' + $data + '"') -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    do {
+        $ready = Select-String -LiteralPath $stdout -SimpleMatch 'Camo bridge ready'
+        if ($ready -or $process.HasExited) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if (!$ready -or $process.HasExited) {
+        throw "Native bridge did not start: $(Get-Content -LiteralPath $stderr -Raw)"
+    }
+    Check-Events 401
+    Check-Events 403 @{ Origin = 'https://mw4.darkmattersolutions.uk'; Authorization = "Bearer $key" }
+    $origin = 'chrome-extension://' + ('a' * 32)
+    $message = [Text.Encoding]::UTF8.GetBytes("Camo Connector browser v1:$origin")
+    $token = [Convert]::ToHexString([Security.Cryptography.HMACSHA256]::HashData($secret, $message)).ToLowerInvariant()
+    $headers = @{ Origin = $origin; 'X-Camo-Client' = $origin; Authorization = "Bearer $token" }
+    $before = Check-Events 200 $headers
+    if ($before.count -ne 0) { throw 'The bridge replayed an existing progress event.' }
+    [IO.File]::AppendAllText($eventLog, $event)
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $after = Check-Events 200 $headers
+        if ($after.count -eq 1) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($after.count -ne 1) { throw 'The bridge missed the new progress event.' }
+    Write-Output 'Native bridge authentication and progress checks passed.'
+} finally {
+    if ($process) {
+        if (!$process.HasExited) {
+            $process.Kill()
+            $process.WaitForExit()
+        }
+        $process.Dispose()
+    }
+    $client.Dispose()
+    [IO.Directory]::Delete($data, $true)
+}
