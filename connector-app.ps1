@@ -207,6 +207,7 @@ $focusClient = [Net.Http.HttpClient]::new()
 $focusClient.Timeout = [TimeSpan]::FromSeconds(1)
 $script:nextFocusPoll = [DateTime]::MinValue
 $updater = Join-Path $PSScriptRoot 'connector-updater.ps1'
+$updateRepository = 'JoshuaRibeiro/camo-connector'
 $version = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'manifest.json') -Raw | ConvertFrom-Json).version
 
 $form = [Windows.Forms.Form]::new()
@@ -218,6 +219,23 @@ $form.Font = [Drawing.Font]::new('Segoe UI',10)
 $tabs = [Windows.Forms.TabControl]::new()
 $tabs.Dock = 'Fill'
 $form.Controls.Add($tabs)
+$updateBar = [Windows.Forms.FlowLayoutPanel]::new()
+$updateBar.Dock = 'Top'
+$updateBar.Height = 40
+$updateBar.FlowDirection = 'RightToLeft'
+$updateBar.WrapContents = $false
+$updateBar.Padding = [Windows.Forms.Padding]::new(8,3,8,0)
+$form.Controls.Add($updateBar)
+$updateButton = [Windows.Forms.Button]::new()
+$updateButton.Text = 'Check for updates'
+$updateButton.Size = [Drawing.Size]::new(152,28)
+$updateBar.Controls.Add($updateButton)
+$updateStatus = [Windows.Forms.Label]::new()
+$updateStatus.AutoSize = $true
+$updateStatus.Margin = [Windows.Forms.Padding]::new(3,7,7,0)
+$updateBar.Controls.Add($updateStatus)
+$updateTooltip = [Windows.Forms.ToolTip]::new()
+$updateTooltip.SetToolTip($updateStatus, '')
 $setup = [Windows.Forms.TabPage]::new('Setup')
 $tabs.TabPages.Add($setup)
 
@@ -334,32 +352,12 @@ $start = Add-OptionButton 'Start connector'
 $stop = Add-OptionButton 'Stop connector'
 Set-Running $false
 
-$updatesPage = [Windows.Forms.TabPage]::new('Updates')
-$tabs.TabPages.Add($updatesPage)
-$setupOptions = $options
-$options = [Windows.Forms.FlowLayoutPanel]::new()
-$options.Dock = 'Fill'
-$options.FlowDirection = 'TopDown'
-$options.WrapContents = $false
-$options.Padding = [Windows.Forms.Padding]::new(14)
-$updatesPage.Controls.Add($options)
-Add-OptionLabel "Installed version $version"
-$repository = Add-OptionField 'GitHub repository (owner/repo)' $settings.repository
-$checkUpdate = Add-OptionButton 'Check for updates'
-$installUpdate = Add-OptionButton 'Update and restart'
-$installUpdate.Enabled = $false
-$updateStatus = [Windows.Forms.Label]::new()
-$updateStatus.AutoSize = $true
-$updateStatus.MaximumSize = [Drawing.Size]::new(740,0)
-$options.Controls.Add($updateStatus)
-$options = $setupOptions
-
 function Save-Settings {
     [void][IO.Directory]::CreateDirectory($settingsFolder)
     $selected = if ($script:preferredSource) { $script:preferredSource } else { $sources.SelectedItem.Label }
     $values = @{
         dataPath = $dataPath.Text; player = $player.Text; clan = $clan.Text
-        source = $selected; ocr = $ocr.Checked; trace = $trace.Checked; repository = $repository.Text.Trim()
+        source = $selected; ocr = $ocr.Checked; trace = $trace.Checked
     }
     $pending = Join-Path $settingsFolder ("settings-" + [guid]::NewGuid().ToString('N') + '.tmp')
     try {
@@ -388,32 +386,29 @@ function Update-TrackerFocus {
     }
 }
 
-$repository.Add_TextChanged({ $installUpdate.Enabled = $false; $script:availableVersion = $null })
-$checkUpdate.Add_Click({
+$updateButton.Add_Click({
+    $updateTooltip.SetToolTip($updateStatus, '')
+    $copy = $null
     try {
-        $installUpdate.Enabled = $false
-        $script:availableVersion = $null
-        Save-Settings
-        $script:updateCheck = Start-LoggedProcess 'powershell.exe' @('-NoProfile','-File',$updater,
-            '-Mode','Check','-Repository',$repository.Text.Trim(),'-InstallRoot',$PSScriptRoot) 'update-check'
-        $checkUpdate.Enabled = $repository.Enabled = $false
-        $updateStatus.Text = 'Checking GitHub releases...'
-    } catch { $updateStatus.Text = $_.Exception.Message }
-})
-$installUpdate.Add_Click({
-    if (!$script:availableVersion) { return }
-    try {
+        if (!$script:availableVersion) {
+            $script:updateCheck = Start-LoggedProcess 'powershell.exe' @('-NoProfile','-File',$updater,
+                '-Mode','Check','-Repository',$updateRepository,'-InstallRoot',$PSScriptRoot) 'update-check'
+            $updateButton.Enabled = $false
+            $updateStatus.Text = 'Checking...'
+            return
+        }
         Save-Settings
         $copy = Join-Path $PSScriptRoot ('CamoConnector-Updater-' + [guid]::NewGuid().ToString('N') + '.ps1')
         Copy-Item -LiteralPath $updater -Destination $copy
-        $arguments = @('-NoProfile','-File',$copy,'-Mode','Install','-Repository',$repository.Text.Trim(),
+        $arguments = @('-NoProfile','-File',$copy,'-Mode','Install','-Repository',$updateRepository,
             '-InstallRoot',$PSScriptRoot,'-ExpectedVersion',$script:availableVersion,'-AppProcessId',[string]$PID,'-StagedCopy')
         Start-Process -FilePath 'powershell.exe' -ArgumentList (($arguments | ForEach-Object { Quote-Argument $_ }) -join ' ') -WindowStyle Hidden
         $script:updateClosing = $true
         $form.Close()
     } catch {
         if ($copy) { Remove-Item -LiteralPath $copy -ErrorAction SilentlyContinue }
-        $updateStatus.Text = $_.Exception.Message
+        $updateStatus.Text = if ($script:availableVersion) { 'Could not start update' } else { 'Update check failed' }
+        $updateTooltip.SetToolTip($updateStatus, $_.Exception.Message)
     }
 })
 $form.Add_FormClosing({
@@ -422,9 +417,6 @@ $form.Add_FormClosing({
             [void][Windows.Forms.MessageBox]::Show($_.Exception.Message,'Could not save Camo Connector settings')
         }
     }
-})
-$form.Add_Shown({
-    if ($repository.Text.Trim()) { $checkUpdate.PerformClick() }
 })
 
 $refresh.Add_Click({ try { Find-Sources } catch { $status.Text = $_.Exception.Message } })
@@ -478,16 +470,17 @@ $timer.Add_Tick({
             $exitCode = $script:updateCheck.ExitCode
             Stop-Child $script:updateCheck
             $script:updateCheck = $null
-            $checkUpdate.Enabled = $repository.Enabled = $true
+            $updateButton.Enabled = $true
             if ($exitCode -eq 0) {
                 $result = Get-Content -LiteralPath (Join-Path $runFolder 'update-check.log') -Raw | ConvertFrom-Json
                 if ($result.available) {
                     $script:availableVersion = $result.latest
                     $updateStatus.Text = "Version $($result.latest) is available."
-                    $installUpdate.Enabled = $true
-                } else { $updateStatus.Text = 'Camo Connector is up to date.' }
+                    $updateButton.Text = 'Update and restart'
+                } else { $updateStatus.Text = 'Up to date!' }
             } else {
-                $updateStatus.Text = 'Update check failed. ' + ((Get-Content -LiteralPath (Join-Path $runFolder 'update-check-errors.log') -TotalCount 2) -join ' ')
+                $updateStatus.Text = 'Update check failed'
+                $updateTooltip.SetToolTip($updateStatus, ((Get-Content -LiteralPath (Join-Path $runFolder 'update-check-errors.log') -TotalCount 2) -join ' '))
             }
         }
         if ($script:running) {
@@ -531,6 +524,9 @@ try {
         $video = @(Read-CaptureDevices $sample)
         if ($video.Count -ne 1 -or $video[0].Input -ne '@device_pnp_test') { throw 'Capture device enumeration failed.' }
         if ($logLayout.Controls.Count -ne 3 -or !$pin.ReadOnly) { throw 'Logs or tracker focus controls are missing.' }
+        if ($tabs.TabPages.Count -ne 2 -or $updateButton.Text -ne 'Check for updates' -or $script:updateCheck) {
+            throw 'The manual update control is missing or started an automatic check.'
+        }
         'Monitor preview, capture-device parsing, log panes, and read-only tracker focus passed.'
     } else {
         $timer.Start()
@@ -545,6 +541,7 @@ try {
     $focusClient.Dispose()
     Set-Preview $null
     $timer.Dispose()
+    $updateTooltip.Dispose()
     $form.Dispose()
     # This folder is unique to this run and only contains transient frames and display logs.
     [IO.Directory]::Delete($runFolder,$true)

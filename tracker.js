@@ -154,12 +154,14 @@
 
     function readRow(row) {
       const text = (row.innerText || row.textContent).toLowerCase();
-      if (!text.includes(name) || grinding(row)) return null;
+      const identity = camoRowIdentity(row, name);
+      if (!identity || grinding(row)) return null;
       const counters = [...text.matchAll(/(?<![+\d])(\d+)\s*\/\s*(\d+)/g)];
-      if (counters.length !== 1 || Number(counters[0][2]) !== goal) return null;
+      if (counters.length !== 1) return null;
       for (let card = row.parentElement; card && card !== document.body; card = card.parentElement) {
         if (grinding(card)) {
-          return headings.some(title => card.contains(title)) ? { text, count: +counters[0][1] } : null;
+          return headings.some(title => card.contains(title)) ?
+            { identity, text, count: +counters[0][1], total: +counters[0][2] } : null;
         }
       }
       return null;
@@ -168,21 +170,24 @@
     // The row title can share a text node with its description.
     for (const plus of buttons(document).filter(button => buttonText(button) === '+1')) {
       for (let row = plus.parentElement; row && row !== document.body && !grinding(row); row = row.parentElement) {
-        if (!readRow(row)) continue;
+        const meter = readRow(row);
+        if (!meter) continue;
         const controls = buttons(row);
         if (controls.length !== 3 || controls[0] !== plus || buttonText(controls[1]) !== '+5') continue;
         const tick = controls[2];
         if (!tick.disabled && !/untick|undo/i.test(buttonText(tick) + ' ' + (tick.title || ''))) {
-          targets.set(tick, { name, button: tick, done: false });
+          if ((targets.get(tick)?.identity || 0) < meter.identity) {
+            targets.set(tick, { identity: meter.identity, name, button: tick, done: false });
+          }
         }
-        break;
+        if (meter.identity === 2) break;
       }
     }
-    if (targets.size) return targets.size === 1 ? [...targets.values()][0] : null;
+    if (targets.size) return uniqueCamoControl(targets);
     for (const row of document.querySelectorAll('div,section,li,article')) {
       if (!visible(row)) continue;
       const meter = readRow(row);
-      if (meter?.count === goal && /\bdone(?![a-z])/i.test(meter.text) &&
+      if (meter && meter.count === meter.total && /\bdone(?![a-z])/i.test(meter.text) &&
           !buttons(row).some(button => buttonText(button) === '+1' && !button.disabled)) {
         return { name, done: true };
       }
@@ -220,7 +225,7 @@
     }
     const control = sangChallengeControl(confirmedName);
     if (!control) {
-      show('Sang 9mm completion seen · no matching open objective (' + challenge + ')');
+      show('Sang 9mm · could not find the ' + confirmedName + ' camo row');
       return true;
     }
     if (control.done) {
@@ -293,13 +298,33 @@
   }
 
   const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
-  function rowHasCamoName(row, name) {
-    const expected = weaponKey(name || '');
-    if (!expected) return false;
-    const title = text => weaponKey(text.split('·', 1)[0].trim());
-    if (title(label(row)) === expected) return true;
-    return [...row.querySelectorAll('span,strong,b,p,div,label')].some(node =>
-      title(label(node)) === expected);
+  const camoKey = value => (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  function camoRowIdentity(row, name) {
+    const expected = camoKey(name);
+    if (!expected) return 0;
+    const title = text => camoKey(text.split(/[·•:]|\s+[-–—]\s+/, 1)[0]);
+    const nodes = [row, ...row.querySelectorAll('h2,h3,h4,h5,span,strong,b,p,div,label')];
+    if (nodes.some(node => {
+      const text = label(node);
+      return camoKey(text) === expected || title(text) === expected;
+    })) return 2;
+    for (const image of row.querySelectorAll('img,[role="img"]')) {
+      if (['alt', 'title', 'aria-label', 'data-camo-name'].some(attribute =>
+        camoKey(image.getAttribute(attribute)) === expected)) return 1;
+      const src = image.getAttribute('src');
+      if (!src) continue;
+      try {
+        const filename = decodeURIComponent(new URL(src, document.baseURI).pathname.split('/').pop());
+        if (camoKey(filename.replace(/\.[a-z0-9]+$/i, '')) === expected) return 1;
+      } catch {}
+    }
+    return 0;
+  }
+
+  function uniqueCamoControl(candidates) {
+    const named = [...candidates.values()].filter(candidate => candidate.identity === 2);
+    if (named.length) return named.length === 1 ? named[0] : null;
+    return candidates.size === 1 ? [...candidates.values()][0] : null;
   }
 
   function trackedControl(snapshot, doneName) {
@@ -311,19 +336,22 @@
     for (const plus of buttons(document).filter(button => label(button).replace(/\s+/g, '') === '+1')) {
       for (let row = plus.parentElement; row && row !== document.body && !grinding(row); row = row.parentElement) {
         const text = label(row);
-        if (!rowHasCamoName(row, snapshot.camo)) continue;
+        const identity = camoRowIdentity(row, snapshot.camo);
+        if (!identity) continue;
         const counts = [...text.matchAll(/(?<![+\d])(\d+)\s*\/\s*(\d+)/g)];
-        if (counts.length !== 1 || Number(counts[0][2]) !== snapshot.goal) continue;
+        if (counts.length !== 1) continue;
         let card = row.parentElement;
         while (card && card !== document.body && !grinding(card)) card = card.parentElement;
         if (!card || card === document.body || !names.some(name => card.contains(name))) continue;
         const controls = buttons(row);
         if (controls.length > 3 || controls.filter(button => label(button) === '+1').length !== 1) continue;
-        candidates.set(plus, { button: plus, count: Number(counts[0][1]) });
-        break;
+        if ((candidates.get(plus)?.identity || 0) < identity) {
+          candidates.set(plus, { identity, button: plus, count: Number(counts[0][1]) });
+        }
+        if (identity === 2) break;
       }
     }
-    if (candidates.size === 1) return [...candidates.values()][0];
+    if (candidates.size) return uniqueCamoControl(candidates);
     if (candidates.size || !(doneName || snapshot.confirmed && snapshot.camo) ||
         snapshot.value !== snapshot.goal) return null;
     const completedName = doneName || snapshot.camo;
@@ -331,13 +359,12 @@
       if (!visible(row) || grinding(row)) continue;
       const text = label(row);
       const counters = [...text.matchAll(/(\d+)\s*\/\s*(\d+)/g)];
-      if (!rowHasCamoName(row, completedName) || !/\bdone(?![a-z])/i.test(text) ||
-          counters.length !== 1 || Number(counters[0][1]) !== snapshot.goal ||
-          Number(counters[0][2]) !== snapshot.goal) continue;
+      if (!camoRowIdentity(row, completedName) || !/\bdone(?![a-z])/i.test(text) ||
+          counters.length !== 1 || Number(counters[0][1]) !== Number(counters[0][2])) continue;
       let card = row.parentElement;
       while (card && card !== document.body && !grinding(card)) card = card.parentElement;
       if (card && card !== document.body && names.some(name => card.contains(name))) {
-        return { count: snapshot.goal };
+        return { count: Number(counters[0][1]), completed: true };
       }
     }
     return null;
@@ -383,31 +410,36 @@
     const matches = new Map();
     for (const minus of buttons(details.panel).filter(button => /^[-−–]$/.test(label(button)))) {
       for (let row = minus.parentElement; row && row !== details.panel; row = row.parentElement) {
-        const text = label(row);
-        if (!rowHasCamoName(row, snapshot.camo)) continue;
+        const identity = camoRowIdentity(row, snapshot.camo);
+        if (!identity) continue;
         const controls = buttons(row);
         if (controls.filter(button => /^[-−–]$/.test(label(button))).length !== 1) break;
         const plus = controls.filter(button => label(button) === '+');
         if (plus.length !== 1) continue;
-        if (!new RegExp('[·•/]\\s*' + snapshot.goal + '(?!\\d)').test(text)) continue;
         const inputs = [...row.querySelectorAll('input')].filter(input =>
           ['number', 'text'].includes(input.type) && /^\d+$/.test(input.value));
-        const numberText = [...row.querySelectorAll('span,div,button,output')].filter(node =>
+        const numbers = [...row.querySelectorAll('span,div,button,output')].filter(node =>
           /^\d+$/.test(label(node)) && ![...node.children].some(child => label(child) === label(node)));
+        const actionable = numbers.filter(node => node.tagName === 'BUTTON' || node.tagName === 'OUTPUT');
+        const numberText = actionable.length ? actionable : numbers;
         const meter = inputs.length === 1 ? inputs[0].value :
           inputs.length === 0 && numberText.length === 1 ? label(numberText[0]) : null;
-        if (meter === null || Number(meter) > snapshot.goal) continue;
-        const completed = Number(meter) === snapshot.goal ||
+        if (meter === null) continue;
+        const maximum = Number(inputs[0]?.getAttribute('max')) || null;
+        const completed = (maximum !== null && Number(meter) >= maximum) ||
           [...row.querySelectorAll('input,[role="checkbox"]')].some(box =>
             box.checked || box.getAttribute('aria-checked') === 'true');
         const input = inputs.length === 1 && !inputs[0].disabled && !inputs[0].readOnly ? inputs[0] : null;
         const editor = !input && numberText.length === 1 && numberText[0].tagName === 'BUTTON' &&
           !numberText[0].disabled ? numberText[0] : null;
-        matches.set(minus, { input, editor, button: plus[0], count: Number(meter), completed });
-        break;
+        const prior = matches.get(minus);
+        if (!prior || identity > prior.identity) {
+          matches.set(minus, { identity, input, editor, button: plus[0], count: Number(meter), completed, maximum });
+        }
+        if (identity === 2) break;
       }
     }
-    return matches.size === 1 ? [...matches.values()][0] : null;
+    return uniqueCamoControl(matches);
   }
 
   async function reconcileDetails(snapshot, storage, state, done) {
@@ -420,7 +452,7 @@
     }
     const target = detailCounter(details, snapshot);
     if (!target) {
-      show(snapshot.weapon + ' · no unique editable details row for ' + snapshot.objective);
+      show(snapshot.weapon + ' · no unique tracker details row for ' + snapshot.camo);
       return true;
     }
     if (target.count === snapshot.value || target.completed) {
@@ -433,13 +465,17 @@
         snapshot.weapon + ' · synced ' + snapshot.value + '/' + snapshot.goal);
       return true;
     }
+    if (target.maximum !== null && snapshot.value > target.maximum) {
+      show(snapshot.camo + ' · game count exceeds the tracker field limit');
+      return true;
+    }
     if (!target.input) {
       if (target.editor?.isConnected && !activatedCountFields.has(target.editor)) {
         activatedCountFields.add(target.editor);
         target.editor.click();
-        return show('Opening exact count field for ' + snapshot.objective);
+        return show('Opening count field for ' + snapshot.camo);
       }
-      return show('No editable count field for ' + snapshot.objective);
+      return show('No editable count field for ' + snapshot.camo);
     }
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     if (!setValue) return show('Could not access the editable count field');
@@ -447,7 +483,7 @@
     const currentDetails = weaponDetails(weapon);
     const current = currentDetails && detailCounter(currentDetails, snapshot);
     if (!multiplayerSelected() || !current || current.completed ||
-        current.count !== target.count || current.input !== target.input ||
+        current.count !== target.count || current.maximum !== target.maximum || current.input !== target.input ||
         !current.input.isConnected || current.input.disabled || current.input.readOnly) {
       await chrome.storage.local.set({ [storage]: state });
       return true;
@@ -515,10 +551,9 @@
       return true;
     }
     const target = trackedControl(snapshot);
-    if (target?.count === snapshot.value) {
+    if (target && (target.completed || target.count === snapshot.value)) {
       await chrome.storage.local.set({ [key]: handled });
-      show(target ? snapshot.weapon + ' progress verified' :
-        snapshot.weapon + ' · no unique tracker row for ' + snapshot.objective);
+      show(snapshot.weapon + ' · ' + snapshot.camo + ' progress verified');
       return true;
     }
     return reconcileDetails(snapshot, key, state, handled);
@@ -609,16 +644,17 @@
     return true;
   }
   function goldCheckbox(panel) {
-    const matches = new Set();
-    for (const title of panel.querySelectorAll('span,div,strong,label')) {
-      if (label(title).toLowerCase() !== 'gold') continue;
-      for (let row = title.parentElement; row && row !== panel; row = row.parentElement) {
-        const boxes = [...row.querySelectorAll('input[type="checkbox"],[role="checkbox"]')].filter(visible);
-        if (boxes.length === 1) matches.add(boxes[0]);
-        if (boxes.length) break;
+    const matches = new Map();
+    const selector = 'input[type="checkbox"],[role="checkbox"]';
+    for (const box of [...panel.querySelectorAll(selector)].filter(visible)) {
+      for (let row = box.parentElement; row && row !== panel; row = row.parentElement) {
+        if ([...row.querySelectorAll(selector)].filter(visible).length !== 1) break;
+        const identity = camoRowIdentity(row, 'Gold');
+        if ((matches.get(box)?.identity || 0) < identity) matches.set(box, { identity, box });
+        if (identity === 2) break;
       }
     }
-    return matches.size === 1 ? [...matches][0] : null;
+    return uniqueCamoControl(matches)?.box || null;
   }
 
   async function syncGold(session, names) {

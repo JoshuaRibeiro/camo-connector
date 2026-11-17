@@ -22,14 +22,14 @@ you have moved it. Keep a Multiplayer Armoury tab open while syncing.
 
 App updates
 
-Enter a public GitHub repository as owner/repo on the Updates tab. The app
-checks that repository on launch. Use Check for updates to check again and
-Update and restart to install an available release in the existing folder.
+Click Check for updates at the top right to check the project's GitHub
+releases. If a newer release is available, click Update and restart to
+install it in the existing folder.
 After the update, reload the unpacked extension in the browser and refresh
 the tracker page. The app remembers the selected data folder and settings.
 
-Publish a normal GitHub release with a tag such as v1.9.34 and attach the
-matching camo-connector-v1.9.34.zip as a release asset. The archived
+Publish a normal GitHub release with a tag such as v1.9.35 and attach the
+matching camo-connector-v1.9.35.zip as a release asset. The archived
 camo-connector folder contains the app files. Use a tag and archive name
 that match the version in manifest.json.
 
@@ -63,16 +63,19 @@ The connector counts Signal 50 Sunburn longshots and recognises Sang 9mm
 Military Camo unlocks. It ticks any missing Military tiers in sequence
 through the confirmed tier and checks the tracker after each click.
 Keep the in-game CAMOS tracked panel open for two reads. Numeric camo
-rows catch up when their weapon, target and objective uniquely match an
-editable tracker counter. Weapon-level rows are logged separately.
+rows catch up when the weapon and camo identify one editable tracker row.
+The connector checks the camo name first and uses known artwork when the
+game's tracked panel omits the name. Tracker thumbnail labels can also
+identify a row. Objective wording does not identify the camo.
+Weapon-level rows are logged separately.
 Older queued Sunburn longshots are covered by the snapshot. For an absolute
 snapshot the connector enters one exact value in the matching details row
 and verifies that the tracker saved it. Completed rows stay checked. If the
 connector cannot open the details automatically, click the weapon name.
 
 Sang 9mm also recognises the completion banners for 25 ADS kills and three
-kills without dying five times. The connector matches the tracker row by
-its objective and verifies the tick. Preview a saved full-screen frame with
+kills without dying five times. The connector finds the corresponding
+named camo row and verifies the tick. Preview a saved full-screen frame with
 -Image .\frame.png -ChallengeBanner -ShowOcr.
 On Camo Select, hovering an unfinished camo also syncs a visible objective
 fraction. Prerequisite fractions like Gold's completed specials are ignored.
@@ -87,8 +90,8 @@ marks all three named Specials. For partial totals, the reader checks the
 three tile padlocks, including their shifted hover positions, and matches
 the unlocked slots to special-catalog.json only when the total agrees.
 The menu can be previewed with -Image .\frame.png -CamoMenu -ShowOcr.
-The catalogue's RGB artwork samples are references for future live banner
-matching. Menu catch-up does not depend on those samples.
+The catalogue's RGB artwork samples identify tracked-panel thumbnails.
+Menu catch-up does not depend on those samples.
 
 Live combat tracking logs kills, deaths, the current streak, and the best
 streak this session. Pass -Player '<your in-game name>' to label the session.

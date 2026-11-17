@@ -71,27 +71,29 @@ function collectEvents() {
       if (event?.kind === 'progress-snapshot' && event.source === 'live' && event.mode === 'mp' &&
           event.key !== 'signal-50:sp-3' && ['camo', 'weapon-level'].includes(event.type) &&
           typeof event.weapon === 'string' && /^[a-z0-9 .-]{2,32}$/i.test(event.weapon) &&
-          typeof event.objective === 'string' && event.objective.length > 0 && event.objective.length <= 160 &&
+          (event.type === 'camo' || typeof event.objective === 'string' && event.objective.length > 0 && event.objective.length <= 160) &&
           Number.isInteger(event.count) && Number.isInteger(event.goal) &&
           event.count >= 0 && event.count <= event.goal && event.goal > 0 && event.goal <= 9999) {
         const artwork = event.identity === 'artwork' && event.type === 'camo' &&
           Object.hasOwn(specialCatalog, event.weapon) &&
           specialCatalog[event.weapon]?.some(entry => entry.name === event.camo &&
-            entry.artworkRGB12 && (!entry.goal || entry.goal === event.goal));
+            entry.artworkRGB12);
         if (event.type === 'camo' && (typeof event.camo !== 'string' || !camoKey(event.camo) ||
             event.camo.length > 80 || (event.identity === 'artwork' && !artwork))) continue;
         const spaceTime = event.type === 'camo' && event.weapon === 'Sang 9mm' &&
           event.goal === 50 && camoKey(event.camo) === 'spacetime';
         const key = spaceTime ? 'sang9mm:space-time' :
-          [event.weapon, event.type === 'camo' ? camoKey(event.camo) : event.objective, event.goal].join('|').toLowerCase();
+          (event.type === 'camo' ? [event.weapon, camoKey(event.camo)] :
+            [event.weapon, event.objective, event.goal]).join('|').toLowerCase();
         const previous = trackedRows.get(key);
-        if (!previous || (!previous.confirmed && (event.count !== previous.value ||
+        if (!previous || (!previous.confirmed && (event.count !== previous.value || event.goal !== previous.goal ||
             (event.camo && event.camo !== previous.camo) || (spaceTime && previous.akimboThrough !== akimboCount)))) {
-          trackedRows.set(key, { id: ++progressId, weapon: event.weapon, objective: event.objective,
+          trackedRows.set(key, { id: ++progressId, weapon: event.weapon,
+            ...(event.type === 'weapon-level' && { objective: event.objective }),
             camo: typeof event.camo === 'string' ? event.camo : null,
             type: event.type, value: event.count, goal: event.goal, ...(artwork && { identity: 'artwork' }),
             ...(spaceTime && { akimboThrough: akimboCount }) });
-          console.log(event.weapon, event.objective, event.count + '/' + event.goal);
+          console.log(event.weapon, event.camo || event.objective, event.count + '/' + event.goal);
         }
       }
       if (event?.kind === 'challenge-completed' && event.source === 'live' && event.mode === 'mp') {
@@ -107,13 +109,13 @@ function collectEvents() {
       if (event?.kind === 'catalog-special-unlocked' && event.source === 'live' && event.mode === 'mp') {
         const camo = Object.hasOwn(specialCatalog, event.weapon) &&
           specialCatalog[event.weapon].find(entry => entry.name === event.challenge);
-        if (camo?.objective && Number.isInteger(camo.goal)) {
+        if (camo && Number.isInteger(camo.goal)) {
           const spaceTime = event.weapon === 'Sang 9mm' && camo.name === 'Space Time';
           const key = spaceTime ? 'sang9mm:space-time' :
-            [event.weapon, camoKey(camo.name), camo.goal].join('|').toLowerCase();
+            [event.weapon, camoKey(camo.name)].join('|').toLowerCase();
           if (!trackedRows.get(key)?.confirmed) {
             trackedRows.set(key, { id: ++progressId, weapon: event.weapon, camo: camo.name,
-              objective: camo.objective, goal: camo.goal, value: camo.goal, type: 'camo', confirmed: true,
+              goal: camo.goal, value: camo.goal, type: 'camo', confirmed: true,
               ...(spaceTime && { akimboThrough: akimboCount }) });
             console.log('Verified Special unlock:', event.weapon, camo.name);
           }

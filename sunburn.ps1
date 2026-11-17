@@ -212,7 +212,7 @@ function Read-TrackedCamoArea($frame, $area, $thumbnail) {
     }
 }
 
-function Find-TrackedCamoArtwork($frame, $area, $thumbnail, $header, [int]$goal) {
+function Find-TrackedCamoArtwork($frame, $area, $thumbnail, $header) {
     if (!$frame -or !$thumbnail -or !$specialCatalog) { return }
     $entries = @($specialCatalog.PSObject.Properties[$header.Name].Value |
         Where-Object { $_.name -and $_.artworkRGB12 })
@@ -244,8 +244,7 @@ function Find-TrackedCamoArtwork($frame, $area, $thumbnail, $header, [int]$goal)
         }) | Sort-Object Score
         if ($ShowOcr) { Write-Status ("Thumbnail scores | $($header.Name) | " + (($ranked | % { "$($_.Camo.name)=$([Math]::Round($_.Score,1))" }) -join ', ')) }
         if (@($ranked).Count -ge 2 -and $ranked[0].Score -le 31 -and
-            ($ranked[1].Score - $ranked[0].Score) -ge 8 -and
-            (!$ranked[0].Camo.goal -or $ranked[0].Camo.goal -eq $goal)) { return $ranked[0].Camo }
+            ($ranked[1].Score - $ranked[0].Score) -ge 8) { return $ranked[0].Camo }
     } finally {
         $graphics.Dispose()
         $sample.Dispose()
@@ -273,10 +272,6 @@ function ConvertFrom-TrackedCamoLines($lines, $frame, $area, $thumbnail) {
         $value = [int]$Matches[2]
         $goal = [int]$Matches[3]
         if (!$goal -or $value -gt $goal) { continue }
-        if ($header.Name -eq 'Krait P68' -and $goal -eq 15 -and
-            $objective -match '\bGet\s+15\s+Point[\s-]*Blank\s+Kills\b') {
-            $objective = 'Get 15 Point Blank Kills against Players'
-        }
         $camo = $null
         $identity = $null
         $type = if ($objective -match '\bReach Weapon Level\s+(\d+)$') {
@@ -284,16 +279,16 @@ function ConvertFrom-TrackedCamoLines($lines, $frame, $area, $thumbnail) {
             'weapon-level'
         } else {
             $names = @($lines | Where-Object { $_.Y -gt $header.Y -and $_.Y -lt $limit } | ForEach-Object {
-                $_.Text -replace '[^a-z0-9]', ''
+                ($_.Text -split '\s*[·•:]\s*|\s+(?:[-–—]|\d{1,4}\s*[/|]\s*\d{1,4}\b)', 2)[0] -replace '[^a-z0-9]', ''
             })
             $named = @($specialCatalog.PSObject.Properties[$header.Name].Value | Where-Object {
-                $_.name -and (!$_.goal -or $_.goal -eq $goal) -and ($_.name -replace '[^a-z0-9]', '') -in $names
+                $_.name -and ($_.name -replace '[^a-z0-9]', '') -in $names
             })
             if ($named.Count -eq 1) {
                 $camo = $named[0]
                 $identity = 'name'
             } else {
-                $camo = Find-TrackedCamoArtwork $frame $area $thumbnail $header $goal
+                $camo = Find-TrackedCamoArtwork $frame $area $thumbnail $header
                 $identity = 'artwork'
             }
             if (!$camo) { continue }
@@ -733,7 +728,6 @@ function Read-CamoMenu($frame, [switch]$HoverOnly, [switch]$SummaryOnly) {
                     $_.name -and ($_.name -replace '[^a-z0-9]', '') -eq ($title -replace '[^a-z0-9]', '')
                 })
                 if ($entry.Count -eq 1) {
-                    if ($entry[0].goal -and $entry[0].goal -ne $goal) { continue }
                     $camoName = $entry[0].name
                 }
                 if (!$objective) { $objective = $camoName }
@@ -1362,7 +1356,8 @@ do {
                     $row.kind = 'progress-snapshot'; $row.mode = 'mp'; $row.source = 'live'
                     Write-MatchEvent -Path $Log -Json ($row | ConvertTo-Json -Compress)
                     $publishedTrackedCounts[$rowKey] = $row.count
-                    Write-Status "Tracked progress | $($row.weapon) | $($row.objective) | $($row.count)/$($row.goal)"
+                    $progressName = if ($row.camo) { $row.camo } else { $row.objective }
+                    Write-Status "Tracked progress | $($row.weapon) | $progressName | $($row.count)/$($row.goal)"
                 }
             }
         }
