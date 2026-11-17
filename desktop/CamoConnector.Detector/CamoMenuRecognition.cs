@@ -26,7 +26,7 @@ public static class CamoMenuRecognition
         const string suffix = "progression";
         if (!key.EndsWith(suffix, StringComparison.Ordinal)) return null;
         var name = key[..^suffix.Length];
-        if (Regex.IsMatch(name, @"\A[5s][0o][g6][s5]\z")) return ".50 GS";
+        if (name == "08gs" || Regex.IsMatch(name, @"\A[5s][0o][g6][s5]\z")) return ".50 GS";
         if (Regex.IsMatch(name, @"\A(?:krait|karit|crate)p[g6][8b]\z")) return "Krait P68";
         return WeaponRecognition.Read(new[] { name }, false)?.Name;
     }

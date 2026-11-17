@@ -6,11 +6,14 @@ using CamoConnector.Detector;
 Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
 var listDevices = args.Length == 1 && args[0] == "--list-devices";
 var previewOnly = args.Length == 2 && args[0] is "--preview-monitor" or "--preview-device";
+var saveMenuCrops = args.Length == 4 && args[2] == "--save-crops";
+var menuProbe = (args.Length == 2 || saveMenuCrops) && args[0] is "--probe-menu-monitor" or "--probe-menu-image";
 var publishPreview = args.Length == 4 && args[3] == "--preview" && args[0] is "--monitor" or "--device";
-if (!listDevices && !previewOnly && !publishPreview &&
+if (!listDevices && !previewOnly && !publishPreview && !menuProbe &&
     (args.Length != 3 || args[0] is not ("--image" or "--monitor" or "--device" or "--device-frame" or "--video")))
 {
     Console.Error.WriteLine("CamoConnector.Detector --list-devices | (--image <capture> | --video <file> | --monitor <index> | --device <input> | --device-frame <input>) <data-directory>");
+    Console.Error.WriteLine("CamoConnector.Detector (--probe-menu-monitor <display> | --probe-menu-image <capture>) [--save-crops <directory>]");
     return 2;
 }
 
@@ -44,6 +47,31 @@ try
     }
     var runtime = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Ocr"));
     var capture = new HudCapture(runtime);
+    if (menuProbe)
+    {
+        var monitor = args[0] == "--probe-menu-monitor" ? FindMonitor(args[1]) : null;
+        using var frame = monitor == null ? new Bitmap(args[1]) : HudCapture.Desktop(monitor);
+        var cropDirectory = saveMenuCrops
+            ? Directory.CreateDirectory(Path.Combine(Path.GetFullPath(args[3]), $"camo-probe-{Guid.NewGuid():N}")).FullName
+            : null;
+        var reads = new Dictionary<string, string>();
+        void RecordCrop(string region, string raw, Bitmap crop)
+        {
+            reads[region] = raw;
+            if (cropDirectory != null)
+                crop.Save(Path.Combine(cropDirectory, region + ".png"), System.Drawing.Imaging.ImageFormat.Png);
+        }
+        var weapon = await capture.ReadCamoMenuWeaponAsync(frame, stop.Token, RecordCrop);
+        var camoProgress = await capture.DetectCamoProgressAsync(frame, weapon, stop.Token, RecordCrop);
+        var json = JsonSerializer.Serialize(new
+        {
+            source = monitor?.DeviceName ?? Path.GetFullPath(args[1]), frame.Width, frame.Height,
+            menuWeapon = weapon, camoProgress, cropDirectory, reads
+        }, new JsonSerializerOptions { WriteIndented = saveMenuCrops });
+        if (cropDirectory != null) File.WriteAllText(Path.Combine(cropDirectory, "ocr.json"), json);
+        Console.WriteLine(json);
+        return 0;
+    }
     await using var external = args[0] switch
     {
         "--device" or "--device-frame" => ExternalCapture.Open(ffmpeg, args[1]),

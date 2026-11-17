@@ -193,31 +193,45 @@ internal sealed class HudCapture
         return null;
     }
 
-    public async Task<CamoProgress?> DetectCamoProgressAsync(Bitmap frame, string? weapon, CancellationToken cancel)
+    public async Task<CamoProgress?> DetectCamoProgressAsync(Bitmap frame, string? weapon, CancellationToken cancel,
+        Action<string, string, Bitmap>? trace = null)
     {
         if (weapon == null) return null;
-        var title = string.Join(" ", await ReadAsync(frame, (.312, .614, .472, .064), cancel));
+        var (titleText, _) = await ReadTextAsync(frame, (.312, .614, .472, .064), cancel,
+            trace: trace, regionName: "camoTitle");
+        var title = string.Join(" ", Lines(titleText));
         if (title.Length == 0) return null;
-        var lines = await ReadAsync(frame, (.313, .679, .342, .181), cancel);
+        var (objectives, _) = await ReadTextAsync(frame, (.313, .679, .342, .181), cancel,
+            trace: trace, regionName: "camoObjectives");
         var names = catalog.GetValueOrDefault(weapon)?.Select(camo => camo.Name).ToArray() ?? [];
-        return CamoMenuRecognition.ReadProgress(weapon, title, lines, names);
+        return CamoMenuRecognition.ReadProgress(weapon, title, Lines(objectives), names);
     }
 
-    public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel)
+    public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null)
     {
         // End before the game logo beside CAMO SELECT.
-        var (heading, _) = await ReadTextAsync(frame, (.072, .047, .114, .040), cancel, pageMode: 7);
-        var (tab, _) = await ReadTextAsync(frame, (.071, .102, .147, .033), cancel, pageMode: 7);
+        var (heading, _) = await ReadTextAsync(frame, (.072, .047, .114, .040), cancel, pageMode: 7,
+            trace: trace, regionName: "heading");
+        var (tab, _) = await ReadTextAsync(frame, (.071, .102, .147, .033), cancel, pageMode: 7,
+            trace: trace, regionName: "progressionTab");
         var weapon = CamoMenuRecognition.ReadProgressionWeapon(tab);
+        if (weapon == null)
+        {
+            var (activeTab, _) = await ReadTextAsync(frame, (.075, .106, .112, .027), cancel, pageMode: 7,
+                trace: trace, regionName: "activeProgressionTab");
+            weapon = CamoMenuRecognition.ReadProgressionWeapon(activeTab);
+        }
         if (weapon == null && CamoMenuRecognition.IsCamoMenu(heading))
         {
-            var (wideTab, _) = await ReadTextAsync(frame, (.071, .102, .202, .033), cancel, pageMode: 7);
+            var (wideTab, _) = await ReadTextAsync(frame, (.071, .102, .202, .033), cancel, pageMode: 7,
+                trace: trace, regionName: "wideProgressionTab");
             weapon = CamoMenuRecognition.ReadProgressionWeapon(wideTab);
         }
         if (weapon == null || CamoMenuRecognition.IsCamoMenu(heading)) return weapon;
         // The progression tab and a military row together identify the menu
         // when its heading drops out or is partly obscured.
-        var (military, _) = await ReadTextAsync(frame, (.071, .163, .095, .029), cancel, pageMode: 7);
+        var (military, _) = await ReadTextAsync(frame, (.071, .163, .095, .029), cancel, pageMode: 7,
+            trace: trace, regionName: "militaryRow");
         return CamoMenuRecognition.IsMilitaryMenuRow(military) ? weapon : null;
     }
 
@@ -281,12 +295,14 @@ internal sealed class HudCapture
 
     private async Task<string[]> ReadAsync(Bitmap frame, (double X, double Y, double W, double H) area,
         CancellationToken cancel, PixelAdjustment adjustment = PixelAdjustment.Normal)
-        => (await ReadTextAsync(frame, area, cancel, adjustment: adjustment)).Text.Split('\n',
-            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        => Lines((await ReadTextAsync(frame, area, cancel, adjustment: adjustment)).Text);
+
+    private static string[] Lines(string text) =>
+        text.Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
 
     private async Task<(string Text, int Height)> ReadTextAsync(Bitmap frame, (double X, double Y, double W, double H) area,
         CancellationToken cancel, bool positioned = false, int pageMode = 6, bool countersOnly = false,
-        PixelAdjustment adjustment = PixelAdjustment.Normal)
+        PixelAdjustment adjustment = PixelAdjustment.Normal, Action<string, string, Bitmap>? trace = null, string regionName = "")
     {
         var region = new Rectangle((int)Math.Round(area.X * frame.Width), (int)Math.Round(area.Y * frame.Height),
             Math.Max(1, (int)Math.Round(area.W * frame.Width)), Math.Max(1, (int)Math.Round(area.H * frame.Height)));
@@ -344,7 +360,9 @@ internal sealed class HudCapture
             process.StandardInput.Close();
             await process.WaitForExitAsync(deadline.Token);
             if (process.ExitCode != 0) throw new IOException("OCR failed: " + (await error).Trim());
-            return (await output, crop.Height);
+            var text = await output;
+            trace?.Invoke(regionName, text.Trim(), crop);
+            return (text, crop.Height);
         }
         finally
         {

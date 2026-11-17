@@ -34,7 +34,11 @@ if (!$menu::IsCamoMenu('CAMO SELECT MW4') -or !$menu::IsMilitaryMenuRow('MILITAR
     throw 'Camo menu fallback OCR failed'
 }
 if ($menu::ReadProgressionWeapon('.50 GS PROGRESSION') -ne '.50 GS' -or
-    $menu::ReadProgressionWeapon('UNKNOWN PROGRESSION')) { throw 'Progression weapon gate failed' }
+    $menu::ReadProgressionWeapon('.08 GS PROGRESSION') -ne '.50 GS' -or
+    $menu::ReadProgressionWeapon('.08 GS PROGRESSION MOD')) {
+    throw 'The .50 GS progression tab OCR fallback failed'
+}
+if ($menu::ReadProgressionWeapon('UNKNOWN PROGRESSION')) { throw 'Progression weapon gate failed' }
 $redTiger = $menu::ReadProgress('.50 GS','RED-TIGER', @('Complete 3 Special Camos','2/3','Point blank kills','3/30'),$camos)
 if ($redTiger.Camo -ne 'Red Tiger' -or $redTiger.Count -ne 3 -or $redTiger.Goal -ne 30) { throw 'Named camo count failed' }
 $differentGoal = $menu::ReadProgress('.50 GS','Frosted', @('Different wording 5/10'),$camos)
