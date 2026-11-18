@@ -44,6 +44,46 @@ public sealed class GitHubRelease(HttpClient http)
         return verified;
     }
 
+    public sealed record ExtensionPackage(Version Version, string Name, long Size);
+
+    public async Task<ExtensionPackage?> FindExtensionAsync(string browser, CancellationToken cancel)
+    {
+        if (browser is not ("Chrome" or "Edge" or "Firefox" or "Opera"))
+            throw new ArgumentException("Select a supported browser.", nameof(browser));
+        for (var page = 1; ; page++)
+        {
+            using var metadata = new MemoryStream();
+            await DownloadAsync($"https://api.github.com/repos/JoshuaRibeiro/camo-connector/releases?per_page=30&page={page}",
+                metadata, 4 * 1024 * 1024, cancel);
+            using var json = JsonDocument.Parse(metadata.ToArray());
+            ExtensionPackage? latest = null;
+            foreach (var release in json.RootElement.EnumerateArray())
+            {
+                var tag = release.GetProperty("tag_name").GetString();
+                const string prefix = "extension-v";
+                if (release.GetProperty("draft").GetBoolean() || tag == null || !tag.StartsWith(prefix, StringComparison.Ordinal) ||
+                    !Version.TryParse(tag[prefix.Length..], out var version) || version.Build < 0 || version.Revision != -1 ||
+                    tag != prefix + version.ToString(3) || (latest != null && version <= latest.Version)) continue;
+                var name = $"CamoConnector-{browser}-v{version}.zip";
+                foreach (var asset in release.GetProperty("assets").EnumerateArray())
+                {
+                    if (asset.GetProperty("name").GetString() != name ||
+                        asset.GetProperty("browser_download_url").GetString() != AssetPrefix + tag + "/" + name) continue;
+                    var size = asset.GetProperty("size").GetInt64();
+                    if (size is > 0 and <= 32 * 1024 * 1024)
+                        latest = new ExtensionPackage(version, name, size);
+                }
+            }
+            if (latest != null || json.RootElement.GetArrayLength() < 30) return latest;
+        }
+    }
+
+    public async Task DownloadExtensionAsync(ExtensionPackage package, Stream target, CancellationToken cancel)
+    {
+        await DownloadAsync(AssetPrefix + "extension-v" + package.Version + "/" + package.Name, target, package.Size, cancel);
+        if (target.Length != package.Size) throw new InvalidDataException("The extension download is incomplete.");
+    }
+
     public async Task DownloadArchiveAsync(ReleaseVerification.Manifest manifest, Stream target, CancellationToken cancel, Action<long>? onBytes = null)
     {
         if (!target.CanRead || !target.CanWrite || !target.CanSeek || target.Length != 0 || target.Position != 0)

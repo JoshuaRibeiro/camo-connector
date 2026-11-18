@@ -57,6 +57,10 @@ internal sealed partial class ConnectorWindow : Form
     private readonly Label status = new() { Text = "Starting the local bridge…", AutoSize = true };
     private readonly Button update = new() { Text = "Check for updates", AutoSize = true };
     private readonly Label updateStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
+    private readonly ComboBox extensionBrowser = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 95 };
+    private readonly Button downloadExtension = new() { Text = "Download extension ZIP", AutoSize = true, Enabled = false };
+    private readonly Label extensionStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
+    private GitHubRelease.ExtensionPackage? extensionPackage;
     private readonly string? updateKey = UpdateEnvironment.TrustedKey();
     private static readonly Version desktopVersion = typeof(Program).Assembly.GetName().Version!;
     private ReleaseVerification.Manifest? available;
@@ -80,10 +84,26 @@ internal sealed partial class ConnectorWindow : Form
         {
             Width = 510, Height = 34, FlowDirection = FlowDirection.RightToLeft, WrapContents = false
         };
-        if (updateKey != null) updateBar.Controls.Add(update);
-        else updateStatus.Text = "Install a build with a trusted update key to enable in-app updates.";
+        updateBar.Controls.Add(update);
         updateBar.Controls.Add(updateStatus);
         layout.Controls.Add(updateBar);
+        var extensionBar = new FlowLayoutPanel { AutoSize = true, WrapContents = false };
+        extensionBrowser.Items.AddRange(new object[] { "Chrome", "Edge", "Firefox", "Opera" });
+        extensionBrowser.SelectedIndex = 0;
+        extensionBrowser.AccessibleName = "Browser for extension download";
+        extensionBrowser.SelectedIndexChanged += (_, _) =>
+        {
+            extensionPackage = null;
+            available = null;
+            update.Text = "Check for updates";
+            downloadExtension.Enabled = false;
+            extensionStatus.Text = "Check for updates to find the selected browser ZIP.";
+        };
+        downloadExtension.Click += async (_, _) => await DownloadExtensionAsync();
+        extensionBar.Controls.Add(extensionBrowser);
+        extensionBar.Controls.Add(downloadExtension);
+        layout.Controls.Add(extensionBar);
+        layout.Controls.Add(extensionStatus);
         layout.Controls.Add(status);
         AddCaptureControls(layout);
         update.Click += async (_, _) => await UpdateAsync();
@@ -99,8 +119,7 @@ internal sealed partial class ConnectorWindow : Form
 
     private async Task UpdateAsync()
     {
-        if (updateKey == null) return;
-        update.Enabled = false;
+        SetUpdateControlsBusy(true);
         try
         {
             if (available != null)
@@ -112,14 +131,78 @@ internal sealed partial class ConnectorWindow : Form
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
             timeout.CancelAfter(TimeSpan.FromSeconds(30));
             using var http = new HttpClient();
-            updateStatus.Text = "Checking GitHub…";
-            available = await new GitHubRelease(http).CheckAsync(
-                new Version(desktopVersion.Major, desktopVersion.Minor, desktopVersion.Build), updateKey, timeout.Token);
-            updateStatus.Text = available == null ? "Up to date!" : "Version " + available.Version + " is available.";
-            if (available != null) update.Text = "Update and restart";
+            var releases = new GitHubRelease(http);
+            extensionPackage = null;
+            updateStatus.Text = "Checking desktop version.";
+            extensionStatus.Text = "Checking browser extension.";
+            var packageCheck = releases.FindExtensionAsync((string)extensionBrowser.SelectedItem!, timeout.Token);
+            try
+            {
+                available = updateKey == null ? null : await releases.CheckAsync(
+                    new Version(desktopVersion.Major, desktopVersion.Minor, desktopVersion.Build), updateKey, timeout.Token);
+                if (!IsDisposed) updateStatus.Text = updateKey == null ? "This build has no desktop update key." :
+                    available == null ? "Desktop is up to date." : $"Desktop v{available.Version} is available.";
+            }
+            catch (Exception error)
+            {
+                available = null;
+                if (!IsDisposed) updateStatus.Text = error.Message;
+            }
+            try
+            {
+                extensionPackage = await packageCheck;
+                if (!IsDisposed) extensionStatus.Text = extensionPackage == null ? "No extension ZIP found." :
+                    $"{extensionBrowser.SelectedItem} extension v{extensionPackage.Version} is available to download.";
+            }
+            catch
+            {
+                if (!IsDisposed) extensionStatus.Text = "Could not check for the browser extension.";
+            }
+
+            if (!IsDisposed && available != null) update.Text = "Update and restart";
         }
         catch (Exception error) { if (!IsDisposed) updateStatus.Text = error.Message; }
-        finally { if (!IsDisposed) update.Enabled = true; }
+        finally { if (!IsDisposed) SetUpdateControlsBusy(false); }
+    }
+
+    private void SetUpdateControlsBusy(bool busy)
+    {
+        update.Enabled = extensionBrowser.Enabled = !busy;
+        downloadExtension.Enabled = !busy && extensionPackage != null;
+    }
+
+    private async Task DownloadExtensionAsync()
+    {
+        if (extensionPackage is not { } package) return;
+        using var dialog = new SaveFileDialog
+        {
+            Title = "Save browser extension ZIP",
+            FileName = package.Name,
+            Filter = "ZIP archive (*.zip)|*.zip"
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+        SetUpdateControlsBusy(true);
+        extensionStatus.Text = "Downloading browser extension.";
+        var temp = dialog.FileName + "." + Guid.NewGuid().ToString("N") + ".part";
+        try
+        {
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
+            timeout.CancelAfter(TimeSpan.FromSeconds(60));
+            using var http = new HttpClient();
+            await using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write))
+                await new GitHubRelease(http).DownloadExtensionAsync(package, stream, timeout.Token);
+            File.Move(temp, dialog.FileName, overwrite: true);
+            if (!IsDisposed) extensionStatus.Text = "Extension ZIP saved. Install it from your browser.";
+        }
+        catch (Exception error) { if (!IsDisposed) extensionStatus.Text = error.Message; }
+        finally
+        {
+            try { File.Delete(temp); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            if (!IsDisposed) SetUpdateControlsBusy(false);
+        }
     }
 
     private async Task StartBridgeAsync()
