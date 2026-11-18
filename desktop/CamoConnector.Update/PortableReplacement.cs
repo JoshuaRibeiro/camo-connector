@@ -32,7 +32,7 @@ public sealed class PortableReplacement
         commit = Path.Combine(work, "committed");
     }
 
-    public void Apply(Stream archive, ReleaseVerification.Manifest manifest, Action<int>? afterReplacement = null)
+    public void Apply(Stream archive, ReleaseVerification.Manifest manifest, Action<int>? afterReplacement = null, Action<string>? report = null)
     {
         ValidateDirectory(root);
         ValidateDirectory(work);
@@ -48,7 +48,9 @@ public sealed class PortableReplacement
         Directory.CreateDirectory(previous);
         try
         {
+            report?.Invoke("Extracting update files…");
             var paths = Extract(archive, ready);
+            report?.Invoke("Backing up installed files…");
             var existing = new List<string>();
             foreach (var path in paths)
             {
@@ -62,6 +64,7 @@ public sealed class PortableReplacement
             for (var index = 0; index < paths.Length; index++)
             {
                 var path = paths[index];
+                report?.Invoke($"Replacing files ({index + 1}/{paths.Length})…");
                 var destination = ValidateFilePath(root, path);
                 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                 File.Move(In(ready, path), destination, true);

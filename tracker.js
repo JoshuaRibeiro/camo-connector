@@ -470,6 +470,10 @@
     return uniqueCamoControl(matches);
   }
 
+  function isSunburn(row) {
+    return weaponKey(row.weapon) === 'signal50' && camoKey(row.camo) === 'sunburn';
+  }
+
   async function reconcileDetails(snapshot, storage, state, done) {
     const weapon = weaponKey(snapshot.weapon);
     const details = weaponDetails(weapon);
@@ -492,6 +496,32 @@
       show(target.completed && target.count !== snapshot.value ? 'Completed camo preserved' :
         snapshot.weapon + ' · synced ' + snapshot.value + '/' + snapshot.goal);
       return true;
+    }
+    if (isSunburn(snapshot) && snapshot.confirmed === true) {
+      const box = target.checkbox;
+      if (!box || box.disabled) return show('No available Sunburn completion checkbox');
+      await extension.storage.local.set({ [storage]: { ...state, pending: true } });
+      const currentDetails = weaponDetails(weapon);
+      const current = currentDetails && detailCounter(currentDetails, snapshot);
+      if (!multiplayerSelected() || current?.checkbox !== box || current.completed ||
+          !box.isConnected || box.disabled) {
+        await extension.storage.local.set({ [storage]: state });
+        return true;
+      }
+      box.click();
+      for (let attempt = 0; attempt < 8; attempt++) {
+        await pause(150);
+        const updatedDetails = weaponDetails(weapon);
+        if (updatedDetails && detailCounter(updatedDetails, snapshot)?.completed) {
+          await extension.storage.local.set({ [storage]: done });
+          if (openedDetails === weapon) {
+            updatedDetails.close.click();
+            openedDetails = null;
+          }
+          return show('Signal 50 · Sunburn completion verified');
+        }
+      }
+      return show('Sunburn completion paused after an unverified click');
     }
     if (target.maximum !== null && snapshot.value > target.maximum) {
       show(snapshot.camo + ' · game count exceeds the tracker field limit');
@@ -555,17 +585,18 @@
     show('Tracked camo update paused · could not verify the exact count');
     return true;
   }
-  async function syncTrackedRows(session, rows) {
+  async function syncTrackedRows(session, rows, sunburnOnly = false) {
     if (!rows?.length || !multiplayerSelected()) return false;
-    const key = 'trackedProgress';
+    const key = sunburnOnly ? 'sunburnCompletion' : 'trackedProgress';
     const saved = (await extension.storage.local.get(key))[key];
     const state = saved?.session === session ? saved : { session, handled: [] };
     if (state.pending) {
+      if (sunburnOnly) return false;
       show('Tracked camo update paused after unverified click');
       return true;
     }
     const pending = rows.filter(row => row.type === 'camo' && row.camo &&
-      !(weaponKey(row.weapon) === 'signal50' && camoKey(row.camo) === 'sunburn') &&
+      (sunburnOnly ? isSunburn(row) && row.confirmed === true && row.value === 40 && row.goal === 40 : !isSunburn(row)) &&
       !state.handled.includes(row.id));
     const snapshot = (latestWeapon && pending.find(row => weaponKey(row.weapon) === weaponKey(latestWeapon))) || pending[0];
     if (!snapshot) return false;
@@ -806,6 +837,7 @@
             if (focusWeapon(key)) return show('Switching focus to ' + weapon);
           }
         }
+        if (await syncTrackedRows(session, trackedRows, true)) return;
         const target = findTarget();
         const signalIsCurrent = !weapon || weaponKey(weapon) === 'signal50';
         if (!state.pending && signalIsCurrent && state.cursor < count && (target?.count === 40 ||

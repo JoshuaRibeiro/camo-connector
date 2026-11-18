@@ -44,15 +44,15 @@ public sealed class GitHubRelease(HttpClient http)
         return verified;
     }
 
-    public async Task DownloadArchiveAsync(ReleaseVerification.Manifest manifest, Stream target, CancellationToken cancel)
+    public async Task DownloadArchiveAsync(ReleaseVerification.Manifest manifest, Stream target, CancellationToken cancel, Action<long>? onBytes = null)
     {
         if (!target.CanRead || !target.CanWrite || !target.CanSeek || target.Length != 0 || target.Position != 0)
             throw new ArgumentException("Use a new empty staging file for the update.", nameof(target));
-        await DownloadAsync(AssetPrefix + "v" + manifest.Version + "/" + manifest.Asset, target, manifest.Size, cancel);
+        await DownloadAsync(AssetPrefix + "v" + manifest.Version + "/" + manifest.Asset, target, manifest.Size, cancel, onBytes);
         ReleaseVerification.VerifyArchive(target, manifest);
     }
 
-    private async Task DownloadAsync(string url, Stream destination, long limit, CancellationToken cancel)
+    private async Task DownloadAsync(string url, Stream destination, long limit, CancellationToken cancel, Action<long>? onBytes = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.UserAgent.ParseAdd("CamoConnector");
@@ -69,6 +69,7 @@ public sealed class GitHubRelease(HttpClient http)
             bytes += size;
             if (bytes > limit) throw new InvalidDataException("Update download exceeds its expected size.");
             await destination.WriteAsync(buffer.AsMemory(0, size), cancel);
+            onBytes?.Invoke(bytes);
         }
     }
 }

@@ -11,15 +11,16 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
     /  poll\(\);\s*setInterval\(poll, 500\);/,
     '  findTarget = globalThis.target; multiplayerSelected = () => true;\n' +
     '  focusedWeapon = key => key === globalThis.focused; reportTrackerFocus = () => {};\n' +
-    '  syncGold = globalThis.syncGold; globalThis.pollOnce = poll;');
+    '  syncGold = globalThis.syncGold; globalThis.pollOnce = poll;\n' +
+    '  weaponDetails = key => key === globalThis.focused ? globalThis.details : null;\n' +
+    '  detailCounter = () => globalThis.detailCounter();');
   const data = {};
   let trackerCount = 39;
   let clicks = 0;
   const button = { click() { clicks++; trackerCount++; } };
   const events = { session: 'session', count: 0, progress: { id: 1, value: 4, through: 0 }, trackedRows: [
     { id: 2, type: 'camo', weapon: 'Signal 50', camo: 'Sunburn', value: 4, goal: 40 },
-    { id: 3, type: 'weapon-level', weapon: 'Signal 50', value: 0, goal: 4 },
-    { id: 4, type: 'camo', weapon: 'Signal 50', camo: 'Sunburn', value: 40, goal: 40, confirmed: true }
+    { id: 3, type: 'weapon-level', weapon: 'Signal 50', value: 0, goal: 4 }
   ] };
   const page = {
     document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
@@ -56,6 +57,21 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
   await page.pollOnce();
   assert.deepEqual(page.seenGold, ['Krait P68']);
   assert.equal(clicks, 1);
+
+  events.weapon = 'Signal 50';
+  page.focused = 'signal50';
+  trackerCount = 39;
+  page.details = {};
+  let completionClicks = 0;
+  const checkbox = { isConnected: true, click() { completionClicks++; trackerCount = 40; } };
+  page.detailCounter = () => ({ checkbox, completed: trackerCount === 40, count: trackerCount });
+  events.trackedRows.push({ id: 4, type: 'camo', weapon: 'Signal 50', camo: 'Sunburn', value: 40, goal: 40, confirmed: true });
+  await page.pollOnce();
+  await page.pollOnce();
+  assert.equal(completionClicks, 1);
+  assert.equal(trackerCount, 40);
+  assert.equal(clicks, 1);
+  assert.deepEqual([...data.sunburnCompletion.handled], [4]);
 });
 
 test('the details panel recognizes a completed Special camo by its prefixed title', () => {
