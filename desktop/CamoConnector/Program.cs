@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net;
+using System.Reflection;
 using CamoConnector.Update;
 
 namespace CamoConnector;
@@ -57,13 +58,16 @@ internal sealed partial class ConnectorWindow : Form
     private readonly Button update = new() { Text = "Check for updates", AutoSize = true };
     private readonly Label updateStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly string? updateKey = UpdateEnvironment.TrustedKey();
+    private static readonly Version desktopVersion = typeof(Program).Assembly.GetName().Version!;
     private ReleaseVerification.Manifest? available;
     private Process? bridge;
     private readonly CancellationTokenSource closing = new();
 
     public ConnectorWindow()
     {
-        Text = "Camo Connector · Desktop development preview";
+        var build = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion.Split('+')[0] ?? desktopVersion.ToString(3);
+        Text = $"Camo Connector v{build}";
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(570, 575);
         MinimumSize = new Size(500, 300);
@@ -77,7 +81,7 @@ internal sealed partial class ConnectorWindow : Form
             Width = 510, Height = 34, FlowDirection = FlowDirection.RightToLeft, WrapContents = false
         };
         if (updateKey != null) updateBar.Controls.Add(update);
-        else updateStatus.Text = "Automatic updates are available in signed releases.";
+        else updateStatus.Text = "Install a build with a trusted update key to enable in-app updates.";
         updateBar.Controls.Add(updateStatus);
         layout.Controls.Add(updateBar);
         layout.Controls.Add(status);
@@ -105,13 +109,12 @@ internal sealed partial class ConnectorWindow : Form
                 Close();
                 return;
             }
-            var version = typeof(Program).Assembly.GetName().Version!;
             using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
             timeout.CancelAfter(TimeSpan.FromSeconds(30));
             using var http = new HttpClient();
             updateStatus.Text = "Checking GitHub…";
             available = await new GitHubRelease(http).CheckAsync(
-                new Version(version.Major, version.Minor, version.Build), updateKey, timeout.Token);
+                new Version(desktopVersion.Major, desktopVersion.Minor, desktopVersion.Build), updateKey, timeout.Token);
             updateStatus.Text = available == null ? "Up to date!" : "Version " + available.Version + " is available.";
             if (available != null) update.Text = "Update and restart";
         }

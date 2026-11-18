@@ -27,9 +27,10 @@ The bridge creates a `Data` folder beside the launcher. It follows new records
 written to `Data/sunburn-events.jsonl` and stores a local backup there.
 
 The GitHub Actions preview workflow bundles Tesseract, the English OCR model
-and FFmpeg in the unsigned desktop artifact. Download the full desktop preview
-ZIP and extract it before launching. Automatic updates require a build with a
-trusted release key. The workflow does not publish a GitHub Release.
+and FFmpeg in the desktop artifact. The title bar includes the desktop version
+and preview run number. The desktop version lives in `desktop/version.txt`
+and can change independently of the browser extensions. Branch builds publish
+preview artifacts. A matching `vX.Y.Z` tag publishes a verified desktop release.
 
 For a signed update test, pass `-UpdatePublicKeyFile <PEM file>` to the
 build script. The build embeds that public key in both programs. Keep the
@@ -86,7 +87,32 @@ For Windows publisher signing, supply `-CertificateThumbprint` and
 the current user's certificate store. If those options are omitted the
 manifest is still signed, but the Windows executables are unsigned.
 
-For a verified release, attach the generated `CamoConnector-vX.Y.Z-win-x64.zip`,
-`portable-update.json`, and `portable-update.sig` together to the matching
-`vX.Y.Z` GitHub Release. The preview workflow only produces development
-artifacts. Verify a fresh extraction and an update before publishing.
+To enable verified updates, configure these repository Actions settings once.
+Use the existing key pair if releases have already been signed with it.
+
+| Setting | Name | Value |
+| --- | --- | --- |
+| Repository variable | `CAMO_UPDATE_PUBLIC_KEY` | RSA public key in PEM format |
+| Repository secret | `CAMO_PORTABLE_SIGNING_KEY` | Matching RSA private key in PEM format |
+
+For a first-time setup, generate and upload a new key from an authenticated
+GitHub CLI session in PowerShell 7:
+
+```powershell
+$key = [Security.Cryptography.RSA]::Create(3072)
+try {
+    $key.ExportPkcs8PrivateKeyPem() | gh secret set CAMO_PORTABLE_SIGNING_KEY --repo JoshuaRibeiro/camo-connector
+    if ($LASTEXITCODE) { throw 'Could not set the GitHub Actions signing secret.' }
+    $key.ExportSubjectPublicKeyInfoPem() | gh variable set CAMO_UPDATE_PUBLIC_KEY --repo JoshuaRibeiro/camo-connector
+    if ($LASTEXITCODE) { throw 'Could not set the GitHub Actions public key variable.' }
+} finally { $key.Dispose() }
+```
+
+For each release, bump `desktop/version.txt`, commit the change and push a
+matching tag, such as `v1.9.38`. Actions publishes the ZIP and its signed
+manifest. The automated workflow signs the update manifest. Authenticode for
+Windows executables is available through the local signing options above.
+
+Existing builds without a trusted key require a one-time manual switch to
+a keyed build. After that, use **Check for updates** and **Update and restart**
+in the app. The updater checks signatures and keeps the existing `Data` folder.

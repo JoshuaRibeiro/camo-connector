@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
@@ -36,22 +37,81 @@ jobs:
           }
           "CAMO_OCR_DIRECTORY=$ocr" >> $env:GITHUB_ENV
       - run: ./scripts/build-detector-development.ps1 -CaptureDirectory $env:CAMO_CAPTURE_DIRECTORY -OcrDirectory $env:CAMO_OCR_DIRECTORY
-      - run: ./scripts/build-desktop-preview.ps1 -CaptureDirectory $env:CAMO_CAPTURE_DIRECTORY -OcrDirectory $env:CAMO_OCR_DIRECTORY
+        if: github.ref_type != 'tag'
+      - name: Build desktop preview
+        if: github.ref_type != 'tag'
+        env:
+          CAMO_UPDATE_PUBLIC_KEY: ${{ vars.CAMO_UPDATE_PUBLIC_KEY }}
+        run: |
+          $key = ''
+          if ($env:CAMO_UPDATE_PUBLIC_KEY) {
+            $key = Join-Path $env:RUNNER_TEMP 'camo-update-public.pem'
+            [IO.File]::WriteAllText($key, $env:CAMO_UPDATE_PUBLIC_KEY)
+          }
+          ./scripts/build-desktop-preview.ps1 -CaptureDirectory $env:CAMO_CAPTURE_DIRECTORY -OcrDirectory $env:CAMO_OCR_DIRECTORY -UpdatePublicKeyFile $key -PreviewNumber $env:GITHUB_RUN_NUMBER
+          'CAMO_CHECK_ROOT=dist/desktop-preview' >> $env:GITHUB_ENV
+      - name: Package verified desktop release
+        if: github.ref_type == 'tag'
+        env:
+          CAMO_UPDATE_PUBLIC_KEY: ${{ vars.CAMO_UPDATE_PUBLIC_KEY }}
+          CAMO_PORTABLE_SIGNING_KEY: ${{ secrets.CAMO_PORTABLE_SIGNING_KEY }}
+        run: |
+          $version = (Get-Content desktop/version.txt -Raw).Trim()
+          if ($env:GITHUB_REF_NAME -cne "v$version") { throw 'Release tag and desktop version differ.' }
+          if (!$env:CAMO_UPDATE_PUBLIC_KEY -or !$env:CAMO_PORTABLE_SIGNING_KEY) {
+            throw 'Configure CAMO_UPDATE_PUBLIC_KEY and CAMO_PORTABLE_SIGNING_KEY before releasing.'
+          }
+          $key = Join-Path $env:RUNNER_TEMP 'camo-update-public.pem'
+          [IO.File]::WriteAllText($key, $env:CAMO_UPDATE_PUBLIC_KEY)
+          ./scripts/build-portable-release.ps1 -OutputDirectory dist/portable-release -CaptureDirectory $env:CAMO_CAPTURE_DIRECTORY -OcrDirectory $env:CAMO_OCR_DIRECTORY -UpdatePublicKeyFile $key
+          'CAMO_CHECK_ROOT=dist/portable-release/app' >> $env:GITHUB_ENV
       - name: Check bundled capture and OCR runtimes
         run: |
-          $runtime = Join-Path $PWD 'dist/desktop-preview/Runtime'
+          $runtime = Join-Path $env:CAMO_CHECK_ROOT 'Runtime'
           $languages = & "$runtime/Ocr/tesseract.exe" --tessdata-dir "$runtime/Ocr/tessdata" --list-langs
           if ($LASTEXITCODE -or $languages -notcontains 'eng') { throw 'Bundled OCR cannot load the English model.' }
           $devices = & "$runtime/Capture/ffmpeg.exe" -hide_banner -devices
           if ($LASTEXITCODE -or !($devices -match '\bdshow\b')) { throw 'Bundled FFmpeg lacks DirectShow support.' }
-      - run: ./tests/native-bridge.ps1
+      - run: ./tests/native-bridge.ps1 -Executable (Join-Path $env:CAMO_CHECK_ROOT 'Runtime/Bridge/CamoConnector.Bridge.exe')
       - uses: actions/upload-artifact@v4
+        if: github.ref_type != 'tag'
         with:
           name: CamoConnector-detector-development-win-x64
           path: dist/detector-development/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
+        if: github.ref_type != 'tag'
         with:
           name: CamoConnector-desktop-preview-win-x64
           path: dist/desktop-preview/
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: github.ref_type == 'tag'
+        with:
+          name: CamoConnector-desktop-release
+          path: |
+            dist/portable-release/CamoConnector-v*-win-x64.zip
+            dist/portable-release/portable-update.json
+            dist/portable-release/portable-update.sig
+          if-no-files-found: error
+
+  publish:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: CamoConnector-desktop-release
+          path: release
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $assets = @("release/CamoConnector-$env:GITHUB_REF_NAME-win-x64.zip", 'release/portable-update.json', 'release/portable-update.sig')
+          foreach ($asset in $assets) { if (!(Test-Path -LiteralPath $asset)) { throw "Missing $asset" } }
+          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --latest --generate-notes --title "Camo Connector $env:GITHUB_REF_NAME"
+          if ($LASTEXITCODE) { throw 'GitHub Release publishing failed.' }

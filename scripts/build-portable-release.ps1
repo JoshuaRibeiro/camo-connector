@@ -8,7 +8,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
-$version = (Get-Content -LiteralPath (Join-Path $root 'manifest.json') -Raw | ConvertFrom-Json).version
+$version = (Get-Content -LiteralPath (Join-Path $root 'desktop/version.txt') -Raw).Trim()
 if ($version -cnotmatch '^\d+\.\d+\.\d+$') { throw 'Use a three-part release version.' }
 if (!$env:CAMO_PORTABLE_SIGNING_KEY) { throw 'Supply the manifest private key through CAMO_PORTABLE_SIGNING_KEY.' }
 if ([bool]$CertificateThumbprint -ne [bool]$TimestampServer) { throw 'Supply both Authenticode thumbprint and timestamp server, or neither.' }
