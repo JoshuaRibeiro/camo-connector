@@ -118,7 +118,7 @@ $trackedLines = [CamoConnector.Detector.HudLine[]]@(
 $counterLines = [CamoConnector.Detector.HudLine[]]@([CamoConnector.Detector.HudLine]::new('8 / 20', .56))
 $rows = $tracked::ReadRows($trackedLines, $catalog, [Func[double,byte[]]]{ param($y) return ,$wrongThumbnail }, $counterLines)
 if ($rows.Length -ne 1 -or $rows[0].Camo -ne 'Frosted' -or $rows[0].Count -ne 8 -or $rows[0].Goal -ne 20 -or
-    $rows[0].Identity -ne 'artwork') {
+    $rows[0].Identity -ne 'name') {
     throw 'The counter-only pass did not recover the .50 GS row independently.'
 }
 $ambiguous = [CamoConnector.Detector.CamoReference[]]@(
@@ -146,6 +146,22 @@ if ($primary.Length -ne 1 -or $merged.Length -ne 2 -or
     ($merged | Where-Object Camo -eq Frosted).Count -ne 18 -or
     ($merged | Where-Object Camo -eq 'Red Tiger').Count -ne 16) {
     throw 'Pause menu lost a tracked row for a repeated LAST USED weapon'
+}
+$lobbyLines = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('.50 GS', .03)
+    [CamoConnector.Detector.HudLine]::new('Get 20 Headshot Kills against', .11)
+    [CamoConnector.Detector.HudLine]::new('Players', .18)
+    [CamoConnector.Detector.HudLine]::new('19 / 20', .24)
+    [CamoConnector.Detector.HudLine]::new('MOJAVE .357', .33)
+    [CamoConnector.Detector.HudLine]::new('Earn 1 more weapon unlock', .40)
+    [CamoConnector.Detector.HudLine]::new('FSS CARBON EDGE 1095', .61)
+    [CamoConnector.Detector.HudLine]::new('Reach Weapon Level 16', .69)
+    [CamoConnector.Detector.HudLine]::new('12 / 16', .82)
+)
+$lobby = $tracked::ReadRows($lobbyLines, $catalog, [Func[double,byte[]]]{ param($y) return ,$redReference })
+if ($lobby.Length -ne 2 -or $lobby[0].Camo -ne 'Frosted' -or $lobby[0].Count -ne 19 -or
+    $lobby[1].WeaponLevelObjective -ne 'Reach Weapon Level 16' -or $lobby[1].Count -ne 12) {
+    throw 'Lobby counters did not distinguish Special camo progress from weapon levels'
 }
 'Passed tracked-panel name precedence, thumbnail fallback and ambiguity rejection.'
 $combat = [CamoConnector.Detector.CombatRecognition]

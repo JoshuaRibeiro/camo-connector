@@ -6,7 +6,10 @@ using System.Text.RegularExpressions;
 
 namespace CamoConnector.Detector;
 
-public sealed record CamoProgress(string Weapon, string Camo, int Count, int Goal, string Identity = "name");
+public sealed record CamoProgress(string Weapon, string Camo, int Count, int Goal, string Identity = "name")
+{
+    public string? WeaponLevelObjective { get; init; }
+}
 
 public static class CamoMenuRecognition
 {

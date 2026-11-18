@@ -43,11 +43,10 @@ public static class TrackedCamoRecognition
         for (var i = 0; i < headers.Length; i++)
         {
             var (y, name) = headers[i];
-            if (!catalog.TryGetValue(name!, out var entries)) continue;
             var limit = Math.Min(y + .40, i + 1 < headers.Length ? headers[i + 1].Y : 1);
             var rows = lines.Where(line => line.Y > y && line.Y < limit).Select(line => line.Text).ToArray();
             var text = string.Join(" ", rows);
-            if (Regex.IsMatch(text, @"\bReach Weapon Level\b", RegexOptions.IgnoreCase)) continue;
+            var level = Regex.Match(text, @"\bReach\s+Weapon\s+Level\s+([0-9]{1,4})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             var counterText = counterLines == null ? text :
                 string.Join(" ", counterLines.Where(line => line.Y > y && line.Y < limit).Select(line => line.Text));
             var counters = Regex.Matches(counterText, @"(?<![0-9/])([0-9]{1,4})\s*[/|]\s*([0-9]{1,4})(?![0-9/])");
@@ -55,13 +54,30 @@ public static class TrackedCamoRecognition
             var count = int.Parse(counters[0].Groups[1].Value, CultureInfo.InvariantCulture);
             var goal = int.Parse(counters[0].Groups[2].Value, CultureInfo.InvariantCulture);
             if (goal == 0 || count > goal) continue;
+            if (level.Success)
+            {
+                if (int.Parse(level.Groups[1].Value, CultureInfo.InvariantCulture) == goal)
+                {
+                    var objective = $"Reach Weapon Level {goal}";
+                    result.Add(new(name!, objective, count, goal) { WeaponLevelObjective = objective });
+                }
+                continue;
+            }
 
+            if (!catalog.TryGetValue(name!, out var entries)) continue;
             var names = rows.Select(row => Key(Regex.Split(row, @"\s*[·•:]\s*|\s+(?:[-–—]|[0-9]+\s*[/|]\s*[0-9]+)", RegexOptions.CultureInvariant)[0]))
                 .ToHashSet(StringComparer.Ordinal);
             var named = entries.Select(entry => entry.Name).Where(camo => names.Contains(Key(camo))).Distinct().ToArray();
             if (named.Length > 1) continue;
-            var camo = named.Length == 1 ? named[0] : MatchArtwork(thumbnail(y), entries);
-            if (camo != null) result.Add(new(name!, camo, count, goal, named.Length == 1 ? "name" : "artwork"));
+            var objectiveCamo = name == ".50 GS" ? (goal, Key(text)) switch
+            {
+                (20, var objective) when objective.Contains("get20headshotkills", StringComparison.Ordinal) => "Frosted",
+                (30, var objective) when objective.Contains("get30pointblankkills", StringComparison.Ordinal) => "Red Tiger",
+                _ => null
+            } : null;
+            if (objectiveCamo != null && !entries.Any(entry => entry.Name == objectiveCamo)) objectiveCamo = null;
+            var camo = named.SingleOrDefault() ?? objectiveCamo ?? MatchArtwork(thumbnail(y), entries);
+            if (camo != null) result.Add(new(name!, camo, count, goal, named.Length == 1 || objectiveCamo != null ? "name" : "artwork"));
         }
         return result.GroupBy(row => (row.Weapon, row.Camo))
             .Select(group => group.Distinct().ToArray()).Where(group => group.Length == 1).Select(group => group[0]).ToArray();

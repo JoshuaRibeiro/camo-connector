@@ -339,7 +339,7 @@ internal sealed class HudCapture : IDisposable
             byte[]? Thumbnail(double y) => Sample(frame, layout.Area.Item2 + y * layout.Area.Item4, layout.Thumbnail);
             var rows = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail);
             var (x, y, w, h) = layout.Area;
-            var counterArea = (x + w * .61, y, w * .35, h);
+            var counterArea = (x + w * .54, y, w * .42, h);
             var (counterText, counterHeight) = await ReadTextAsync(frame, counterArea, cancel,
                 positioned: true, pageMode: 11, countersOnly: true, trace: trace, regionName: "trackedCounters");
             var counters = TrackedCamoRecognition.ReadTsv(counterText, counterHeight)
