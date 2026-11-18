@@ -396,7 +396,7 @@
         const identity = camoRowIdentity(row, snapshot.camo);
         if (!identity) continue;
         const counts = [...text.matchAll(/(?<![+\d])(\d+)\s*\/\s*(\d+)/g)];
-        if (counts.length !== 1) continue;
+        if (counts.length !== 1 || Number(counts[0][2]) !== snapshot.goal) continue;
         let card = row.parentElement;
         while (card && card !== document.body && !grinding(card)) card = card.parentElement;
         if (!card || card === document.body || !names.some(name => card.contains(name))) continue;
@@ -628,10 +628,39 @@
       return true;
     }
     if (militaryIncomplete(name)) return false;
-    const target = trackedControl(snapshot);
+    const readTarget = () => findTarget(name, snapshot.camo, snapshot.goal) ?? trackedControl(snapshot);
+    const target = readTarget();
     if (target && (target.completed || target.count >= snapshot.value)) {
       await extension.storage.local.set({ [key]: done });
       show(snapshot.weapon + ' · ' + snapshot.camo + ' progress verified');
+      return true;
+    }
+    if (target?.button?.isConnected && !target.button.disabled &&
+        Number.isInteger(snapshot.value) && Number.isInteger(snapshot.goal) &&
+        target.count < snapshot.value && snapshot.value <= snapshot.goal) {
+      await extension.storage.local.set({ [key]: { ...state, pendingId: snapshot.id } });
+      const current = readTarget();
+      if (!multiplayerSelected() || !focusedWeapon(name) || current?.button !== target.button ||
+          current.count !== target.count || !target.button.isConnected || target.button.disabled) {
+        await extension.storage.local.set({ [key]: state });
+        return true;
+      }
+      current.button.click();
+      for (let attempt = 0; attempt < 8; attempt++) {
+        await pause(150);
+        if (!multiplayerSelected() || !focusedWeapon(name)) break;
+        const observed = readTarget();
+        if (observed && observed.count >= current.count + 1) {
+          await extension.storage.local.set({ [key]: observed.count >= snapshot.value ? done : state });
+          show(snapshot.camo + ' · ' + observed.count + '/' + snapshot.goal);
+          return true;
+        }
+        if (!observed && snapshot.value === snapshot.goal && pastCompletionStage(name, snapshot.camo)) {
+          await extension.storage.local.set({ [key]: done });
+          return true;
+        }
+      }
+      show(snapshot.camo + ' · could not verify the automatic +1');
       return true;
     }
     return reconcileDetails(snapshot, key, state, done);
@@ -666,7 +695,8 @@
       return trackedControl(snapshot, snapshot.camo);
     };
     const target = readTarget();
-    if (!target) return false;    if (target.completed || target.count === snapshot.goal) {
+    if (!target) return false;
+    if (target.completed || target.count === snapshot.goal) {
       await extension.storage.local.set({ [key]: { session, cursor: count } });
       if (openedDetails === weapon) {
         weaponDetails(weapon)?.close.click();

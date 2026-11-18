@@ -162,6 +162,33 @@ test('unavailable camo checkoffs leave later checkoffs runnable and retry when v
   assert.deepEqual([...data.trackedProgress.handled], [0, 1]);
 });
 
+test('tracked progress applies verified increments on the visible weapon card', async () => {
+  const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
+    /  poll\(\);\s*setInterval\(poll, 500\);/,
+    '  multiplayerSelected = focusedWeapon = () => true; grindingCard = weaponDetails = () => null;\n' +
+    '  findTarget = globalThis.readCounter; globalThis.sync = syncTrackedRows;');
+  const data = {};
+  let count = 8;
+  let clicks = 0;
+  const button = { isConnected: true, click() { clicks++; count++; } };
+  const page = {
+    document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
+    chrome: { storage: { local: { get: async () => data, set: async value => Object.assign(data, value) } } },
+    readCounter: (weapon, camo, goal) => weapon === '50gs' && camo === 'Red Tiger' && goal === 30
+      ? { count, button } : null,
+    setTimeout: callback => callback()
+  };
+  vm.runInNewContext(tracker, page);
+  const row = { id: 13, type: 'camo', weapon: '.50 GS', camo: 'Red Tiger', goal: 30, value: 12 };
+  for (let pass = 0; pass < 5; pass++) await page.sync('session', [row]);
+  assert.equal(count, 12);
+  assert.equal(clicks, 4);
+  assert.deepEqual([...data.trackedProgress.handled], [13]);
+  await page.sync('session', [{ ...row, id: 14, value: 9 }]);
+  assert.equal(count, 12);
+  assert.equal(clicks, 4);
+});
+
 test('Military clicks only the highest tier and later visible stages acknowledge earlier unlocks', async () => {
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
