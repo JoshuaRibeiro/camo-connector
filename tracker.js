@@ -281,7 +281,7 @@
       if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
       const observed = readControl();
       if (observed?.done || (!observed && pastCompletionStage(weapon, name)) ||
-          (!observed && !control.button.isConnected && control.card?.isConnected &&
+          (name !== 'Gold' && !observed && !control.button.isConnected && control.card?.isConnected &&
           !camoRowIdentity(control.card, name))) {
         await extension.storage.local.set({ [key]: done });
         show(name + ' completed');
@@ -752,15 +752,19 @@
   }
   async function syncGold(session, names) {
     if (!names?.length || !multiplayerSelected()) return false;
-    const key = 'goldProgress';
-    const saved = (await extension.storage.local.get(key))[key];
-    const state = saved?.session === session ? saved : { session, handled: [] };
-    if (state.pending) return false;
-    const pending = names.filter(name => !state.handled.includes(name));
-    pending.sort((a, b) => Number(focusedWeapon(weaponKey(b))) - Number(focusedWeapon(weaponKey(a))));
-    for (const name of pending) {
-      if (await syncGrindingCompletion(weaponKey(name), 'Gold', key, state,
-        { ...state, handled: [...state.handled, name] })) return true;
+    for (const name of names) {
+      const weapon = weaponKey(name);
+      const key = 'goldProgress-' + weapon;
+      const saved = (await extension.storage.local.get(key))[key];
+      const state = saved?.session === session ? saved : { session, handled: [] };
+      if (state.handled.length) continue;
+      const done = { session, handled: [name] };
+      if (state.pending) {
+        if (focusedWeapon(weapon) && (grindingCompletion(weapon, 'Gold')?.done || pastCompletionStage(weapon, 'Gold')))
+          await extension.storage.local.set({ [key]: done });
+        continue;
+      }
+      if (await syncGrindingCompletion(weapon, 'Gold', key, state, done)) return true;
     }
     return false;
   }

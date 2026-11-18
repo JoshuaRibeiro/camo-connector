@@ -236,11 +236,12 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   await page.syncMilitary('session', [2, 7, 6, 8], '.50 GS');
   await page.syncTrackedRows('session', rows);
   assert.deepEqual([...data.trackedProgress.handled], [1]);
+  data['goldProgress-han86'] = { session: 'session', handled: [], pending: true };
   await page.syncGold('session', ['.50 GS']);
-  assert.equal(data.goldProgress, undefined);
+  assert.equal(data['goldProgress-50gs'], undefined);
   stage = 'Platinum';
   await page.syncGold('session', ['.50 GS']);
-  assert.deepEqual([...data.goldProgress.handled], ['.50 GS']);
+  assert.deepEqual([...data['goldProgress-50gs'].handled], ['.50 GS']);
 
   count = 0;
   page.military = () => ({ count, button: null });
