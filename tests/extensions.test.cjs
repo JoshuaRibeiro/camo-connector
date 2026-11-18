@@ -271,6 +271,32 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   assert.deepEqual(clicked, [7, 8]);
 });
 
+test('Military tile lookup supports artwork titles in the eight-tile row', () => {
+  const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
+    /  poll\(\);\s*setInterval\(poll, 500\);/,
+    '  globalThis.militaryControl = militaryControl;');
+  const tiles = Array.from({ length: 8 }, (_, index) => ({
+    title: 'Artwork ' + index,
+    getAttribute: () => null,
+    getClientRects: () => [{}]
+  }));
+  const header = {
+    children: [{ textContent: 'Military · Earn weapon unlocks using the Pila' }, { textContent: '0/8' }],
+    nextElementSibling: { querySelectorAll: () => tiles },
+    getClientRects: () => [{}]
+  };
+  const card = { querySelectorAll: () => [header] };
+  const page = {
+    document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
+    getComputedStyle: () => ({ visibility: 'visible' })
+  };
+  vm.runInNewContext(tracker, page);
+  assert.equal(page.militaryControl('pila', 2, card).button, tiles[1]);
+  assert.equal(page.militaryControl('han86', 2, card), null);
+  tiles.pop();
+  assert.equal(page.militaryControl('pila', 2, card).button, null);
+});
+
 test('named Now Grinding actions work for any camo and only the matching weapon', () => {
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,

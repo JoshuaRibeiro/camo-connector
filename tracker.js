@@ -87,10 +87,14 @@
       const count = label(counter).match(/^([0-8])\s*\/\s*8$/);
       if (!count) continue;
       const row = header.nextElementSibling;
-      const tiles = row ? buttons(row).filter(button =>
-        button.title === 'Military ' + tier || button.getAttribute('aria-label') === 'Tick up to Military ' + tier) : [];
-      if (tiles.length > 1) continue;
-      targets.push({ button: tiles[0] ?? null, header, count: Number(count[1]) });
+      const tiles = row ? buttons(row) : [];
+      const named = tiles.filter(button =>
+        [button.title, button.getAttribute('aria-label')].some(text =>
+          new RegExp('^(?:Tick up to |Select )?Military(?: Camo)? ' + tier + '$', 'i').test(text?.trim() ?? '')));
+      if (named.length > 1) continue;
+      // The top row always has eight tiers in order. Some trackers title tiles with the camo name.
+      const tile = named[0] ?? (tiles.length === 8 ? tiles[tier - 1] : null);
+      targets.push({ button: tile, header, count: Number(count[1]) });
     }
     if (targets.length <= 1) return targets[0] ?? null;
     // The same weapon can appear in the overlay and in the armoury list.
@@ -129,8 +133,14 @@
       return false;
     }
     const action = target?.button;
-    if (!action?.isConnected || action.disabled || action.closest('[aria-disabled="true"],button:disabled')) return false;
-    if (state.pending && target.count < (state.pendingTier ?? tier)) return false;
+    if (!action?.isConnected || action.disabled || action.closest('[aria-disabled="true"],button:disabled')) {
+      show(weaponName + ' | Military ' + tier + (target ? ' tile unavailable' : ' row unavailable'));
+      return true;
+    }
+    if (state.pending && target.count < (state.pendingTier ?? tier)) {
+      show(weaponName + ' | Military ' + tier + ' tile clicked, count still ' + target.count + '/8');
+      return true;
+    }
 
     const ready = { session, cursor: state.cursor };
     await extension.storage.local.set({ [key]: { ...ready, pending: true, pendingTier: tier } });
@@ -153,7 +163,7 @@
       }
     }
     show(weaponName + ' Military ' + tier + ' clicked | waiting to verify');
-    return false;
+    return true;
   }
 
   function militaryIncomplete(weapon) {
