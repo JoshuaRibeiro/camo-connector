@@ -246,16 +246,19 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   count = 0;
   page.military = () => ({ count, button: null });
   const pilaAction = {
-    textContent: String.fromCharCode(0x2713) + ' Military 1',
+    get textContent() { return String.fromCharCode(0x2713) + ' Military ' + (count + 1); },
     isConnected: true,
     getClientRects: () => [{}],
     closest: () => null,
-    click() { count = 1; }
+    click() { count++; }
   };
   card.querySelectorAll = () => [pilaAction];
-  await page.syncMilitary('session', [1], 'Pila');
+  await page.syncMilitary('session', [1, 2], 'Pila');
   assert.equal(count, 1);
-  assert.equal(data['militaryCursor-pila'].cursor, 1);
+  assert.equal(data['militaryCursor-pila'].cursor, 0);
+  await page.syncMilitary('session', [1, 2], 'Pila');
+  assert.equal(count, 2);
+  assert.equal(data['militaryCursor-pila'].cursor, 2);
   assert.equal(page.pastCompletionStage('50gs', 'Platinum'), false);
   stage = 'Harmonic Break';
   assert.equal(page.pastCompletionStage('50gs', 'Platinum'), true);

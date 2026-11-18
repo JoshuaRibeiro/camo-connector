@@ -122,7 +122,7 @@
     const state = saved?.session === session ? saved : { session, cursor: 0 };
     const remaining = tiers.slice(state.cursor);
     if (!remaining.length) return false;
-    const tier = state.pendingTier ?? Math.max(...remaining);
+    const tier = Math.max(...remaining);
     if (!focusedWeapon(weapon)) {
       if (Date.now() - lastFocusAttempt >= 3500) {
         lastFocusAttempt = Date.now();
@@ -132,38 +132,49 @@
     }
     const card = grindingCard(weapon);
     if (!card) return false;
-    const control = militaryControl(weapon, tier, card);
-    const cursor = state.pendingCursor ?? (state.pending ? state.cursor : tiers.length);
-    const done = { session, cursor };
-    if (!control && (!state.pending || militaryIncomplete(weapon))) return false;
-    if (!control || control.count >= tier) {
-      await extension.storage.local.set({ [key]: control ? done : { session, cursor: tiers.length } });
-      if (!control) show(weaponName + ' | Military row already complete');
+    const target = militaryControl(weapon, tier, card);
+    const done = { session, cursor: tiers.length };
+    const ready = { session, cursor: state.cursor };
+    if (target?.count >= tier || (!target && state.pending && !militaryIncomplete(weapon) &&
+        (state.pendingTier ?? tier) === tier)) {
+      await extension.storage.local.set({ [key]: done });
       return false;
     }
-    if (state.pending) return false;
-    const action = militaryAction(card, control, tier);
-    if (!action) return false;
-    await extension.storage.local.set({ [key]: { ...state, pending: true, pendingTier: tier, pendingCursor: cursor } });
-    const current = militaryControl(weapon, tier, card);
-    if (!multiplayerSelected() || !focusedWeapon(weapon) || !current || current.header !== control.header || current.button !== control.button ||
-        current.count !== control.count ||
-        militaryAction(card, current, tier) !== action || !action.isConnected) {
-      await extension.storage.local.set({ [key]: state });
-      return true;
+    if (!target) return false;
+    if (state.pending) {
+      if (target.count >= (state.pendingTier ?? tier))
+        await extension.storage.local.set({ [key]: ready });
+      return false;
+    }
+
+    // Some cards expose only the next Military action, even when several tiers are already unlocked in-game.
+    const nextTier = target.count + 1;
+    const targetAction = militaryAction(card, target, tier);
+    const clickTier = targetAction ? tier : nextTier;
+    const control = targetAction ? target : militaryControl(weapon, nextTier, card);
+    const action = targetAction ?? militaryAction(card, control, clickTier);
+    if (!action || control?.count !== target.count) return false;
+    await extension.storage.local.set({ [key]: { ...ready, pending: true, pendingTier: clickTier } });
+    const current = militaryControl(weapon, clickTier, card);
+    if (!multiplayerSelected() || !focusedWeapon(weapon) || !current || current.header !== control.header ||
+        current.button !== control.button || current.count !== control.count ||
+        militaryAction(card, current, clickTier) !== action || !action.isConnected) {
+      await extension.storage.local.set({ [key]: ready });
+      return false;
     }
     action.click();
     for (let attempt = 0; attempt < 8; attempt++) {
       await pause(150);
       if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
       const observed = militaryControl(weapon, tier, grindingCard(weapon) || card);
-      if (observed?.count >= tier || (!observed && !militaryIncomplete(weapon))) {
-        await extension.storage.local.set({ [key]: observed ? done : { session, cursor: tiers.length } });
-        show(weaponName + ' | Military ' + tier + '/8 synced');
+      const reachedTarget = observed?.count >= tier || (!observed && clickTier === tier && !militaryIncomplete(weapon));
+      if (reachedTarget || observed?.count >= clickTier) {
+        await extension.storage.local.set({ [key]: reachedTarget ? done : ready });
+        show(weaponName + ' | Military ' + (observed?.count ?? tier) + '/8 synced');
         return true;
       }
     }
-    show(weaponName + ' Military ' + tier + ' clicked | waiting to verify');
+    show(weaponName + ' Military ' + clickTier + ' clicked | waiting to verify');
     return false;
   }
 

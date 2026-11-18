@@ -308,11 +308,12 @@ internal sealed class HudCapture : IDisposable
             ? CamoMenuRecognition.ReadProgress(weapon, title, [counter], names) : null;
     }
 
-    public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null)
+    public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null, bool requireHeading = false)
     {
         // End before the game logo beside CAMO SELECT.
         var (heading, _) = await ReadTextAsync(frame, (.072, .047, .114, .040), cancel, pageMode: 7,
             trace: trace, regionName: "heading");
+        if (requireHeading && !CamoMenuRecognition.IsCamoMenu(heading)) return null;
         var (tab, _) = await ReadTextAsync(frame, (.071, .102, .147, .033), cancel, pageMode: 7,
             trace: trace, regionName: "progressionTab");
         var weapon = CamoMenuRecognition.ReadProgressionWeapon(tab);

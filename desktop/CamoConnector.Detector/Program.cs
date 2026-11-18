@@ -222,13 +222,20 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         }
         var now = DateTimeOffset.UtcNow;
         var scanStarted = Stopwatch.GetTimestamp();
-        var scanLobby = now - lastLobbyScan >= TimeSpan.FromSeconds(1);
-        var scanChallenge = now - lastChallengeScan >= TimeSpan.FromMilliseconds(200);
-        var unlockRead = ReadSnapshotAsync(frame, copy => capture.DetectMilitaryUnlockAsync(copy, cancel));
+        var pollProgress = lastMenuWeapon != null || now - lastProgressScan >= TimeSpan.FromMilliseconds(400) ||
+            (previousMenuMilitary != null && !seenUnlocks.Contains(previousMenuMilitary));
+        var menuWeapon = pollProgress ? await capture.ReadCamoMenuWeaponAsync(frame, cancel, requireHeading: true) : null;
+        var scanGameplay = menuWeapon == null;
+        var scanLobby = scanGameplay && now - lastLobbyScan >= TimeSpan.FromSeconds(1);
+        var scanChallenge = scanGameplay && now - lastChallengeScan >= TimeSpan.FromMilliseconds(200);
+        var unlockRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectMilitaryUnlockAsync(copy, cancel)) :
+            Task.FromResult<MilitaryUnlock?>(null);
         var lobbyRead = scanLobby ? ReadSnapshotAsync(frame, copy => capture.DetectMatchNoticeAsync(copy, cancel)) : null;
         var challengeRead = scanChallenge ? ReadSnapshotAsync(frame, copy => capture.DetectChallengeBannerAsync(copy, cancel)) : null;
-        var combatRead = ReadSnapshotAsync(frame, copy => capture.DetectCombatAsync(copy, cancel));
-        var weaponRead = capture.DetectAsync(frame, cancel);
+        var combatRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectCombatAsync(copy, cancel)) :
+            Task.FromResult(new CombatRead(false, false, null));
+        var weaponRead = scanGameplay ? capture.DetectAsync(frame, cancel) :
+            Task.FromResult<(WeaponRead? Weapon, bool Replay)>((null, false));
         await Task.WhenAll(unlockRead, (Task?)lobbyRead ?? Task.CompletedTask,
             (Task?)challengeRead ?? Task.CompletedTask, combatRead, weaponRead);
         var result = await weaponRead;
@@ -370,11 +377,11 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             });
             await File.AppendAllTextAsync(log, record + "\n", cancel);
         }
-        if (DateTimeOffset.UtcNow - lastProgressScan >= TimeSpan.FromMilliseconds(400))
+        if (pollProgress)
         {
-            lastProgressScan = DateTimeOffset.UtcNow;
-            var menuWeapon = result is { Weapon: null, Replay: false }
-                ? await capture.ReadCamoMenuWeaponAsync(frame, cancel) : null;
+            lastProgressScan = now;
+            if (menuWeapon == null && result is { Weapon: null, Replay: false })
+                menuWeapon = await capture.ReadCamoMenuWeaponAsync(frame, cancel);
             if (menuWeapon != null)
             {
                 menuReads++;
@@ -391,11 +398,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     context = "camo-menu", at = now
                 }, cancel);
             }
-            // GDI+ bitmap clones can share backing storage. Keep this menu scan on one reader.
-            var gold = await capture.DetectCompletionistGoldAsync(frame, menuWeapon, cancel);
-            var specials = await capture.DetectSpecialUnlocksAsync(frame, menuWeapon, cancel);
             var militaryTier = menuWeapon == null ? null : await capture.ReadMilitaryMenuCountAsync(frame, cancel);
-            var reads = await ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
             var menuMilitary = menuWeapon != null && militaryTier is int tier && tier > 0
                 ? new MilitaryUnlock(menuWeapon, tier) : null;
             if (menuMilitary != null && menuMilitary == previousMenuMilitary && seenUnlocks.Add(menuMilitary))
@@ -406,7 +409,17 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     tier = menuMilitary.Tier, context = "camo-menu", at = now
                 }, cancel);
             }
+            var confirmingMilitary = menuMilitary != null && menuMilitary != previousMenuMilitary &&
+                !seenUnlocks.Contains(menuMilitary);
             previousMenuMilitary = menuMilitary;
+            if (confirmingMilitary)
+            {
+                await Task.Delay(75, cancel);
+                continue;
+            }
+            var gold = await capture.DetectCompletionistGoldAsync(frame, menuWeapon, cancel);
+            var specials = await capture.DetectSpecialUnlocksAsync(frame, menuWeapon, cancel);
+            var reads = await ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
             if (gold != null && gold == goldCandidate && goldUnlocked.Add(gold))
                 await AppendAsync(log, new
                 {
