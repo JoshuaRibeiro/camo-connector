@@ -797,7 +797,10 @@
         }
         const detected = weapon ? weaponKey(weapon) : null;
         const activeWeapon = aliases.get(detected) || detected;
-        const canSync = name => !activeWeapon || weaponKey(name) === activeWeapon;
+        const canSync = name => {
+          const key = weaponKey(name);
+          return (!activeWeapon || key === activeWeapon) && focusedWeapon(key);
+        };
         const activeRows = trackedRows?.filter(row => canSync(row.weapon));
         if (canSync('Sang 9mm') && await syncMilitary(session, military)) return;
         for (const [name, tiers] of catalogMilitary || []) {
@@ -821,21 +824,6 @@
             await syncAkimbo(session, akimboCount, akimboTiming, firstReceived)) return;
         if (!sunburnPending && canSync('Sang 9mm') && await syncChallenges(session, challenges)) return;
         if (!sunburnPending && await syncGold(session, goldUnlocks?.filter(canSync))) return;
-        const desired = weapon || (sunburnPending ? 'Signal 50' : null);
-        if (desired && multiplayerSelected()) {
-          const normalized = weaponKey(desired);
-          const key = aliases.get(normalized) || normalized;
-          if (!(key === 'signal50' && target) && !focusedWeapon(key)) {
-            if (Date.now() - lastFocusAttempt >= 3500) {
-              lastFocusAttempt = Date.now();
-              if (focusWeapon(key)) return show('Switching focus to ' + desired);
-            }
-            const trackerName = key === 'oris86' ? 'Oris 8.6' : desired;
-            return show('Detected ' + desired + ' · waiting for the ' + trackerName +
-              ' card (clear search and Hide maxed weapons)');
-          }
-          if (key !== 'signal50') return show(desired + ' · focus synced');
-        }
         if (signalIsCurrent && state.pending && (weapon || target))
           return show('Sunburn sync paused after an unverified +1. Check the tracker count.');
         if (!target) return show(weapon ? weapon + ' · focus synced' : 'Ready · waiting for camo detections');

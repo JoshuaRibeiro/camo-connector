@@ -185,9 +185,30 @@ if (($unlock.Challenge -join ',') -ne 'menu-autumn,menu-snakeskin,menu-space-tim
 $confirmation = [CamoConnector.Detector.SpecialUnlockConfirmation]::new()
 if ($confirmation.Observe($unlock).Length -or $confirmation.Observe($unlock).Length -ne 3 -or
     $confirmation.Observe($unlock).Length) { throw 'Special confirmation did not require two reads or deduplicate' }
+$catalog = Get-Content (Join-Path $PSScriptRoot '../special-catalog.json') -Raw | ConvertFrom-Json
+$osprey = [CamoConnector.Detector.CamoReference[]]@(
+    foreach ($entry in $catalog.'Cronen Osprey') {
+        [CamoConnector.Detector.CamoReference]::new($entry.name, $null, $entry.slot, $entry.goal)
+    }
+)
+$unlocks = $specials::Resolve('Cronen Osprey', 3, [double[]]@(), $osprey)
+if (($unlocks.Challenge -join ',') -ne 'In the Weeds,Dark Ichor,Chained') {
+    throw 'Cronen Osprey Specials were dropped when their numeric goals were absent'
+}
+$partial = $specials::Resolve('Cronen Osprey', 1, [double[]]@(.8,.3,.8), $osprey)
+if (($partial.Challenge -join ',') -ne 'Dark Ichor') { throw 'Partial Cronen Osprey unlock mapped to the wrong slot' }
 'Passed Special count, padlock ambiguity, menu event mapping and two-scan confirmation.'
 if ($specials::ReadBanner('CHALLENGE COMPLETED','25 player kills while aiming down sights') -ne 'ads-25' -or
     $specials::ReadBanner('CHALLENGE COMPLETED','3 player kills without dying 5 times') -ne 'streak-3x5' -or
     $specials::ReadBanner('CHALLENGE COMPLETED','50 player kills while using Akimbo') -ne 'menu-space-time' -or
     $specials::ReadBanner('','25 player kills while aiming down sights')) { throw 'Special banner checks failed' }
+$pistolSpecials = [CamoConnector.Detector.CamoReference[]]@(
+    foreach ($entry in $catalog.'.50 GS') {
+        [CamoConnector.Detector.CamoReference]::new($entry.name, $null, $entry.slot, $entry.goal)
+    }
+)
+if ($specials::ReadNamedBanner([string[]]@('SPLATTER OPS'), $pistolSpecials) -ne 'Splatter Ops' -or
+    $specials::ReadNamedBanner([string[]]@('SPLATTER OPS','FROSTED'), $pistolSpecials)) {
+    throw 'Named Special badge recognition failed'
+}
 'Passed named Special completion banner rules.'

@@ -20,6 +20,16 @@ public static class SpecialUnlocks
         if (text.Contains("50PLAYERKILLSWHILEUSINGAKIMBO", StringComparison.Ordinal)) return "menu-space-time";
         return null;
     }
+    public static string? ReadNamedBanner(string[]? lines, IEnumerable<CamoReference> catalog)
+    {
+        if (lines == null) return null;
+        static string Key(string text) => Regex.Replace(text.ToUpperInvariant(), "[^A-Z0-9]", "");
+        var text = lines.Select(Key).Where(line => line.Length > 0).ToHashSet();
+        var matches = catalog.Select(entry => entry.Name).Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(name => text.Contains(Key(name))).Take(2).ToArray();
+        return matches.Length == 1 ? matches[0] : null;
+    }
+
     public static int? ReadCount(string text)
     {
         var match = Regex.Match(text, @"\bSPECIAL\s*(?:\[|1)?\s*([0-3])\s*/\s*3(?:\]|1)?(?![0-9])",
@@ -45,7 +55,7 @@ public static class SpecialUnlocks
         }
         if (catalog.Length != 3 || catalog.Select(entry => entry.Slot).Distinct().Count() != 3 ||
             catalog.Any(entry => entry.Slot is < 1 or > 3)) return [];
-        return catalog.Where(entry => entry.Goal is > 0 && slots.Contains(entry.Slot))
+        return catalog.Where(entry => slots.Contains(entry.Slot))
             .Select(entry => new SpecialUnlock(weapon, entry.Name, "catalog-special-unlocked")).ToArray();
     }
 }

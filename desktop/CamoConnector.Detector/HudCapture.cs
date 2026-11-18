@@ -185,7 +185,7 @@ internal sealed class HudCapture : IDisposable
         return best;
     }
 
-    public async Task<(string? Challenge, bool Completed)> DetectChallengeBannerAsync(Bitmap frame, CancellationToken cancel,
+    public async Task<(string? Challenge, bool Completed, string[]? Details)> DetectChallengeBannerAsync(Bitmap frame, CancellationToken cancel,
         Action<string, string, Bitmap>? trace = null)
     {
         var warmPixels = 0;
@@ -205,36 +205,39 @@ internal sealed class HudCapture : IDisposable
         if (!LooksCompleted(heading))
             heading = await ReadBannerText((.350, .250, .300, .047), "unlockHeadingOriginal", pageMode: 6);
         var completed = LooksCompleted(heading);
-        if (!goldTile && !completed) return (null, false);
+        if (!goldTile && !completed) return (null, false, null);
         var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)
             ? "gold-15" : SpecialUnlocks.ReadBanner(heading, text);
-        if (Match(detail) is { } match) return (match, true);
+        if (Match(detail) is { } match) return (match, true, null);
+        var details = new List<string> { detail };
         foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast, PixelAdjustment.Invert })
         {
             detail = await ReadBannerText((.382, .301, .237, .022), $"unlockObjective{adjustment}", adjustment);
-            if (Match(detail) is { } fallback) return (fallback, true);
+            if (Match(detail) is { } fallback) return (fallback, true, null);
+            details.Add(detail);
         }
-        return (null, completed);
+        return (null, completed, details.ToArray());
 
         static bool LooksCompleted(string text) => System.Text.RegularExpressions.Regex.IsMatch(text,
             @"\bCOMPLETED\b|\bCHALLENGE\w{0,2}\s+LETED\b",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
     }
 
-    public SpecialUnlock? IdentifySpecialBanner(Bitmap frame, string? weapon)
+    public SpecialUnlock? IdentifySpecialBanner(Bitmap frame, string? weapon, string[]? details)
     {
         var sample = Sample(frame, .148, (.471, .058, .102, 0));
         if (weapon != null && catalog.TryGetValue(weapon, out var entries))
         {
-            var name = MatchBannerArtwork(entries);
-            return name != null && entries.Any(entry => entry.Name == name && entry.Goal is > 0)
+            var name = SpecialUnlocks.ReadNamedBanner(details, entries) ?? MatchBannerArtwork(entries);
+            return name != null
                 ? new(weapon, name, "catalog-special-unlocked") : null;
         }
-        var unique = MatchBannerArtwork(catalog.Values.SelectMany(entries => entries));
+        var candidates = catalog.Values.SelectMany(entries => entries).ToArray();
+        var unique = SpecialUnlocks.ReadNamedBanner(details, candidates) ?? MatchBannerArtwork(candidates);
         if (unique == null) return null;
         var weapons = catalog.Where(pair => pair.Value.Any(entry => entry.Name == unique)).Take(2).ToArray();
-        return weapons.Length == 1 && weapons[0].Value.Any(entry => entry.Name == unique && entry.Goal is > 0)
+        return weapons.Length == 1
             ? new(weapons[0].Key, unique, "catalog-special-unlocked") : null;
 
         string? MatchBannerArtwork(IEnumerable<CamoReference> candidates) => TrackedCamoRecognition.MatchArtwork(sample,

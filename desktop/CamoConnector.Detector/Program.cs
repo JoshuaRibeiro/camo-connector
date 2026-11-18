@@ -75,7 +75,7 @@ try
             var (weapon, replay) = await capture.DetectAsync(frame, stop.Token);
             var banner = await capture.DetectChallengeBannerAsync(frame, stop.Token, RecordCrop);
             var special = banner.Completed && banner.Challenge == null && !replay
-                ? capture.IdentifySpecialBanner(frame, weapon?.Name) : null;
+                ? capture.IdentifySpecialBanner(frame, weapon?.Name, banner.Details) : null;
             result = new { source, weapon, replay, banner.Challenge, banner.Completed, special, cropDirectory, reads };
         }
         else
@@ -114,7 +114,7 @@ try
             longshot = !replay && await capture.DetectLongshotAsync(image, stop.Token),
             goldWeapon = await capture.DetectCompletionistGoldAsync(image, menuWeapon, stop.Token),
             goldBanner = challenge == "gold-15", challenge,
-            specialBanner = banner.Completed && challenge == null ? capture.IdentifySpecialBanner(image, result.Weapon?.Name) : null,
+            specialBanner = banner.Completed && challenge == null ? capture.IdentifySpecialBanner(image, result.Weapon?.Name, banner.Details) : null,
             specialUnlocks = await capture.DetectSpecialUnlocksAsync(image, menuWeapon, stop.Token)
         }));
         return 0;
@@ -333,7 +333,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                         {
                             kind = "challenge-completed", source = "live", mode = "mp", weapon = candidate, challenge, at = now
                         }, cancel);
-                    else if (challenge == null && capture.IdentifySpecialBanner(frame, candidate) is { } special &&
+                    else if (challenge == null && capture.IdentifySpecialBanner(frame, candidate, banner.Details) is { } special &&
                         seenSpecialBanners.Add(special))
                         await AppendAsync(log, new
                         {
