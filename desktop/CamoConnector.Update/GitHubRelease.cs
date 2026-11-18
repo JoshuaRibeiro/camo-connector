@@ -88,7 +88,21 @@ public sealed class GitHubRelease(HttpClient http)
     {
         if (!target.CanRead || !target.CanWrite || !target.CanSeek || target.Length != 0 || target.Position != 0)
             throw new ArgumentException("Use a new empty staging file for the update.", nameof(target));
-        await DownloadAsync(AssetPrefix + "v" + manifest.Version + "/" + manifest.Asset, target, manifest.Size, cancel, onBytes);
+        var idleTimeout = TimeSpan.FromSeconds(60);
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+        idle.CancelAfter(idleTimeout);
+        try
+        {
+            await DownloadAsync(AssetPrefix + "v" + manifest.Version + "/" + manifest.Asset, target, manifest.Size, idle.Token, bytes =>
+            {
+                idle.CancelAfter(idleTimeout);
+                onBytes?.Invoke(bytes);
+            });
+        }
+        catch (OperationCanceledException) when (idle.IsCancellationRequested && !cancel.IsCancellationRequested)
+        {
+            throw new TimeoutException("The update download received no data for 60 seconds. Try again or download the Windows ZIP from GitHub Releases.");
+        }
         ReleaseVerification.VerifyArchive(target, manifest);
     }
 

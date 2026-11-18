@@ -77,15 +77,17 @@ internal static class Program
                 var staged = Path.Combine(Path.GetTempPath(), "CamoConnector-" + Guid.NewGuid().ToString("N") + ".zip");
                 using var archive = new FileStream(staged, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
                     65536, FileOptions.DeleteOnClose);
-                report("Downloading update (0%)…");
-                var lastPercent = 0;
-                release.DownloadArchiveAsync(manifest, archive, deadline.Token, bytes =>
+                var totalMiB = manifest.Size / 1048576d;
+                report($"Downloading 0.0 / {totalMiB:F1} MiB.");
+                var lastReport = Stopwatch.GetTimestamp();
+                release.DownloadArchiveAsync(manifest, archive, CancellationToken.None, bytes =>
                 {
-                    var percent = (int)(bytes * 100 / manifest.Size);
-                    if (percent == lastPercent) return;
-                    lastPercent = percent;
-                    report(percent == 100 ? "Verifying downloaded files…" : $"Downloading update ({percent}%)…");
+                    if (bytes < manifest.Size && Stopwatch.GetElapsedTime(lastReport) < TimeSpan.FromMilliseconds(500))
+                        return;
+                    lastReport = Stopwatch.GetTimestamp();
+                    report($"Downloading {bytes / 1048576d:F1} / {totalMiB:F1} MiB ({bytes * 100 / manifest.Size}%).");
                 }).GetAwaiter().GetResult();
+                report("Preparing the verified update.");
                 transaction.Apply(archive, manifest, report: report);
             }
         }
