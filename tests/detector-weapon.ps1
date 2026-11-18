@@ -67,6 +67,13 @@ if ($menu::ReadProgressionWeapon('SIGNAL 50 PROGRESSION MODE MASTERY') -ne 'Sign
     $menu::ReadProgressionWeapon('UNKNOWN PROGRESSION MODE MASTERY')) {
     throw 'Neighboring menu tab affected weapon identity'
 }
+if ($menu::ReadBreadcrumbWeapon('CREATE A CLASS / EDIT CUSTOM CLASS / SIGNAL 5O /') -ne 'Signal 50' -or
+    $menu::ReadBreadcrumbWeapon('CREATE A CLASS / EDIT CUSTOM CLASS / FSS CARBON EDGE 1095') -ne 'FSS Carbon Edge 1095' -or
+    $menu::ReadBreadcrumbWeapon('CREATE A CLASS / EDIT CUSTOM CLASS / .50 GS /') -ne '.50 GS' -or
+    $menu::ReadBreadcrumbWeapon('CREATE A CLASS / EDIT CUSTOM CLASS / UNKNOWN /') -or
+    $menu::ReadBreadcrumbWeapon('LOADOUT / EDIT CUSTOM CLASS / SIGNAL 50 /')) {
+    throw 'Camo menu breadcrumb recognition failed'
+}
 $redTiger = $menu::ReadProgress('.50 GS','RED-TIGER', @('Complete 3 Special Camos','2/3','Point blank kills','3/30'),$camos)
 if ($redTiger.Camo -ne 'Red Tiger' -or $redTiger.Count -ne 3 -or $redTiger.Goal -ne 30) { throw 'Named camo count failed' }
 $differentGoal = $menu::ReadProgress('.50 GS','Frosted', @('Different wording 5/10'),$camos)

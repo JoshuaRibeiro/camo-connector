@@ -38,6 +38,14 @@ public static class CamoMenuRecognition
         return WeaponRecognition.Read(new[] { name }, false)?.Name;
     }
 
+    public static string? ReadBreadcrumbWeapon(string text)
+    {
+        var parts = text.Split('/', StringSplitOptions.TrimEntries);
+        if (parts.Length is < 3 or > 4 || (parts.Length == 4 && parts[3].Length != 0) ||
+            Key(parts[0]) != "createaclass" || Key(parts[1]) != "editcustomclass") return null;
+        return WeaponRecognition.Read([parts[2]], false)?.Name;
+    }
+
     public static string? ReadKnownCamoTitle(string text, string[] knownCamos)
     {
         var lines = text.Split('\n').Select(Key).ToHashSet(StringComparer.Ordinal);

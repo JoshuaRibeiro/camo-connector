@@ -294,6 +294,12 @@ internal sealed class HudCapture : IDisposable
                 trace: trace, regionName: "wideProgressionTab");
             weapon = CamoMenuRecognition.ReadProgressionWeapon(wideTab);
         }
+        if (weapon == null && CamoMenuRecognition.IsCamoMenu(heading))
+        {
+            var (breadcrumb, _) = await ReadTextAsync(frame, (.072, .023, .295, .023), cancel, pageMode: 7,
+                trace: trace, regionName: "camoBreadcrumb");
+            weapon = CamoMenuRecognition.ReadBreadcrumbWeapon(breadcrumb);
+        }
         if (weapon == null || CamoMenuRecognition.IsCamoMenu(heading)) return weapon;
         // The progression tab and a military row together identify the menu
         // when its heading drops out or is partly obscured.
