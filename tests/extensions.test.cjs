@@ -156,7 +156,7 @@ test('Military clicks only the highest tier and later visible stages acknowledge
     /  poll\(\);\s*setInterval\(poll, 500\);/,
     '  multiplayerSelected = () => true; focusedWeapon = () => true; grindingCard = () => globalThis.card;\n' +
     '  militaryControl = (_, tier) => globalThis.military(tier); grindingCompletion = () => null;\n' +
-    '  Object.assign(globalThis, { syncMilitary, syncTrackedRows, syncGold });');
+    '  Object.assign(globalThis, { syncMilitary, syncTrackedRows, syncGold, pastCompletionStage });');
   const data = {};
   let count = 0;
   let stage = '';
@@ -203,6 +203,10 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   stage = 'Platinum';
   await page.syncGold('session', ['.50 GS']);
   assert.deepEqual([...data.goldProgress.handled], ['.50 GS']);
+  assert.equal(page.pastCompletionStage('50gs', 'Platinum'), false);
+  stage = 'Harmonic Break';
+  assert.equal(page.pastCompletionStage('50gs', 'Platinum'), true);
+  assert.equal(page.pastCompletionStage('50gs', 'Harmonic Break'), false);
   assert.deepEqual(clicked, [7, 8]);
 });
 

@@ -165,10 +165,12 @@
   function pastCompletionStage(weapon, name) {
     const card = grindingCard(weapon);
     if (!card) return false;
-    const later = camoKey(name) === 'gold' ? /^(?:Platinum|Harmonic Break|Mode Mastery|Prestige)(?=$|\s*[\u00b7\u2022:])/i :
-      /^(?:Gold|Platinum|Harmonic Break|Mode Mastery|Prestige)(?=$|\s*[\u00b7\u2022:])/i;
+    const stages = ['gold', 'platinum', 'harmonicbreak', 'modemastery', 'prestige'];
+    const requestedStage = stages.indexOf(camoKey(name));
     return [...document.querySelectorAll('h2,h3,h4,span,strong,b,p,div,label')].some(title => {
-      if (!visible(title) || !later.test(label(title))) return false;
+      if (!visible(title)) return false;
+      const stage = stages.indexOf(camoKey(label(title).split(/[\u00b7\u2022:]/, 1)[0]));
+      if (stage <= requestedStage) return false;
       let hasStageRow = false;
       for (let row = title; row && row !== document.body; row = row.parentElement) {
         if (buttons(row).some(button => label(button) === 'Grind this')) return false;
