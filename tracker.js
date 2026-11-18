@@ -255,7 +255,10 @@
       return false;
     }
     if (!control.button?.isConnected) return false;
-    await extension.storage.local.set({ [key]: { ...state, pending: true } });
+    const interrupted = key === 'trackedProgress' || key === 'sunburnCompletion'
+      ? { ...state, pendingId: done.handled.at(-1) }
+      : { ...state, pending: true };
+    await extension.storage.local.set({ [key]: interrupted });
     const current = readControl();
     if (militaryIncomplete(weapon) || current?.button !== control.button || !control.button.isConnected) {
       await extension.storage.local.set({ [key]: state });
@@ -516,13 +519,14 @@
       show(snapshot.weapon + ' · no unique tracker details row for ' + snapshot.camo);
       return true;
     }
-    if (target.count === snapshot.value || target.completed) {
+    if (target.count >= snapshot.value || target.completed) {
       await extension.storage.local.set({ [storage]: done });
       if (openedDetails === weapon) {
         details.close.click();
         openedDetails = null;
       }
-      show(target.completed && target.count !== snapshot.value ? 'Completed camo preserved' :
+      show(target.count > snapshot.value ? 'Higher tracker count preserved' :
+        target.completed && target.count !== snapshot.value ? 'Completed camo preserved' :
         snapshot.weapon + ' · synced ' + snapshot.value + '/' + snapshot.goal);
       return true;
     }
@@ -540,7 +544,7 @@
     }
     const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
     if (!setValue) return show('Could not access the editable count field');
-    await extension.storage.local.set({ [storage]: { ...state, pending: true } });
+    await extension.storage.local.set({ [storage]: { ...state, pendingId: snapshot.id } });
     const currentDetails = weaponDetails(weapon);
     const current = currentDetails && detailCounter(currentDetails, snapshot);
     if (!multiplayerSelected() || !current || current.completed ||
@@ -592,11 +596,12 @@
     if (!rows?.length || !multiplayerSelected()) return false;
     const key = sunburnOnly ? 'sunburnCompletion' : 'trackedProgress';
     const saved = (await extension.storage.local.get(key))[key];
-    const state = saved?.session === session ? saved : { session, handled: [] };
-    if (state.pending) {
-      if (sunburnOnly) return false;
-      show('Tracked camo update paused after unverified click');
-      return true;
+    let state = saved?.session === session ? saved : { session, handled: [] };
+    if (state.pending || state.pendingId != null) {
+      const { pending, pendingId, ...clean } = state;
+      // An interrupted write with a known event ID is never repeated.
+      state = pendingId == null ? clean : { ...clean, handled: [...clean.handled, pendingId] };
+      await extension.storage.local.set({ [key]: state });
     }
     const pending = rows.filter(row => row.type === 'camo' && row.camo &&
       (sunburnOnly ? isSunburn(row) && row.confirmed === true && row.value === 40 && row.goal === 40 : !isSunburn(row)) &&
@@ -624,7 +629,7 @@
     }
     if (militaryIncomplete(name)) return false;
     const target = trackedControl(snapshot);
-    if (target && (target.completed || target.count === snapshot.value)) {
+    if (target && (target.completed || target.count >= snapshot.value)) {
       await extension.storage.local.set({ [key]: done });
       show(snapshot.weapon + ' · ' + snapshot.camo + ' progress verified');
       return true;

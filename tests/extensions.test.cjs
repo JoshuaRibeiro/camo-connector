@@ -147,6 +147,7 @@ test('unavailable camo checkoffs leave later checkoffs runnable and retry when v
   await page.syncChallenges('session', challenges);
   await page.syncGold('session', ['.50 GS', 'Sang 9mm']);
   page.focused = '50gs';
+  data.trackedProgress = { session: 'session', handled: [], pending: true };
   const rows = ['Frosted', 'Red Tiger'].map((camo, id) =>
     ({ id, camo, type: 'camo', weapon: '.50 GS', confirmed: true, goal: 20 }));
   await page.syncTrackedRows('session', rows);
@@ -155,6 +156,10 @@ test('unavailable camo checkoffs leave later checkoffs runnable and retry when v
   available.add('50gs:Gold');
   await page.syncGold('session', ['.50 GS', 'Sang 9mm']);
   assert.deepEqual(clicked, ['snakeskin', 'autumn', 'sang9mm:Gold', 'Red Tiger', 'Frosted', '50gs:Gold']);
+  data.trackedProgress = { session: 'session', handled: [], pendingId: 0 };
+  await page.syncTrackedRows('session', rows);
+  assert.equal(clicked.filter(name => name === 'Frosted').length, 1);
+  assert.deepEqual([...data.trackedProgress.handled], [0, 1]);
 });
 
 test('Military clicks only the highest tier and later visible stages acknowledge earlier unlocks', async () => {

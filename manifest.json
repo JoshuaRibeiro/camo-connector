@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Camo Connector",
-  "version": "1.9.51",
+  "version": "1.9.52",
   "description": "Sync Call of Duty camo progress to the MW4 tracker using the local Camo Connector desktop app.",
   "icons": { "16": "icon-16.png", "32": "icon-32.png", "48": "icon-48.png", "128": "icon-128.png" },
   "action": { "default_title": "Camo Connector", "default_popup": "pairing.html" },
