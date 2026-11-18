@@ -161,13 +161,19 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   let count = 0;
   let stage = '';
   const clicked = [];
-  const meter = { textContent: '0/1' };
+  const meter = { get textContent() { return stage === 'Platinum' ? 'Platinum Locked' : 'Gold 0/1'; } };
   const title = { parentElement: meter, getClientRects: () => [{}], get textContent() { return stage; } };
-  const card = { querySelectorAll: () => [title] };
-  meter.parentElement = card;
+  const card = {};
+  const fullCard = { textContent: 'Now Grinding .50 GS', contains: node => node === card };
+  for (const node of [title, meter, fullCard]) {
+    node.querySelectorAll = () => [];
+    node.contains ??= () => false;
+  }
+  card.parentElement = fullCard;
+  meter.parentElement = fullCard;
   const controls = new Map();
   const page = {
-    document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
+    document: { querySelectorAll: () => [title], createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
     chrome: { storage: { local: { get: async () => data, set: async value => Object.assign(data, value) } } },
     card,
     getComputedStyle: () => ({ visibility: 'visible' }),

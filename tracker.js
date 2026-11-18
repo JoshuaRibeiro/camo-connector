@@ -165,13 +165,19 @@
   function pastCompletionStage(weapon, name) {
     const card = grindingCard(weapon);
     if (!card) return false;
-    const later = name === 'Gold' ? /^(?:Platinum|Harmonic Break|Mode Mastery|Prestige)(?=$|\s*[·•:])/i :
-      /^(?:Gold|Platinum|Harmonic Break|Mode Mastery|Prestige)(?=$|\s*[·•:])/i;
-    return [...card.querySelectorAll('h2,h3,h4,span,strong,b,p,div,label')].some(title => {
+    const later = camoKey(name) === 'gold' ? /^(?:Platinum|Harmonic Break|Mode Mastery|Prestige)(?=$|\s*[\u00b7\u2022:])/i :
+      /^(?:Gold|Platinum|Harmonic Break|Mode Mastery|Prestige)(?=$|\s*[\u00b7\u2022:])/i;
+    return [...document.querySelectorAll('h2,h3,h4,span,strong,b,p,div,label')].some(title => {
       if (!visible(title) || !later.test(label(title))) return false;
-      for (let row = title; row && row !== card; row = row.parentElement) {
-        const meters = label(row).match(/\b\d+\s*\/\s*\d+\b/g);
-        if (meters?.length) return meters.length === 1;
+      let hasStageRow = false;
+      for (let row = title; row && row !== document.body; row = row.parentElement) {
+        if (buttons(row).some(button => label(button) === 'Grind this')) return false;
+        if (row === card || row.contains(card)) return hasStageRow;
+        if (grinding(row)) return false;
+        const text = label(row);
+        const meters = text.match(/\b\d+\s*\/\s*\d+\b/g);
+        if (meters?.length > 1) return false;
+        if (meters?.length === 1 || /\blocked\b/i.test(text)) hasStageRow = true;
       }
       return false;
     });
