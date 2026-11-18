@@ -41,12 +41,14 @@ try {
             }
         }
     } else { Write-Warning 'Windows executables are unsigned. Only the update manifest is signed.' }
+    $unexpectedFiles = [Collections.Generic.List[string]]::new()
     $files = @(Get-ChildItem -LiteralPath $assembly -Recurse -File | ForEach-Object {
         $relative = [IO.Path]::GetRelativePath($assembly, $_.FullName).Replace('\','/')
         if ([CamoConnector.Update.PortableReplacement]::IsAppFile($relative)) {
             [pscustomobject]@{ FullName = $_.FullName; Relative = $relative }
-        } elseif ($_.Extension -ne '.pdb') { throw "Unexpected release file: $relative" }
+        } elseif ($_.Extension -ne '.pdb') { $unexpectedFiles.Add($relative) }
     })
+    if ($unexpectedFiles.Count) { throw ("Unexpected release files: " + ($unexpectedFiles -join ", ")) }
     $required = $programs + @('Runtime/Bridge/special-catalog.json','Runtime/Ocr/tesseract.exe',
         'Runtime/Ocr/tessdata/eng.traineddata','Runtime/Capture/ffmpeg.exe')
     foreach ($file in $required) {

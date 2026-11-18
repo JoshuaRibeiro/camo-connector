@@ -160,7 +160,7 @@ public sealed class PortableReplacement
     {
         if (path == null) return false;
         if (Managed.Contains(path, StringComparer.Ordinal) || path == "Runtime/Ocr/tessdata/eng.traineddata") return true;
-        if (!Regex.IsMatch(path, @"\ARuntime/(?:Ocr|Capture)/(?:tesseract\.exe|ffmpeg\.exe|[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*\.dll|(?:LICENSE|COPYING|NOTICE)[A-Za-z0-9_.-]*)\z", RegexOptions.CultureInvariant))
+        if (!Regex.IsMatch(path, @"\ARuntime/(?:Ocr|Capture)/(?:tesseract\.exe|ffmpeg\.exe|[A-Za-z0-9_+\-]+(?:\.[A-Za-z0-9_+\-]+)*\.dll|(?:LICENSE|COPYING|NOTICE)[A-Za-z0-9_.-]*)\z", RegexOptions.CultureInvariant))
             return false;
         var leaf = path.Split('/')[2];
         if (leaf.EndsWith('.') || Regex.IsMatch(leaf, @"\A(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|\z)", RegexOptions.IgnoreCase))

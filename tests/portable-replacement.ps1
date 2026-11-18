@@ -12,7 +12,7 @@ function Apply-TestUpdate([string]$directory, [switch]$Interrupt, [switch]$Unman
     try {
         $paths = @('CamoConnector.exe','Runtime/Bridge/CamoConnector.Bridge.exe',
             'Runtime/Bridge/special-catalog.json','Runtime/Detector/CamoConnector.Detector.exe','CamoConnector.Updater.exe',
-            'Runtime/Ocr/tesseract.exe','Runtime/Ocr/tessdata/eng.traineddata','Runtime/Capture/ffmpeg.exe')
+            'Runtime/Ocr/tesseract.exe','Runtime/Ocr/libstdc++-6.dll','Runtime/Ocr/tessdata/eng.traineddata','Runtime/Capture/ffmpeg.exe')
         if ($Unmanaged) { $paths += 'Data/settings.json' }
         foreach ($path in $paths) {
             $entry = $zip.CreateEntry($path)
@@ -58,6 +58,7 @@ try {
         [IO.File]::ReadAllText((Join-Path $root 'Data/settings.json')) -ne 'settings' -or
         [IO.File]::ReadAllText((Join-Path $root 'notes.txt')) -ne 'notes' -or
         [IO.File]::ReadAllText((Join-Path $root 'Runtime/Ocr/notes.txt')) -ne 'runtime notes' -or
+        [IO.File]::ReadAllText((Join-Path $root 'Runtime/Ocr/libstdc++-6.dll')) -ne 'new' -or
         [IO.File]::ReadAllText((Join-Path $root 'Runtime/Ocr/tessdata/eng.traineddata')) -ne 'new' -or
         (Test-Path -LiteralPath (Join-Path $root '.camo-update'))) { throw 'Successful update did not preserve data or clean up.' }
     'Passed interrupted replacement, recovery, unmanaged ZIP rejection and data preservation.'
