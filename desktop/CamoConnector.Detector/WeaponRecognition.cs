@@ -54,7 +54,7 @@ public static class WeaponRecognition
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     internal static bool IsWeaponSummary(string heading) =>
-        Key(heading) == "topperformingweapon";
+        Key(heading) is "topperformingweapon" or "topperformingweapons";
 
     public static MilitaryUnlock? ReadMilitarySummary(string heading, string weaponLabel, string card)
     {

@@ -139,16 +139,22 @@ internal sealed class HudCapture : IDisposable
 
     private async Task<MilitaryUnlock?> DetectMilitarySummaryAsync(Bitmap frame, CancellationToken cancel)
     {
-        var (heading, _) = await ReadTextAsync(frame, (.052, .080, .142, .039), cancel, pageMode: 7);
+        var (heading, _) = await ReadTextAsync(frame, (.052, .080, .150, .039), cancel, pageMode: 7);
         if (!WeaponRecognition.IsWeaponSummary(heading)) return null;
         var (weapon, _) = await ReadTextAsync(frame, (.048, .128, .285, .051), cancel, pageMode: 7);
-        foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast, PixelAdjustment.Invert })
+        MilitaryUnlock? best = null;
+        foreach (var (x, width) in new[] { (.453, .094), (.527, .103), (.349, .137) })
         {
-            var (card, _) = await ReadTextAsync(frame, (.453, .652, .094, .026), cancel, pageMode: 7,
-                adjustment: adjustment);
-            if (WeaponRecognition.ReadMilitarySummary(heading, weapon, card) is { } unlock) return unlock;
+            foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast, PixelAdjustment.Invert })
+            {
+                var (card, _) = await ReadTextAsync(frame, (x, .652, width, .026), cancel, pageMode: 7,
+                    adjustment: adjustment);
+                if (WeaponRecognition.ReadMilitarySummary(heading, weapon, card) is not { } unlock) continue;
+                if (best == null || unlock.Tier > best.Tier) best = unlock;
+                break;
+            }
         }
-        return null;
+        return best;
     }
 
     public async Task<bool> IsReplayAsync(Bitmap frame, CancellationToken cancel)
