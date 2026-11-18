@@ -80,12 +80,12 @@
     const targets = [];
     const sectionName = /^Military[\s\u00b7]*(?:Earn weapon unlocks using|Level up)\s+(?:the\s+)?/i;
     for (const header of root.querySelectorAll('div')) {
-      if (header.children.length !== 2 || !visible(header)) continue;
-      const [name, counter] = header.children;
-      const text = label(name);
-      if (!sectionName.test(text) || weaponKey(text.replace(sectionName, '')) !== weapon) continue;
-      const count = label(counter).match(/^([0-8])\s*\/\s*8$/);
-      if (!count) continue;
+      if (!visible(header)) continue;
+      const text = label(header);
+      const count = text.match(/([0-8])\s*\/\s*8$/);
+      if (!count || !sectionName.test(text)) continue;
+      const name = text.slice(0, count.index).replace(sectionName, '');
+      if (weaponKey(name) !== weapon) continue;
       const row = header.nextElementSibling;
       const tiles = row ? buttons(row) : [];
       const named = tiles.filter(button =>
@@ -108,6 +108,16 @@
     return grindingTargets.length === 1 ? grindingTargets[0] : null;
   }
 
+  function grindingMilitaryControl(weapon, tier, card) {
+    // The weapon heading and the Military controls can be in sibling columns.
+    for (let scope = card; scope && scope !== document.body; scope = scope.parentElement) {
+      if (buttons(scope).some(button => label(button) === 'Grind this')) return null;
+      const control = militaryControl(weapon, tier, scope);
+      if (control) return control;
+    }
+    return null;
+  }
+
   async function syncMilitary(session, tiers, weaponName = 'Sang 9mm') {
     if (!tiers?.length || !multiplayerSelected()) return false;
     const weapon = weaponKey(weaponName);
@@ -126,7 +136,7 @@
     }
     const card = grindingCard(weapon);
     if (!card) return false;
-    const target = militaryControl(weapon, tier, card);
+    const target = grindingMilitaryControl(weapon, tier, card);
     const done = { session, cursor: tiers.length };
     if (target?.count >= tier) {
       await extension.storage.local.set({ [key]: done });
@@ -144,7 +154,7 @@
 
     const ready = { session, cursor: state.cursor };
     await extension.storage.local.set({ [key]: { ...ready, pending: true, pendingTier: tier } });
-    const current = militaryControl(weapon, tier, grindingCard(weapon) || card);
+    const current = grindingMilitaryControl(weapon, tier, grindingCard(weapon) || card);
     if (!multiplayerSelected() || !focusedWeapon(weapon) || current?.header !== target.header ||
         current?.button !== action || current.count !== target.count || !action.isConnected ||
         action.disabled || action.closest('[aria-disabled="true"],button:disabled')) {
@@ -155,7 +165,7 @@
     for (let attempt = 0; attempt < 8; attempt++) {
       await pause(150);
       if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
-      const observed = militaryControl(weapon, tier, grindingCard(weapon) || card);
+      const observed = grindingMilitaryControl(weapon, tier, grindingCard(weapon) || card);
       if (observed?.count >= tier) {
         await extension.storage.local.set({ [key]: done });
         show(weaponName + ' | Military ' + observed.count + '/8 synced');
@@ -168,7 +178,7 @@
 
   function militaryIncomplete(weapon) {
     const card = grindingCard(weapon);
-    const count = card && militaryControl(weapon, 8, card)?.count;
+    const count = card && grindingMilitaryControl(weapon, 8, card)?.count;
     return count != null && count < 8;
   }
 

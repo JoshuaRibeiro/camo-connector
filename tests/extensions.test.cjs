@@ -193,7 +193,7 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
     '  multiplayerSelected = () => true; focusedWeapon = () => true; grindingCard = () => globalThis.card;\n' +
-    '  militaryControl = (_, tier) => globalThis.military(tier); grindingCompletion = () => null;\n' +
+    '  grindingMilitaryControl = (_, tier) => globalThis.military(tier); grindingCompletion = () => null;\n' +
     '  Object.assign(globalThis, { syncMilitary, syncTrackedRows, syncGold, pastCompletionStage });');
   const data = {};
   let count = 0;
@@ -274,27 +274,28 @@ test('Military clicks only the highest tier and later visible stages acknowledge
 test('Military tile lookup supports artwork titles in the eight-tile row', () => {
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
-    '  globalThis.militaryControl = militaryControl;');
+    '  globalThis.grindingMilitaryControl = grindingMilitaryControl;');
   const tiles = Array.from({ length: 8 }, (_, index) => ({
-    title: 'Artwork ' + index,
+    title: 'Artwork ' + index, textContent: '',
     getAttribute: () => null,
     getClientRects: () => [{}]
   }));
   const header = {
-    children: [{ textContent: 'Military · Earn weapon unlocks using the Pila' }, { textContent: '0/8' }],
+    textContent: 'Military · Earn weapon unlocks using the Pila 0/8',
     nextElementSibling: { querySelectorAll: () => tiles },
     getClientRects: () => [{}]
   };
-  const card = { querySelectorAll: () => [header] };
+  const parent = { querySelectorAll: selector => selector === 'div' ? [header] : tiles };
+  const card = { parentElement: parent, querySelectorAll: () => [] };
   const page = {
     document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
     getComputedStyle: () => ({ visibility: 'visible' })
   };
   vm.runInNewContext(tracker, page);
-  assert.equal(page.militaryControl('pila', 2, card).button, tiles[1]);
-  assert.equal(page.militaryControl('han86', 2, card), null);
+  assert.equal(page.grindingMilitaryControl('pila', 2, card).button, tiles[1]);
+  assert.equal(page.grindingMilitaryControl('han86', 2, card), null);
   tiles.pop();
-  assert.equal(page.militaryControl('pila', 2, card).button, null);
+  assert.equal(page.grindingMilitaryControl('pila', 2, card).button, null);
 });
 
 test('named Now Grinding actions work for any camo and only the matching weapon', () => {
