@@ -169,7 +169,7 @@ try
 catch (OperationCanceledException) when (stop.IsCancellationRequested) { return 0; }
 catch (Exception error)
 {
-    Console.Error.WriteLine(error.Message);
+    Console.Error.WriteLine(error.Message.ReplaceLineEndings(" | "));
     return 1;
 }
 

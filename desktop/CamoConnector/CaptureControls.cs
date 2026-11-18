@@ -154,27 +154,46 @@ internal sealed partial class ConnectorWindow
             }
             finally { File.Delete(staging); }
             detectorStopRequested = false;
-            child = detector = LaunchDetector(source.Mode, source.MonitorId ?? source.Input, DataDirectory, "--preview");
-            var lastError = "";
-            child.ErrorDataReceived += (_, item) =>
+            const int retryLimit = 3;
+            for (var attempt = 0; ; attempt++)
             {
-                if (LogPreviewDiagnostic(item.Data)) return;
-                if (!string.IsNullOrWhiteSpace(item.Data)) lastError = item.Data;
-                LogLine(detectorMessages, item.Data);
-                if (source.Mode == "--device") LogLine(captureMessages, item.Data);
-            };
-            child.BeginErrorReadLine();
-            var output = StartReadingPreview(child);
-            detectorStatus.Text = "Detecting from " + source.Name;
-            LogLine(detectorMessages, detectorStatus.Text);
-            UpdateCaptureButtons();
-            await child.WaitForExitAsync();
-            await output;
-            var error = lastError.Trim();
-            if (!IsDisposed)
-                detectorStatus.Text = detectorStopRequested || child.ExitCode == 0 ? "Detector stopped." :
-                    error.Length == 0 ? $"Detector exited with code {child.ExitCode}. See the Detector log." : error;
+                child = detector = LaunchDetector(source.Mode, source.MonitorId ?? source.Input, DataDirectory, "--preview");
+                var lastError = "";
+                child.ErrorDataReceived += (_, item) =>
+                {
+                    if (LogPreviewDiagnostic(item.Data)) return;
+                    if (!string.IsNullOrWhiteSpace(item.Data)) lastError = item.Data;
+                    LogLine(detectorMessages, item.Data);
+                    if (source.Mode == "--device") LogLine(captureMessages, item.Data);
+                };
+                child.BeginErrorReadLine();
+                var output = StartReadingPreview(child);
+                detectorStatus.Text = "Detecting from " + source.Name;
+                LogLine(detectorMessages, detectorStatus.Text);
+                UpdateCaptureButtons();
+                await child.WaitForExitAsync();
+                await output;
+                if (source.Mode == "--device" && child.ExitCode != 0 && !detectorStopRequested &&
+                    !closing.IsCancellationRequested && !IsDisposed && attempt < retryLimit)
+                {
+                    detectorStatus.Text = $"Capture or detection interrupted. Reconnecting to {source.Name} ({attempt + 1}/{retryLimit})…";
+                    LogLine(detectorMessages, detectorStatus.Text);
+                    await Task.Delay(TimeSpan.FromSeconds(attempt + 1), closing.Token);
+                    if (detectorStopRequested) { detectorStatus.Text = "Detector stopped."; return; }
+                    StopProcess(child);
+                    detector = null;
+                    child.Dispose();
+                    child = null;
+                    continue;
+                }
+                var error = lastError.Trim();
+                if (!IsDisposed)
+                    detectorStatus.Text = detectorStopRequested || child.ExitCode == 0 ? "Detector stopped." :
+                        error.Length == 0 ? $"Detector exited with code {child.ExitCode}. See the Detector log." : error;
+                break;
+            }
         }
+        catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
         catch (Exception error) { if (!IsDisposed) detectorStatus.Text = error.Message; }
         finally
         {
