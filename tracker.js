@@ -145,57 +145,74 @@
     return false;
   }
 
-  function sangChallengeControl(name) {
-    const goals = { autumn: 25, snakeskin: 5, 'space time': 50 };
-    if (!Object.hasOwn(goals, name) || !focusedWeapon('sang9mm')) return null;
-    const goal = goals[name];
-    const targets = new Map();
-    const buttonText = button => label(button).replace(/\s+/g, '');
-    const headings = weaponHeadings().filter(title => weaponKey(label(title)) === 'sang9mm');
-
-    function readRow(row) {
-      const text = (row.innerText || row.textContent).toLowerCase();
+  function grindingCompletion(weapon, name) {
+    if (!multiplayerSelected() || !focusedWeapon(weapon)) return null;
+    const headings = weaponHeadings().filter(title => weaponKey(label(title)) === weapon);
+    const candidates = new Map();
+    const isTick = button => {
+      const text = [label(button), button.title, button.getAttribute('aria-label')].filter(Boolean).join(' ');
+      return !button.disabled && button.getAttribute('aria-disabled') !== 'true' &&
+        !/untick|undo|locked/i.test(text) && /[\u2713\u2714]|\b(?:tick|mark (?:as )?(?:done|complete)|complete (?:camo|challenge))\b/i.test(text);
+    };
+    const rows = document.querySelectorAll('div,section,li,article');
+    for (const row of rows) {
+      if (!visible(row) || grinding(row)) continue;
+      let card = row.parentElement;
+      while (card && card !== document.body && !grinding(card)) card = card.parentElement;
+      if (!card || card === document.body || !headings.some(title => card.contains(title))) continue;
       const identity = camoRowIdentity(row, name);
-      if (!identity || grinding(row)) return null;
-      const counters = [...text.matchAll(/(?<![+\d])(\d+)\s*\/\s*(\d+)/g)];
-      if (counters.length !== 1) return null;
-      for (let card = row.parentElement; card && card !== document.body; card = card.parentElement) {
-        if (grinding(card)) {
-          return headings.some(title => card.contains(title)) ?
-            { identity, text, count: +counters[0][1], total: +counters[0][2] } : null;
-        }
-      }
-      return null;
-    }
-
-    // The row title can share a text node with its description.
-    for (const plus of buttons(document).filter(button => buttonText(button) === '+1')) {
-      for (let row = plus.parentElement; row && row !== document.body && !grinding(row); row = row.parentElement) {
-        const meter = readRow(row);
-        if (!meter) continue;
-        const controls = buttons(row);
-        if (controls.length !== 3 || controls[0] !== plus || buttonText(controls[1]) !== '+5') continue;
-        const tick = controls[2];
-        if (!tick.disabled && !/untick|undo/i.test(buttonText(tick) + ' ' + (tick.title || ''))) {
-          if ((targets.get(tick)?.identity || 0) < meter.identity) {
-            targets.set(tick, { identity: meter.identity, name, button: tick, done: false });
-          }
-        }
-        if (meter.identity === 2) break;
+      if (!identity) continue;
+      const counters = [...label(row).matchAll(/(?<![+\d])(\d+)\s*\/\s*(\d+)/g)];
+      if (counters.length !== 1) continue;
+      const [, count, total] = counters[0];
+      const ticks = buttons(row).filter(isTick);
+      const done = +total > 0 && +count === +total && ticks.length === 0;
+      if (!done && (ticks.length !== 1 || +count >= +total)) continue;
+      const button = ticks[0];
+      const key = button || row;
+      if ((candidates.get(key)?.identity || 0) < identity) {
+        candidates.set(key, { identity, button, done, card });
       }
     }
-    if (targets.size) return uniqueCamoControl(targets);
-    for (const row of document.querySelectorAll('div,section,li,article')) {
-      if (!visible(row)) continue;
-      const meter = readRow(row);
-      if (meter && meter.count === meter.total && /\bdone(?![a-z])/i.test(meter.text) &&
-          !buttons(row).some(button => buttonText(button) === '+1' && !button.disabled)) {
-        return { name, done: true };
-      }
-    }
-    return null;
+    return uniqueCamoControl(candidates);
   }
 
+  async function syncGrindingCompletion(weapon, name, key, state, done) {
+    if (!focusedWeapon(weapon)) {
+      if (Date.now() - lastFocusAttempt >= 3500) {
+        lastFocusAttempt = Date.now();
+        return focusWeapon(weapon);
+      }
+      return false;
+    }
+    const control = grindingCompletion(weapon, name);
+    if (!control) return false;
+    if (control.done) {
+      await extension.storage.local.set({ [key]: done });
+      return false;
+    }
+    if (!control.button?.isConnected) return false;
+    await extension.storage.local.set({ [key]: { ...state, pending: true } });
+    const current = grindingCompletion(weapon, name);
+    if (current?.button !== control.button || !control.button.isConnected) {
+      await extension.storage.local.set({ [key]: state });
+      return false;
+    }
+    control.button.click();
+    for (let attempt = 0; attempt < 8; attempt++) {
+      await pause(150);
+      if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
+      const observed = grindingCompletion(weapon, name);
+      if (observed?.done || (!observed && !control.button.isConnected && control.card.isConnected &&
+          !camoRowIdentity(control.card, name))) {
+        await extension.storage.local.set({ [key]: done });
+        show(name + ' completed');
+        return true;
+      }
+    }
+    show(name + ' completion paused after an unverified click');
+    return true;
+  }
   async function syncChallenges(session, challenges, key = 'sangChallengeCursor') {
     if (!challenges?.length || !multiplayerSelected()) return false;
     const saved = (await extension.storage.local.get(key))[key];
@@ -225,56 +242,8 @@
       return true;
     }
     if (!confirmedName) return false;
-    const readControl = () => {
-      const details = weaponDetails('sang9mm');
-      if (!details) return sangChallengeControl(confirmedName);
-      const target = detailCounter(details, { camo: confirmedName });
-      return target ? { name: confirmedName, done: target.completed, button: target.checkbox } : null;
-    };
-    const control = readControl();
-    if (!control) {
-      if (!weaponDetails('sang9mm') && Date.now() - lastFocusAttempt >= 3500) {
-        lastFocusAttempt = Date.now();
-        openWeaponDetails('sang9mm');
-      }
-      show('Sang 9mm · looking for ' + confirmedName + ' in weapon details');
-      return true;
-    }
-    const closeOwnedDetails = () => {
-      if (openedDetails !== 'sang9mm') return;
-      weaponDetails('sang9mm')?.close.click();
-      openedDetails = null;
-    };
-    if (control.done) {
-      await extension.storage.local.set({ [key]: { session, cursor: state.cursor + 1 } });
-      closeOwnedDetails();
-      return false;
-    }
-    if (!control.button?.isConnected || control.button.disabled) {
-      show('Sang 9mm · no available completion control for ' + confirmedName);
-      return true;
-    }
-    await extension.storage.local.set({ [key]: { ...state, pending: true } });
-    const current = readControl();
-    if (!multiplayerSelected() || !focusedWeapon('sang9mm') || current?.button !== control.button || current.done ||
-        !control.button.isConnected || control.button.disabled) {
-      await extension.storage.local.set({ [key]: state });
-      return true;
-    }
-    control.button.click();
-    for (let attempt = 0; attempt < 8; attempt++) {
-      await pause(150);
-      if (multiplayerSelected() && focusedWeapon('sang9mm') && readControl()?.done) {
-        await extension.storage.local.set({ [key]: { session, cursor: state.cursor + 1 } });
-        closeOwnedDetails();
-        show('Sang 9mm · ' + control.name + ' ticked');
-        return true;
-      }
-    }
-    show('Paused after an unverified challenge tick · check the tracker before restarting the bridge');
-    return true;
+    return syncGrindingCompletion('sang9mm', confirmedName, key, state, { session, cursor: state.cursor + 1 });
   }
-
   function multiplayerSelected() {
     const modeButtons = ['Multiplayer', 'DMZ', 'Warzone'].map(mode =>
       buttons(document).filter(button => label(button) === mode));
@@ -497,32 +466,6 @@
         snapshot.weapon + ' · synced ' + snapshot.value + '/' + snapshot.goal);
       return true;
     }
-    if (isSunburn(snapshot) && snapshot.confirmed === true) {
-      const box = target.checkbox;
-      if (!box || box.disabled) return show('No available Sunburn completion checkbox');
-      await extension.storage.local.set({ [storage]: { ...state, pending: true } });
-      const currentDetails = weaponDetails(weapon);
-      const current = currentDetails && detailCounter(currentDetails, snapshot);
-      if (!multiplayerSelected() || current?.checkbox !== box || current.completed ||
-          !box.isConnected || box.disabled) {
-        await extension.storage.local.set({ [storage]: state });
-        return true;
-      }
-      box.click();
-      for (let attempt = 0; attempt < 8; attempt++) {
-        await pause(150);
-        const updatedDetails = weaponDetails(weapon);
-        if (updatedDetails && detailCounter(updatedDetails, snapshot)?.completed) {
-          await extension.storage.local.set({ [storage]: done });
-          if (openedDetails === weapon) {
-            updatedDetails.close.click();
-            openedDetails = null;
-          }
-          return show('Signal 50 · Sunburn completion verified');
-        }
-      }
-      return show('Sunburn completion paused after an unverified click');
-    }
     if (target.maximum !== null && snapshot.value > target.maximum) {
       show(snapshot.camo + ' · game count exceeds the tracker field limit');
       return true;
@@ -603,6 +546,8 @@
     const name = weaponKey(snapshot.weapon);
     const handled = { ...state, handled: [...state.handled, snapshot.id],
       akimboThrough: Math.max(state.akimboThrough || 0, snapshot.akimboThrough || 0) };
+    if (snapshot.confirmed === true)
+      return syncGrindingCompletion(name, snapshot.camo, key, state, handled);
     if (weaponDetails(name)) return reconcileDetails(snapshot, key, state, handled);
     if (!focusedWeapon(name)) {
       if (Date.now() - lastFocusAttempt >= 3500) {
@@ -647,22 +592,10 @@
     };
     const readTarget = () => {
       if (!multiplayerSelected() || !focusedWeapon(weapon)) return null;
-      const details = weaponDetails(weapon);
-      if (details) {
-        return detailCounter(details, snapshot);
-      }
       return trackedControl(snapshot, snapshot.camo);
     };
     const target = readTarget();
-    if (!target) {
-      if (!weaponDetails(weapon) && Date.now() - lastFocusAttempt >= 3500) {
-        lastFocusAttempt = Date.now();
-        openWeaponDetails(weapon);
-      }
-      show('Space Time: ' + (count - baseline) + ' queued · looking for the +1 control');
-      return true;
-    }
-    if (target.completed || target.count === snapshot.goal) {
+    if (!target) return false;    if (target.completed || target.count === snapshot.goal) {
       await extension.storage.local.set({ [key]: { session, cursor: count } });
       if (openedDetails === weapon) {
         weaponDetails(weapon)?.close.click();
@@ -705,20 +638,6 @@
     show('Space Time sync paused after an unverified click');
     return true;
   }
-  function goldCheckbox(panel) {
-    const matches = new Map();
-    const selector = 'input[type="checkbox"],[role="checkbox"]';
-    for (const box of [...panel.querySelectorAll(selector)].filter(visible)) {
-      for (let row = box.parentElement; row && row !== panel; row = row.parentElement) {
-        if ([...row.querySelectorAll(selector)].filter(visible).length !== 1) break;
-        const identity = camoRowIdentity(row, 'Gold');
-        if ((matches.get(box)?.identity || 0) < identity) matches.set(box, { identity, box });
-        if (identity === 2) break;
-      }
-    }
-    return uniqueCamoControl(matches)?.box || null;
-  }
-
   async function syncGold(session, names) {
     if (!names?.length || !multiplayerSelected()) return false;
     const key = 'goldProgress';
@@ -727,38 +646,8 @@
     if (state.pending) return false;
     const name = names.find(name => !state.handled.includes(name));
     if (!name) return false;
-    const weapon = weaponKey(name);
-    const details = weaponDetails(weapon);
-    if (!details) {
-      if (focusedWeapon(weapon)) return openWeaponDetails(weapon);
-      if (Date.now() - lastFocusAttempt < 3500) return false;
-      lastFocusAttempt = Date.now();
-      return focusWeapon(weapon);
-    }
-    const box = goldCheckbox(details.panel);
-    if (!box) return false;
-    const checked = node => node?.checked || node?.getAttribute('aria-checked') === 'true';
-    if (!checked(box)) {
-      if (box.disabled || box.getAttribute('aria-disabled') === 'true') return false;
-      await extension.storage.local.set({ [key]: { ...state, pending: true } });
-      if (!box.isConnected || checked(box) || goldCheckbox(details.panel) !== box) {
-        await extension.storage.local.set({ [key]: state });
-        return false;
-      }
-      box.click();
-      await pause(100);
-      if (!checked(goldCheckbox(weaponDetails(weapon)?.panel ?? details.panel))) {
-        show(name + ' Gold update paused after an unverified click');
-        return true;
-      }
-    }
-    await extension.storage.local.set({ [key]: { ...state, handled: [...state.handled, name] } });
-    if (openedDetails === weapon) {
-      details.close.click();
-      openedDetails = null;
-    }
-    show(name + ' Gold verified');
-    return true;
+    return syncGrindingCompletion(weaponKey(name), 'Gold', key, state,
+      { ...state, handled: [...state.handled, name] });
   }
   let busy = false;
   let timingSession = null;

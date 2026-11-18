@@ -12,8 +12,8 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
     '  findTarget = globalThis.target; multiplayerSelected = () => true;\n' +
     '  focusedWeapon = key => key === globalThis.focused; reportTrackerFocus = () => {};\n' +
     '  syncGold = globalThis.syncGold; globalThis.pollOnce = poll;\n' +
-    '  weaponDetails = key => key === globalThis.focused ? globalThis.details : null;\n' +
-    '  detailCounter = () => globalThis.detailCounter();');
+    '  openWeaponDetails = () => { throw new Error("Completion opened weapon details"); };\n' +
+    '  grindingCompletion = (_, name) => globalThis.readCompletion(name);');
   const data = {};
   let trackerCount = 39;
   let clicks = 0;
@@ -31,6 +31,7 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
     focused: 'signal50',
     syncGold: async (_, unlocks) => { page.seenGold = unlocks; return Boolean(unlocks?.length); },
     target: () => trackerCount < 40 ? { count: trackerCount, button } : null,
+    readCompletion: () => null,
     setTimeout
   };
   vm.runInNewContext(tracker, page);
@@ -61,10 +62,10 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
   events.weapon = 'Signal 50';
   page.focused = 'signal50';
   trackerCount = 39;
-  page.details = {};
+
   let completionClicks = 0;
-  const checkbox = { isConnected: true, click() { completionClicks++; trackerCount = 40; } };
-  page.detailCounter = () => ({ checkbox, completed: trackerCount === 40, count: trackerCount });
+  const tick = { isConnected: true, click() { completionClicks++; trackerCount = 40; } };
+  page.readCompletion = name => name === 'Sunburn' ? { button: tick, done: trackerCount === 40 } : null;
   events.trackedRows.push({ id: 4, type: 'camo', weapon: 'Signal 50', camo: 'Sunburn', value: 40, goal: 40, confirmed: true });
   await page.pollOnce();
   await page.pollOnce();
