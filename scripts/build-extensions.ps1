@@ -23,6 +23,7 @@ foreach ($browser in 'Chrome','Firefox','Edge','Opera') {
                     required = @('websiteContent', 'authenticationInfo', 'personallyIdentifyingInfo')
                 }
             }
+            gecko_android = @{ strict_min_version = '142.0' }
         }
     }
     $target = [IO.Directory]::CreateDirectory((Join-Path $output $browser)).FullName
