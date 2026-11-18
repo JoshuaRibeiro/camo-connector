@@ -113,10 +113,33 @@ internal sealed class HudCapture : IDisposable
     public async Task<MilitaryUnlock?> DetectMilitaryUnlockAsync(Bitmap frame, CancellationToken cancel,
         bool allowCroppedImage = false)
     {
-        var badge = WeaponRecognition.ReadMilitaryUnlock(await ReadAsync(frame, (.827, .045, .155, .405), cancel));
+        var (header, _) = await ReadTextAsync(frame, (.900, .210, .080, .041), cancel, pageMode: 7,
+            adjustment: PixelAdjustment.WhiteText);
+        MilitaryUnlock? badge = null;
+        if (WeaponRecognition.IsUnlockHeader(header))
+        {
+            var body = await ReadAsync(frame, (.833, .242, .144, .065), cancel);
+            badge = WeaponRecognition.ReadMilitaryUnlock([header, .. body]);
+        }
+        badge ??= WeaponRecognition.ReadMilitaryUnlock(await ReadAsync(frame, (.827, .045, .155, .405), cancel));
+        if (badge == null) badge = await DetectMilitarySummaryAsync(frame, cancel);
         if (badge == null && allowCroppedImage)
             return WeaponRecognition.ReadMilitaryUnlock(await ReadAsync(frame, (0, 0, 1, 1), cancel));
         return badge;
+    }
+
+    private async Task<MilitaryUnlock?> DetectMilitarySummaryAsync(Bitmap frame, CancellationToken cancel)
+    {
+        var (heading, _) = await ReadTextAsync(frame, (.052, .080, .142, .039), cancel, pageMode: 7);
+        if (!WeaponRecognition.IsWeaponSummary(heading)) return null;
+        var (weapon, _) = await ReadTextAsync(frame, (.048, .128, .285, .051), cancel, pageMode: 7);
+        foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast, PixelAdjustment.Invert })
+        {
+            var (card, _) = await ReadTextAsync(frame, (.453, .652, .094, .026), cancel, pageMode: 7,
+                adjustment: adjustment);
+            if (WeaponRecognition.ReadMilitarySummary(heading, weapon, card) is { } unlock) return unlock;
+        }
+        return null;
     }
 
     public async Task<bool> IsReplayAsync(Bitmap frame, CancellationToken cancel)
@@ -392,7 +415,7 @@ internal sealed class HudCapture : IDisposable
         return rgb;
     }
 
-    private enum PixelAdjustment { Normal, Contrast, Invert, CyanText }
+    private enum PixelAdjustment { Normal, Contrast, Invert, CyanText, WhiteText }
 
     private async Task<string[]> ReadAsync(Bitmap frame, (double X, double Y, double W, double H) area,
         CancellationToken cancel, PixelAdjustment adjustment = PixelAdjustment.Normal)
@@ -414,7 +437,7 @@ internal sealed class HudCapture : IDisposable
         {
             graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
             var destination = new Rectangle(Point.Empty, crop.Size);
-            if (adjustment is PixelAdjustment.Normal or PixelAdjustment.CyanText)
+            if (adjustment is PixelAdjustment.Normal or PixelAdjustment.CyanText or PixelAdjustment.WhiteText)
                 graphics.DrawImage(frame, destination, region, GraphicsUnit.Pixel);
             else
             {
@@ -429,7 +452,7 @@ internal sealed class HudCapture : IDisposable
                 graphics.DrawImage(frame, destination, region.X, region.Y, region.Width, region.Height, GraphicsUnit.Pixel, attributes);
             }
         }
-        if (adjustment == PixelAdjustment.CyanText)
+        if (adjustment is PixelAdjustment.CyanText or PixelAdjustment.WhiteText)
         {
             var pixels = crop.LockBits(new Rectangle(Point.Empty, crop.Size), ImageLockMode.ReadWrite, crop.PixelFormat);
             try
@@ -441,7 +464,9 @@ internal sealed class HudCapture : IDisposable
                     Marshal.Copy(address, row, 0, row.Length);
                     for (var x = 0; x < row.Length; x += 3)
                     {
-                        var ink = row[x] >= 165 && row[x + 1] >= 165 &&
+                        var ink = adjustment == PixelAdjustment.WhiteText
+                            ? Math.Min(row[x], Math.Min(row[x + 1], row[x + 2])) >= 205
+                            : row[x] >= 165 && row[x + 1] >= 165 &&
                             Math.Min(row[x], row[x + 1]) - row[x + 2] >= 22;
                         row[x] = row[x + 1] = row[x + 2] = ink ? (byte)0 : (byte)255;
                     }

@@ -76,7 +76,8 @@ try
             var banner = await capture.DetectChallengeBannerAsync(frame, stop.Token, RecordCrop);
             var special = banner.Completed && banner.Challenge == null && !replay
                 ? capture.IdentifySpecialBanner(frame, weapon?.Name, banner.Details) : null;
-            result = new { source, weapon, replay, banner.Challenge, banner.Completed, special, cropDirectory, reads };
+            var militaryUnlock = replay ? null : await capture.DetectMilitaryUnlockAsync(frame, stop.Token);
+            result = new { source, weapon, replay, banner.Challenge, banner.Completed, special, militaryUnlock, cropDirectory, reads };
         }
         else
         {

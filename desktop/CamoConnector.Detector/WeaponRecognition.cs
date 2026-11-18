@@ -53,11 +53,25 @@ public static class WeaponRecognition
         @"KILL\s*CAM|FINAL\s+KILL|BEST\s+PLAY|SPECTAT(?:ING|OR)|SKIP\s+(?:THE\s+)?KILL",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
+    internal static bool IsWeaponSummary(string heading) =>
+        Key(heading) == "topperformingweapon";
+
+    public static MilitaryUnlock? ReadMilitarySummary(string heading, string weaponLabel, string card)
+    {
+        if (!IsWeaponSummary(heading)) return null;
+        var weapon = Read(new[] { weaponLabel }, false);
+        var tier = Regex.Match(Key(card), @"\Amilitarycam[o0]([1-8])\z");
+        return weapon is { Akimbo: false } && tier.Success ? new(weapon.Name, tier.Groups[1].Value[0] - '0') : null;
+    }
+
+    internal static bool IsUnlockHeader(string text) =>
+        Regex.IsMatch(Key(text), @"\Ai?un[l1i][o0]c[i1]?ked\z");
+
     public static MilitaryUnlock? ReadMilitaryUnlock(string[] lines)
     {
         for (var header = 0; header + 2 < lines.Length; header++)
         {
-            if (!Regex.IsMatch(Key(lines[header]), @"\Ai?un[l1i][o0]c[i1]?ked\z")) continue;
+            if (!IsUnlockHeader(lines[header])) continue;
             var weapon = Read(new[] { lines[header + 1] }, false);
             if (weapon == null || weapon.Akimbo) continue;
             var military = Key(lines[header + 2]);

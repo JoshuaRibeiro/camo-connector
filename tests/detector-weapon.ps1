@@ -42,6 +42,13 @@ if ($badge.Weapon -ne 'Signal 50' -or $badge.Tier -ne 8) { throw 'Split title re
 if ($reader::ReadMilitaryUnlock(@('Signal 50','Military Camo 8'))) { throw 'Badge accepted without header' }
 if ($reader::ReadMilitaryUnlock(@('Unlocked','Unknown weapon','Military Camo 8'))) { throw 'Unknown weapon attributed' }
 if ($reader::ReadMilitaryUnlock(@('Unlocked','Sang 9mm','Military Camo 17'))) { throw 'Invalid tier accepted' }
+$summary = $reader::ReadMilitarySummary('Top Performing Weapon', 'PILA', 'Military Camo 2')
+if ($summary.Weapon -ne 'Pila' -or $summary.Tier -ne 2 -or
+    $reader::ReadMilitarySummary('Top Performing Weapon', 'PILA', 'LEVEL 12') -or
+    $reader::ReadMilitarySummary('Match Summary', 'PILA', 'Military Camo 2') -or
+    $reader::ReadMilitarySummary('Top Performing Weapon', 'Unknown', 'Military Camo 2')) {
+    throw 'Military summary accepted an unverified weapon or tier.'
+}
 'Passed verified Military unlock text, split titles and invalid badge rejection.'
 
 $menu = [CamoConnector.Detector.CamoMenuRecognition]
