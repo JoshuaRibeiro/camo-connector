@@ -20,13 +20,29 @@ public sealed class ProgressFeed
     private readonly HashSet<string> goldUnlocks = new();
     private readonly object stateLock = new();
     private int count, akimboCount, progressId;
-    private string? weapon;
+    private string? weapon, trackerFocus;
+    private DateTimeOffset trackerFocusAt;
     private object? matchState, progress;
 
     public ProgressFeed(string catalogPath)
     {
         using var document = JsonDocument.Parse(File.ReadAllText(catalogPath));
         catalog = document.RootElement.Clone();
+    }
+
+    public void ReportFocus(string name)
+    {
+        lock (stateLock)
+        {
+            trackerFocus = name;
+            trackerFocusAt = DateTimeOffset.UtcNow;
+        }
+    }
+
+    public string? CurrentFocus()
+    {
+        lock (stateLock)
+            return DateTimeOffset.UtcNow - trackerFocusAt < TimeSpan.FromSeconds(15) ? trackerFocus : null;
     }
 
     internal static JsonElement Field(JsonElement item, string name) =>
@@ -73,8 +89,12 @@ public sealed class ProgressFeed
                 case "weapon" when IsWeapon(name):
                     weapon = name;
                     break;
-                case "completionist-unlock" when IsWeapon(name) && Text(item, "challenge") == "Gold":
-                    goldUnlocks.Add(name!);
+                case "completionist-unlock" when Text(item, "challenge") == "Gold":
+                    if (name == null && !historical &&
+                        DateTimeOffset.TryParse(Text(item, "at"), out var detectedAt) &&
+                        detectedAt >= trackerFocusAt && detectedAt - trackerFocusAt < TimeSpan.FromSeconds(15))
+                        name = trackerFocus;
+                    if (IsWeapon(name)) goldUnlocks.Add(name!);
                     break;
                 case "military-unlock" when IsWeapon(name) && Number(item, "tier") is >= 1 and <= 8:
                     var tiers = military;

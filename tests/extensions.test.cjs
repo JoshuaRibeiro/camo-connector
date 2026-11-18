@@ -241,6 +241,20 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   stage = 'Platinum';
   await page.syncGold('session', ['.50 GS']);
   assert.deepEqual([...data.goldProgress.handled], ['.50 GS']);
+
+  count = 0;
+  page.military = () => ({ count, button: null });
+  const pilaAction = {
+    textContent: String.fromCharCode(0x2713) + ' Military 1',
+    isConnected: true,
+    getClientRects: () => [{}],
+    closest: () => null,
+    click() { count = 1; }
+  };
+  card.querySelectorAll = () => [pilaAction];
+  await page.syncMilitary('session', [1], 'Pila');
+  assert.equal(count, 1);
+  assert.equal(data['militaryCursor-pila'].cursor, 1);
   assert.equal(page.pastCompletionStage('50gs', 'Platinum'), false);
   stage = 'Harmonic Break';
   assert.equal(page.pastCompletionStage('50gs', 'Platinum'), true);

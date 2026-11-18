@@ -211,7 +211,7 @@ internal sealed class HudCapture : IDisposable
         // HUD notices can cover the middle of the completion text. Require the camo artwork as corroboration.
         if (!completed && (heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
             heading.Contains("OMPLETED", StringComparison.OrdinalIgnoreCase)))
-            completed = IdentifySpecialBanner(frame, null, null) != null;
+            completed = !goldTile && IdentifySpecialBanner(frame, null, null, bannerArtworkOnly: true) != null;
         if (!goldTile && !completed) return (null, false, null);
         var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)
@@ -224,14 +224,14 @@ internal sealed class HudCapture : IDisposable
             if (Match(detail) is { } fallback) return (fallback, true, null);
             details.Add(detail);
         }
-        return (null, completed, details.ToArray());
+        return (null, completed && !goldTile, details.ToArray());
 
         static bool LooksCompleted(string text) => System.Text.RegularExpressions.Regex.IsMatch(text,
             @"\bCOMPLETED\b|\bCHALLENGE\w{0,2}\s+LETED\b",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
     }
 
-    public SpecialUnlock? IdentifySpecialBanner(Bitmap frame, string? weapon, string[]? details)
+    public SpecialUnlock? IdentifySpecialBanner(Bitmap frame, string? weapon, string[]? details, bool bannerArtworkOnly = false)
     {
         var sample = Sample(frame, .148, (.471, .058, .102, 0));
         if (weapon != null && catalog.TryGetValue(weapon, out var entries))
@@ -248,7 +248,8 @@ internal sealed class HudCapture : IDisposable
             ? new(weapons[0].Key, unique, "catalog-special-unlocked") : null;
 
         string? MatchBannerArtwork(IEnumerable<CamoReference> candidates) => TrackedCamoRecognition.MatchArtwork(sample,
-            candidates.Select(entry => entry.BannerRgb == null ? entry : entry with { Rgb = entry.BannerRgb }).ToArray());
+            candidates.Where(entry => !bannerArtworkOnly || entry.BannerRgb != null)
+                .Select(entry => entry.BannerRgb == null ? entry : entry with { Rgb = entry.BannerRgb }).ToArray());
     }
 
     public async Task<CamoProgress?> DetectCamoProgressAsync(Bitmap frame, string? weapon, CancellationToken cancel,

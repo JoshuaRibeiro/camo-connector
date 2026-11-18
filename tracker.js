@@ -79,28 +79,39 @@
   function militaryControl(weapon, tier, root = document) {
     const targets = [];
     const sectionName = /^Military[\s\u00b7]*(?:Earn weapon unlocks using|Level up)\s+(?:the\s+)?/i;
-    for (const button of root.querySelectorAll('button[title="Military ' + tier + '"]')) {
-      if (!visible(button)) continue;
-      const row = button.parentElement;
-      const header = row.previousElementSibling;
-      if (!header || header.children.length !== 2) continue;
+    for (const header of root.querySelectorAll('div')) {
+      if (header.children.length !== 2 || !visible(header)) continue;
       const [name, counter] = header.children;
-      const text = name.textContent.trim().replace(/\s+/g, ' ');
+      const text = label(name);
       if (!sectionName.test(text) || weaponKey(text.replace(sectionName, '')) !== weapon) continue;
-      const count = counter.textContent.trim().match(/^([0-8])\s*\/\s*8$/);
+      const count = label(counter).match(/^([0-8])\s*\/\s*8$/);
       if (!count) continue;
-      targets.push({ button, count: Number(count[1]) });
+      const row = header.nextElementSibling;
+      const tiles = row ? buttons(row).filter(button => button.title === 'Military ' + tier) : [];
+      if (tiles.length > 1) continue;
+      targets.push({ button: tiles[0] ?? null, header, count: Number(count[1]) });
     }
     if (targets.length <= 1) return targets[0] ?? null;
     // The same weapon can appear in the overlay and in the armoury list.
     const grindingTargets = targets.filter(target => {
-      for (let card = target.button.parentElement; card && card !== document.body; card = card.parentElement) {
-        if (targets.some(other => other !== target && card.contains(other.button))) break;
+      for (let card = target.header.parentElement; card && card !== document.body; card = card.parentElement) {
+        if (targets.some(other => other !== target && card.contains(other.header))) break;
         if (grinding(card)) return true;
       }
       return false;
     });
     return grindingTargets.length === 1 ? grindingTargets[0] : null;
+  }
+
+  function militaryAction(card, control, tier) {
+    if (!control) return null;
+    const tile = control.button;
+    if (tile?.getAttribute('aria-label') === 'Tick up to Military ' + tier &&
+        !tile.disabled && !tile.closest('[aria-disabled="true"],button:disabled')) return tile;
+    const actions = buttons(card).filter(button =>
+      label(button).replace(/^[\u2713\u2714]\s*/, '') === 'Military ' + tier &&
+      !button.disabled && !button.closest('[aria-disabled="true"],button:disabled'));
+    return actions.length === 1 ? actions[0] : null;
   }
 
   async function syncMilitary(session, tiers, weaponName = 'Sang 9mm') {
@@ -124,24 +135,24 @@
     const control = militaryControl(weapon, tier, card);
     const cursor = state.pendingCursor ?? (state.pending ? state.cursor : tiers.length);
     const done = { session, cursor };
-    if (!control && militaryIncomplete(weapon)) return false;
+    if (!control && (!state.pending || militaryIncomplete(weapon))) return false;
     if (!control || control.count >= tier) {
       await extension.storage.local.set({ [key]: control ? done : { session, cursor: tiers.length } });
       if (!control) show(weaponName + ' | Military row already complete');
       return false;
     }
     if (state.pending) return false;
+    const action = militaryAction(card, control, tier);
+    if (!action) return false;
     await extension.storage.local.set({ [key]: { ...state, pending: true, pendingTier: tier, pendingCursor: cursor } });
     const current = militaryControl(weapon, tier, card);
-    if (!multiplayerSelected() || !focusedWeapon(weapon) || current?.button !== control.button ||
+    if (!multiplayerSelected() || !focusedWeapon(weapon) || !current || current.header !== control.header || current.button !== control.button ||
         current.count !== control.count ||
-        control.button.getAttribute('aria-label') !== 'Tick up to Military ' + tier ||
-        !control.button.isConnected || control.button.disabled ||
-        control.button.closest('[aria-disabled="true"],button:disabled')) {
+        militaryAction(card, current, tier) !== action || !action.isConnected) {
       await extension.storage.local.set({ [key]: state });
       return true;
     }
-    control.button.click();
+    action.click();
     for (let attempt = 0; attempt < 8; attempt++) {
       await pause(150);
       if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
@@ -858,7 +869,7 @@
         if (!sunburnPending && canSync('Sang 9mm') &&
             await syncAkimbo(session, akimboCount, akimboTiming, firstReceived)) return;
         if (!sunburnPending && canSync('Sang 9mm') && await syncChallenges(session, challenges)) return;
-        if (!sunburnPending && await syncGold(session, goldUnlocks?.filter(canSync))) return;
+        if (!sunburnPending && await syncGold(session, goldUnlocks?.filter(name => focusedWeapon(weaponKey(name))))) return;
         if (signalIsCurrent && state.pending && (weapon || target))
           return show('Sunburn sync paused after an unverified +1. Check the tracker count.');
         if (!target) return show(weapon ? weapon + ' · focus synced' : 'Ready · waiting for camo detections');

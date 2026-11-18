@@ -26,9 +26,6 @@ builder.WebHost.ConfigureKestrel(server =>
 var app = builder.Build();
 var pairing = new SemaphoreSlim(1);
 var lastPrompt = DateTimeOffset.MinValue;
-var focusLock = new object();
-string? focus = null;
-var focusedAt = DateTimeOffset.MinValue;
 var shutdown = app.Lifetime.ApplicationStopping;
 var reader = files.FollowAsync(shutdown);
 
@@ -112,10 +109,7 @@ app.Run(async context =>
     {
         if (HttpMethods.IsGet(request.Method))
         {
-            string? weapon;
-            lock (focusLock)
-                weapon = DateTimeOffset.UtcNow - focusedAt < TimeSpan.FromSeconds(15) ? focus : null;
-            await response.WriteAsJsonAsync(new { weapon });
+            await response.WriteAsJsonAsync(new { weapon = feed.CurrentFocus() });
         }
         else if (HttpMethods.IsPost(request.Method) && request.Headers["X-MW4-Connector"] == "focus-v1")
         {
@@ -125,11 +119,7 @@ app.Run(async context =>
                 response.StatusCode = 400;
                 return;
             }
-            lock (focusLock)
-            {
-                focus = weapon;
-                focusedAt = DateTimeOffset.UtcNow;
-            }
+            feed.ReportFocus(weapon);
             response.StatusCode = 204;
         }
         else response.StatusCode = 405;

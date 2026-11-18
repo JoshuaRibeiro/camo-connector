@@ -194,6 +194,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     string? confirmedWeapon = null;
     var lastConfirmedWeapon = DateTimeOffset.MinValue;
     var lastChallengeScan = DateTimeOffset.MinValue;
+    var unassignedGoldVisible = false;
     var match = 0;
     var lastLobbyScan = DateTimeOffset.MinValue;
     var lastAkimbo = DateTimeOffset.MinValue;
@@ -325,12 +326,14 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 lastChallengeScan = now;
                 var banner = await challengeRead;
                 var challenge = banner.Challenge;
+                if (challenge != "gold-15") unassignedGoldVisible = false;
                 if (banner.Completed && (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
                 {
-                    if (challenge == "gold-15" && candidate != null && goldUnlocked.Add(candidate))
+                    if (challenge == "gold-15" && (result.Weapon?.Name is { } goldWeapon
+                        ? goldUnlocked.Add(goldWeapon) : !unassignedGoldVisible))
                         await AppendAsync(log, new
                         {
-                            kind = "completionist-unlock", source = "live", mode = "mp", weapon = candidate, challenge = "Gold", at = now
+                            kind = "completionist-unlock", source = "live", mode = "mp", weapon = result.Weapon?.Name, challenge = "Gold", at = now
                         }, cancel);
                     else if (challenge != null && challenge != "gold-15" && (candidate == "Sang 9mm" || candidate == null && challenge != "menu-space-time") &&
                         seenChallenges.Add((candidate ?? "") + "|" + challenge))
@@ -344,6 +347,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                         {
                             kind = special.Kind, source = "live", mode = "mp", weapon = special.Weapon, challenge = special.Challenge, at = now
                         }, cancel);
+                    if (challenge == "gold-15" && result.Weapon == null) unassignedGoldVisible = true;
                 }
             }
         }
