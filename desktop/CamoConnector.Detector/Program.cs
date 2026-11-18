@@ -169,7 +169,7 @@ try
 catch (OperationCanceledException) when (stop.IsCancellationRequested) { return 0; }
 catch (Exception error)
 {
-    Console.Error.WriteLine(error.Message.ReplaceLineEndings(" | "));
+    Console.Error.WriteLine("Detector error: " + error.Message.ReplaceLineEndings(" | "));
     return 1;
 }
 
@@ -375,7 +375,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             }
             var goldRead = ReadSnapshotAsync(frame, copy => capture.DetectCompletionistGoldAsync(copy, menuWeapon, cancel));
             var specialRead = ReadSnapshotAsync(frame, copy => capture.DetectSpecialUnlocksAsync(copy, menuWeapon, cancel));
-            var progressRead = ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
+            var progressRead = ReadSnapshotAsync(frame, copy => ReadProgressAsync(copy, capture, menuWeapon, result.Replay, cancel));
             var militaryRead = menuWeapon == null ? Task.FromResult<int?>(null) :
                 ReadSnapshotAsync(frame, copy => capture.ReadMilitaryMenuCountAsync(copy, cancel));
             await Task.WhenAll(goldRead, specialRead, progressRead, militaryRead);

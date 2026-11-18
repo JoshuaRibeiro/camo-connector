@@ -159,9 +159,12 @@ internal sealed partial class ConnectorWindow
             {
                 child = detector = LaunchDetector(source.Mode, source.MonitorId ?? source.Input, DataDirectory, "--preview");
                 var lastError = "";
+                string? detectorError = null;
                 child.ErrorDataReceived += (_, item) =>
                 {
                     if (LogPreviewDiagnostic(item.Data)) return;
+                    if (item.Data?.StartsWith("Detector error: ", StringComparison.Ordinal) == true)
+                        detectorError = item.Data;
                     if (!string.IsNullOrWhiteSpace(item.Data)) lastError = item.Data;
                     LogLine(detectorMessages, item.Data);
                     if (source.Mode == "--device") LogLine(captureMessages, item.Data);
@@ -186,7 +189,7 @@ internal sealed partial class ConnectorWindow
                     child = null;
                     continue;
                 }
-                var error = lastError.Trim();
+                var error = detectorError ?? lastError.Trim();
                 if (!IsDisposed)
                     detectorStatus.Text = detectorStopRequested || child.ExitCode == 0 ? "Detector stopped." :
                         error.Length == 0 ? $"Detector exited with code {child.ExitCode}. See the Detector log." : error;
