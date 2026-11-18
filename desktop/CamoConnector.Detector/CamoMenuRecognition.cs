@@ -56,6 +56,12 @@ public static class CamoMenuRecognition
         return matches.Length == 1 ? matches[0] : null;
     }
 
+    public static CamoProgress? ConfirmCounter(CamoProgress? context, CamoProgress? counter, CamoProgress? alternate)
+    {
+        if (counter == null || (context != null && context != counter)) return null;
+        return context == counter || alternate == counter ? counter : null;
+    }
+
     public static CamoProgress? ReadProgress(string weapon, string title, string[] lines, string[] knownCamos)
     {
         title = title.Trim();

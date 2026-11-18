@@ -314,13 +314,24 @@ internal sealed class HudCapture : IDisposable
         var (objectives, _) = await ReadTextAsync(frame, (.313, .679, .342, .181), cancel,
             trace: trace, regionName: "camoObjectives");
         var progress = CamoMenuRecognition.ReadProgress(weapon, title, Lines(objectives), names);
-        if (progress != null || !names.Contains(title) ||
-            System.Text.RegularExpressions.Regex.IsMatch(objectives, @"\d\s*/\s*\d")) return progress;
-        // The Special counter is at the right end of the objective's progress bar.
-        var (counter, _) = await ReadTextAsync(frame, (.512, .795, .060, .045), cancel, pageMode: 7,
-            countersOnly: true, trace: trace, regionName: "camoCounter");
-        return System.Text.RegularExpressions.Regex.IsMatch(counter.Trim(), @"\A[0-9]+\s*/\s*[0-9]+\z")
-            ? CamoMenuRecognition.ReadProgress(weapon, title, [counter], names) : null;
+        if (!names.Contains(title)) return progress;
+
+        // Check the isolated counter even when the wider objective OCR returns a plausible value.
+        async Task<CamoProgress?> ReadCounter(PixelAdjustment adjustment, string region)
+        {
+            var (counter, _) = await ReadTextAsync(frame, (.512, .795, .060, .045), cancel, pageMode: 7,
+                countersOnly: true, adjustment: adjustment, trace: trace, regionName: region);
+            return System.Text.RegularExpressions.Regex.IsMatch(counter.Trim(), @"\A[0-9]+\s*/\s*[0-9]+\z")
+                ? CamoMenuRecognition.ReadProgress(weapon, title, [counter], names) : null;
+        }
+
+        var isolated = await ReadCounter(PixelAdjustment.Normal, "camoCounter");
+        if (progress != null || isolated == null)
+            return CamoMenuRecognition.ConfirmCounter(progress, isolated, null);
+        // If the wider read contains a rejected fraction, avoid substituting a different row's count.
+        if (System.Text.RegularExpressions.Regex.IsMatch(objectives, @"\d\s*/\s*\d")) return null;
+        var alternate = await ReadCounter(PixelAdjustment.Contrast, "camoCounterContrast");
+        return CamoMenuRecognition.ConfirmCounter(null, isolated, alternate);
     }
 
     public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null, bool requireHeading = false)

@@ -88,6 +88,14 @@ if ($differentGoal.Camo -ne 'Frosted' -or $differentGoal.Goal -ne 10) { throw 'O
 if ($menu::ReadProgress('.50 GS','Splatter Ops', @('3/30','4/30'),$camos)) { throw 'Conflicting counts were accepted' }
 if ($menu::ReadProgress('.50 GS','Military Camo 7', @('3/30'),$camos)) { throw 'Military title accepted as special progress' }
 if ($menu::ReadProgress('.50 GS','Gold', @('Weapon level 15/20'),$camos)) { throw 'Prerequisite accepted as camo progress' }
+$ten = $menu::ReadProgress('KG-7 Vulcan', 'Tension', @('10/20'), @('Tension'))
+foreach ($misread in '16/20', '18/20', '10/26') {
+    $wrong = $menu::ReadProgress('KG-7 Vulcan', 'Tension', @($misread), @('Tension'))
+    if ($menu::ConfirmCounter($wrong, $ten, $ten)) { throw "Disagreement accepted: $misread" }
+}
+if ($menu::ConfirmCounter($ten, $ten, $null).Count -ne 10 -or
+    $menu::ConfirmCounter($null, $ten, $ten).Goal -ne 20 -or
+    $menu::ConfirmCounter($null, $ten, $null)) { throw 'Dedicated camo counter confirmation failed' }
 $confirmed = [CamoConnector.Detector.CamoProgressConfirmation]::new()
 if ($confirmed.Observe($redTiger) -or !$confirmed.Observe($redTiger) -or $confirmed.Observe($redTiger)) {
     throw 'Camo progress confirmation failed'
