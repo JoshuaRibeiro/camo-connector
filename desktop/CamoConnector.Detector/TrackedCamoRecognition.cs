@@ -67,8 +67,14 @@ public static class TrackedCamoRecognition
             .Select(group => group.Distinct().ToArray()).Where(group => group.Length == 1).Select(group => group[0]).ToArray();
     }
 
+    public static CamoProgress[] MergeRows(CamoProgress[] primary, CamoProgress[] fallback) =>
+        primary.Concat(fallback.Where(candidate =>
+            !primary.Any(confirmed => confirmed.Weapon == candidate.Weapon && confirmed.Camo == candidate.Camo)))
+            .ToArray();
+
     private static string? ReadWeapon(string label)
     {
+        label = Regex.Replace(label, @"\s*\bLAST\s+USED\b.*$", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         var key = Key(label);
         if (key == "rpgb") return "RPG-8";
         if (Regex.IsMatch(key, @"\A(?:(?:krait|karit|crate)p?[g6][8b]|krait)(?:xp)?\z")) return "Krait P68";

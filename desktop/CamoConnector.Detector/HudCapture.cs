@@ -324,6 +324,7 @@ internal sealed class HudCapture : IDisposable
             ? new[] { (Heading: (.02, .01, .36, .09), Area: (.25, .14, .52, .69), Thumbnail: (.075, .155, .168, .007)) }
             : new[]
             {
+                (Heading: (.654, .383, .095, .035), Area: (.714, .432, .135, .278), Thumbnail: (.670, .039, .069, .004)),
                 (Heading: (.740, .117, .110, .037), Area: (.792, .159, .172, .335), Thumbnail: (.760, .039, .069, .004)),
                 (Heading: (.067, .114, .110, .038), Area: (.121, .156, .169, .335), Thumbnail: (.084, .039, .069, .004))
             };
@@ -345,7 +346,8 @@ internal sealed class HudCapture : IDisposable
                 .Where(line => System.Text.RegularExpressions.Regex.IsMatch(line.Text, @"\A[0-9]{1,4}\s*/\s*[0-9]{1,4}\z"))
                 .ToArray();
             var fallback = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail, counters);
-            return rows.Concat(fallback.Where(candidate => !rows.Any(confirmed => confirmed.Weapon == candidate.Weapon))).ToArray();
+            var merged = TrackedCamoRecognition.MergeRows(rows, fallback);
+            if (merged.Length > 0) return merged;
         }
         return [];
     }

@@ -126,6 +126,27 @@ $ambiguous = [CamoConnector.Detector.CamoReference[]]@(
     [CamoConnector.Detector.CamoReference]::new('B', $redReference)
 )
 if ($tracked::MatchArtwork($redReference, $ambiguous)) { throw 'An ambiguous thumbnail was accepted.' }
+$pauseLines = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('.50 GS LAST USED', .02)
+    [CamoConnector.Detector.HudLine]::new('Get 20 Headshot Kills against Players', .10)
+    [CamoConnector.Detector.HudLine]::new('18 / 20', .23)
+    [CamoConnector.Detector.HudLine]::new('.50 GS LAST USED', .33)
+    [CamoConnector.Detector.HudLine]::new('Get 30 Point Blank Kills against Players', .42)
+    [CamoConnector.Detector.HudLine]::new('MOJAVE .357', .65)
+)
+$pauseCounters = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('18 / 20', .23)
+    [CamoConnector.Detector.HudLine]::new('16 / 30', .54)
+)
+$pauseThumbnail = [Func[double,byte[]]]{ param($y) if ($y -lt .3) { return ,$wrongThumbnail }; return ,$redReference }
+$primary = $tracked::ReadRows($pauseLines, $catalog, $pauseThumbnail)
+$fallback = $tracked::ReadRows($pauseLines, $catalog, $pauseThumbnail, $pauseCounters)
+$merged = $tracked::MergeRows($primary, $fallback)
+if ($primary.Length -ne 1 -or $merged.Length -ne 2 -or
+    ($merged | Where-Object Camo -eq Frosted).Count -ne 18 -or
+    ($merged | Where-Object Camo -eq 'Red Tiger').Count -ne 16) {
+    throw 'Pause menu lost a tracked row for a repeated LAST USED weapon'
+}
 'Passed tracked-panel name precedence, thumbnail fallback and ambiguity rejection.'
 $combat = [CamoConnector.Detector.CombatRecognition]
 $state = [CamoConnector.Detector.CombatConfirmation]::new()
