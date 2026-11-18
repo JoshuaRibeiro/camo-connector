@@ -122,13 +122,13 @@ function collectEvents() {
       if (event?.kind === 'catalog-special-unlocked' && event.source === 'live' && event.mode === 'mp') {
         const camo = Object.hasOwn(specialCatalog, event.weapon) &&
           specialCatalog[event.weapon].find(entry => entry.name === event.challenge);
-        if (camo && Number.isInteger(camo.goal)) {
+        if (camo) {
           const spaceTime = event.weapon === 'Sang 9mm' && camo.name === 'Space Time';
           const key = spaceTime ? 'sang9mm:space-time' :
             [event.weapon, camoKey(camo.name)].join('|').toLowerCase();
           if (!trackedRows.get(key)?.confirmed) {
             trackedRows.set(key, { id: ++progressId, weapon: event.weapon, camo: camo.name,
-              goal: camo.goal, value: camo.goal, type: 'camo', confirmed: true,
+              goal: camo.goal ?? null, value: camo.goal ?? null, type: 'camo', confirmed: true,
               ...(spaceTime && { akimboThrough: akimboCount }) });
             console.log('Verified Special unlock:', event.weapon, camo.name);
           }

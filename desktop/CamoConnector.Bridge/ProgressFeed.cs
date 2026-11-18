@@ -104,8 +104,11 @@ public sealed class ProgressFeed
                 case "catalog-special-unlocked" when IsWeapon(name):
                     var camo = Text(item, "challenge");
                     var entry = CatalogEntry(name!, camo);
-                    if (camo != null && Number(entry, "goal") is int goal)
+                    if (camo != null && entry.ValueKind == JsonValueKind.Object)
+                    {
+                        var goal = Number(entry, "goal");
                         SaveRow(name!, camo, "camo", goal, goal, null, null, true);
+                    }
                     break;
             }
         }
@@ -146,7 +149,7 @@ public sealed class ProgressFeed
         SaveRow(name!, camo, type, value, goal, objective, identity, false);
     }
 
-    private void SaveRow(string name, string? camo, string type, int value, int goal, string? objective,
+    private void SaveRow(string name, string? camo, string type, int? value, int? goal, string? objective,
         string? identity, bool confirmed)
     {
         var spaceTime = name == "Sang 9mm" && type == "camo" && goal == 50 && CamoKey(camo!) == "spacetime";
@@ -173,6 +176,6 @@ public sealed class ProgressFeed
         }
     }
 
-    private sealed record TrackedRow(int id, string weapon, string? camo, string type, int value, int goal,
+    private sealed record TrackedRow(int id, string weapon, string? camo, string type, int? value, int? goal,
         string? objective, string? identity, bool? confirmed, int? akimboThrough);
 }

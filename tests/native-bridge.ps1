@@ -67,6 +67,8 @@ try {
     if (@($before.trackedRows | Where-Object { $_.confirmed -and $_.camo -in 'Sunburn','Frosted' }).Count -ne 2) {
         throw 'The bridge lost confirmed camo unlocks on startup.'
     }
+    $frosted = $before.trackedRows | Where-Object camo -eq Frosted
+    if ($null -ne $frosted.goal -or $null -ne $frosted.value) { throw 'The bridge invented a goal for Frosted.' }
     if ($before.weapon -or $before.progress) { throw 'The bridge replayed stale focus or a progress snapshot.' }
     if ($before.count -ne 0) { throw 'The bridge replayed an existing progress event.' }
     [IO.File]::AppendAllText($eventLog, $event)
