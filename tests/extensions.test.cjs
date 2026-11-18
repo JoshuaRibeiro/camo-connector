@@ -9,7 +9,7 @@ const base = require('../manifest.json');
 test('Sunburn ignores absolute reads and applies queued longshots only with +1', async () => {
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
-    '  findTarget = globalThis.target; multiplayerSelected = () => true;\n' +
+    '  findTarget = globalThis.target; multiplayerSelected = () => true; grindingCard = () => null;\n' +
     '  focusedWeapon = key => key === globalThis.focused; reportTrackerFocus = () => {};\n' +
     '  syncGold = globalThis.syncGold; globalThis.pollOnce = poll;\n' +
     '  openWeaponDetails = () => { throw new Error("Completion opened weapon details"); };\n' +
@@ -78,7 +78,7 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
 test('unavailable camo checkoffs leave later checkoffs runnable and retry when visible', async () => {
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
-    '  multiplayerSelected = () => true; focusedWeapon = key => key === globalThis.focused;\n' +
+    '  multiplayerSelected = () => true; grindingCard = () => null; focusedWeapon = key => key === globalThis.focused;\n' +
     '  focusWeapon = () => false; grindingCompletion = globalThis.control;\n' +
     '  Object.assign(globalThis, { syncTrackedRows, syncChallenges, syncGold });');
   const data = {};
@@ -113,6 +113,55 @@ test('unavailable camo checkoffs leave later checkoffs runnable and retry when v
   available.add('50gs:Gold');
   await page.syncGold('session', ['.50 GS', 'Sang 9mm']);
   assert.deepEqual(clicked, ['snakeskin', 'autumn', 'sang9mm:Gold', 'Red Tiger', 'Frosted', '50gs:Gold']);
+});
+
+test('Military clicks only the highest tier and later visible stages acknowledge earlier unlocks', async () => {
+  const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
+    /  poll\(\);\s*setInterval\(poll, 500\);/,
+    '  multiplayerSelected = () => true; focusedWeapon = () => true; grindingCard = () => globalThis.card;\n' +
+    '  militaryControl = (_, tier) => globalThis.military(tier); grindingCompletion = () => null;\n' +
+    '  Object.assign(globalThis, { syncMilitary, syncTrackedRows, syncGold });');
+  const data = {};
+  let count = 0;
+  let stage = '';
+  const clicked = [];
+  const meter = { textContent: '0/1' };
+  const title = { parentElement: meter, getClientRects: () => [{}], get textContent() { return stage; } };
+  const card = { querySelectorAll: () => [title] };
+  meter.parentElement = card;
+  const controls = new Map();
+  const page = {
+    document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
+    chrome: { storage: { local: { get: async () => data, set: async value => Object.assign(data, value) } } },
+    card,
+    getComputedStyle: () => ({ visibility: 'visible' }),
+    setTimeout: callback => callback(),
+    military: tier => {
+      if (count === 8) return null;
+      if (!controls.has(tier)) controls.set(tier, {
+        isConnected: true,
+        getAttribute: () => 'Tick up to Military ' + tier,
+        closest: () => null,
+        click() { clicked.push(tier); count = tier; }
+      });
+      return { count, button: controls.get(tier) };
+    }
+  };
+  vm.runInNewContext(tracker, page);
+  const rows = [{ id: 1, type: 'camo', camo: 'Frosted', weapon: '.50 GS', confirmed: true }];
+  await page.syncMilitary('session', [2, 7, 6], '.50 GS');
+  stage = 'Gold';
+  await page.syncTrackedRows('session', rows);
+  assert.equal(data.trackedProgress, undefined);
+  await page.syncMilitary('session', [2, 7, 6, 8], '.50 GS');
+  await page.syncTrackedRows('session', rows);
+  assert.deepEqual([...data.trackedProgress.handled], [1]);
+  await page.syncGold('session', ['.50 GS']);
+  assert.equal(data.goldProgress, undefined);
+  stage = 'Platinum';
+  await page.syncGold('session', ['.50 GS']);
+  assert.deepEqual([...data.goldProgress.handled], ['.50 GS']);
+  assert.deepEqual(clicked, [7, 8]);
 });
 
 test('the details panel recognizes a completed Special camo by its prefixed title', () => {

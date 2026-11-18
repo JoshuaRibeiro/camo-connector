@@ -28,15 +28,23 @@
     ['0ris', 'oris86'], ['oris8g', 'oris86'], ['vulcan', 'kg7vulcan']
   ]);
 
-  function focusedWeapon(key) {
-    return weaponHeadings().some(heading => {
-      if (weaponKey(label(heading)) !== key) return false;
+  function grindingCard(key) {
+    const cards = new Set();
+    for (const heading of weaponHeadings()) {
+      if (weaponKey(label(heading)) !== key) continue;
       for (let card = heading.parentElement; card && card !== document.body; card = card.parentElement) {
-        if (buttons(card).some(button => label(button) === 'Grind this')) return false;
-        if (grinding(card)) return true;
+        if (buttons(card).some(button => label(button) === 'Grind this')) break;
+        if (grinding(card)) {
+          cards.add(card);
+          break;
+        }
       }
-      return false;
-    });
+    }
+    return cards.size === 1 ? [...cards][0] : null;
+  }
+
+  function focusedWeapon(key) {
+    return grindingCard(key) !== null;
   }
 
   function focusWeapon(key) {
@@ -111,9 +119,12 @@
       }
       return false;
     }
-    const control = militaryControl(weapon, tier);
+    const card = grindingCard(weapon);
+    if (!card) return false;
+    const control = militaryControl(weapon, tier, card);
     const cursor = state.pendingCursor ?? (state.pending ? state.cursor : tiers.length);
     const done = { session, cursor };
+    if (!control && militaryIncomplete(weapon)) return false;
     if (!control || control.count >= tier) {
       await extension.storage.local.set({ [key]: control ? done : { session, cursor: tiers.length } });
       if (!control) show(weaponName + ' | Military row already complete');
@@ -121,7 +132,7 @@
     }
     if (state.pending) return false;
     await extension.storage.local.set({ [key]: { ...state, pending: true, pendingTier: tier, pendingCursor: cursor } });
-    const current = militaryControl(weapon, tier);
+    const current = militaryControl(weapon, tier, card);
     if (!multiplayerSelected() || !focusedWeapon(weapon) || current?.button !== control.button ||
         current.count !== control.count ||
         control.button.getAttribute('aria-label') !== 'Tick up to Military ' + tier ||
@@ -134,8 +145,8 @@
     for (let attempt = 0; attempt < 8; attempt++) {
       await pause(150);
       if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
-      const observed = militaryControl(weapon, tier);
-      if (!observed || observed.count >= tier) {
+      const observed = militaryControl(weapon, tier, grindingCard(weapon) || card);
+      if (observed?.count >= tier || (!observed && !militaryIncomplete(weapon))) {
         await extension.storage.local.set({ [key]: observed ? done : { session, cursor: tiers.length } });
         show(weaponName + ' | Military ' + tier + '/8 synced');
         return true;
@@ -143,6 +154,27 @@
     }
     show(weaponName + ' Military ' + tier + ' clicked | waiting to verify');
     return false;
+  }
+
+  function militaryIncomplete(weapon) {
+    const card = grindingCard(weapon);
+    const count = card && militaryControl(weapon, 8, card)?.count;
+    return count != null && count < 8;
+  }
+
+  function pastCompletionStage(weapon, name) {
+    const card = grindingCard(weapon);
+    if (!card) return false;
+    const later = name === 'Gold' ? /^(?:Platinum|Harmonic Break|Mode Mastery|Prestige)(?=$|\s*[·•:])/i :
+      /^(?:Gold|Platinum|Harmonic Break|Mode Mastery|Prestige)(?=$|\s*[·•:])/i;
+    return [...card.querySelectorAll('h2,h3,h4,span,strong,b,p,div,label')].some(title => {
+      if (!visible(title) || !later.test(label(title))) return false;
+      for (let row = title; row && row !== card; row = row.parentElement) {
+        const meters = label(row).match(/\b\d+\s*\/\s*\d+\b/g);
+        if (meters?.length) return meters.length === 1;
+      }
+      return false;
+    });
   }
 
   function grindingCompletion(weapon, name) {
@@ -188,12 +220,13 @@
       completionFocusAttempts.set(weapon, now);
       return focusWeapon(weapon);
     }
+    if (militaryIncomplete(weapon)) return false;
     const control = grindingCompletion(weapon, name);
-    if (!control) {
+    if (!control && !pastCompletionStage(weapon, name)) {
       completionFocusAttempts.set(weapon, now);
       return false;
     }
-    if (control.done) {
+    if (!control || control.done) {
       await extension.storage.local.set({ [key]: done });
       Object.assign(state, done);
       return false;
@@ -201,7 +234,7 @@
     if (!control.button?.isConnected) return false;
     await extension.storage.local.set({ [key]: { ...state, pending: true } });
     const current = grindingCompletion(weapon, name);
-    if (current?.button !== control.button || !control.button.isConnected) {
+    if (militaryIncomplete(weapon) || current?.button !== control.button || !control.button.isConnected) {
       await extension.storage.local.set({ [key]: state });
       return false;
     }
@@ -561,6 +594,7 @@
       show('Tracked progress · locating ' + snapshot.weapon);
       return true;
     }
+    if (militaryIncomplete(name)) return false;
     const target = trackedControl(snapshot);
     if (target && (target.completed || target.count === snapshot.value)) {
       await extension.storage.local.set({ [key]: done });
@@ -733,6 +767,10 @@
             if (focusWeapon(key)) return show('Switching focus to ' + weapon);
           }
         }
+        if (await syncMilitary(session, military)) return;
+        for (const [name, tiers] of catalogMilitary || []) {
+          if (await syncMilitary(session, tiers, name)) return;
+        }
         if (await syncTrackedRows(session, trackedRows, true)) return;
         const target = findTarget();
         const signalIsCurrent = !weapon || weaponKey(weapon) === 'signal50';
@@ -742,19 +780,15 @@
           await extension.storage.local.set({ [storageKey]: state });
         }
         const sunburnPending = signalIsCurrent && !state.pending && state.cursor < count;
-        if (!sunburnPending && await syncMilitary(session, military)) return;
-        if (!sunburnPending) {
-          for (const [name, tiers] of catalogMilitary || []) {
-            if (await syncMilitary(session, tiers, name)) return;
-          }
-        }
+
         if (!sunburnPending && await syncTrackedRows(session, trackedRows)) return;
-        if (!sunburnPending && await syncGold(session, goldUnlocks)) return;
+
         if (!sunburnPending && challenges?.includes('menu-space-time') &&
             await syncChallenges(session, ['menu-space-time'], 'spaceTimeCompletion')) return;
         if (!sunburnPending &&
             await syncAkimbo(session, akimboCount, akimboTiming, firstReceived)) return;
         if (!sunburnPending && await syncChallenges(session, challenges)) return;
+        if (!sunburnPending && await syncGold(session, goldUnlocks)) return;
         const desired = weapon || (sunburnPending ? 'Signal 50' : null);
         if (desired && multiplayerSelected()) {
           const normalized = weaponKey(desired);
