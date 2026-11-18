@@ -217,7 +217,7 @@ test('Military clicks only the highest tier and later visible stages acknowledge
     getComputedStyle: () => ({ visibility: 'visible' }),
     setTimeout: callback => callback(),
     military: tier => {
-      if (count === 8) return null;
+      if (count === 8) return { count, button: null };
       if (!controls.has(tier)) controls.set(tier, {
         isConnected: true,
         getAttribute: () => 'Tick up to Military ' + tier,
@@ -244,20 +244,25 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   assert.deepEqual([...data['goldProgress-50gs'].handled], ['.50 GS']);
 
   count = 0;
-  page.military = () => ({ count, button: null });
-  const pilaAction = {
-    get textContent() { return String.fromCharCode(0x2713) + ' Military ' + (count + 1); },
-    isConnected: true,
+  let footerClicks = 0;
+  card.querySelectorAll = () => [{
+    textContent: String.fromCharCode(0x2713) + ' Military 1',
     getClientRects: () => [{}],
-    closest: () => null,
-    click() { count++; }
-  };
-  card.querySelectorAll = () => [pilaAction];
+    click() { footerClicks++; }
+  }];
+  page.military = () => ({ count, button: null });
   await page.syncMilitary('session', [1, 2], 'Pila');
-  assert.equal(count, 1);
-  assert.equal(data['militaryCursor-pila'].cursor, 0);
+  assert.equal(count, 0);
+  assert.equal(footerClicks, 0);
+  const military2Tile = {
+    isConnected: true,
+    closest: () => null,
+    click() { count = 2; }
+  };
+  page.military = tier => ({ count, button: tier === 2 ? military2Tile : null });
   await page.syncMilitary('session', [1, 2], 'Pila');
   assert.equal(count, 2);
+  assert.equal(footerClicks, 0);
   assert.equal(data['militaryCursor-pila'].cursor, 2);
   assert.equal(page.pastCompletionStage('50gs', 'Platinum'), false);
   stage = 'Harmonic Break';

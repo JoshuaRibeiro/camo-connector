@@ -87,7 +87,8 @@
       const count = label(counter).match(/^([0-8])\s*\/\s*8$/);
       if (!count) continue;
       const row = header.nextElementSibling;
-      const tiles = row ? buttons(row).filter(button => button.title === 'Military ' + tier) : [];
+      const tiles = row ? buttons(row).filter(button =>
+        button.title === 'Military ' + tier || button.getAttribute('aria-label') === 'Tick up to Military ' + tier) : [];
       if (tiles.length > 1) continue;
       targets.push({ button: tiles[0] ?? null, header, count: Number(count[1]) });
     }
@@ -101,17 +102,6 @@
       return false;
     });
     return grindingTargets.length === 1 ? grindingTargets[0] : null;
-  }
-
-  function militaryAction(card, control, tier) {
-    if (!control) return null;
-    const tile = control.button;
-    if (tile?.getAttribute('aria-label') === 'Tick up to Military ' + tier &&
-        !tile.disabled && !tile.closest('[aria-disabled="true"],button:disabled')) return tile;
-    const actions = buttons(card).filter(button =>
-      label(button).replace(/^[\u2713\u2714]\s*/, '') === 'Military ' + tier &&
-      !button.disabled && !button.closest('[aria-disabled="true"],button:disabled'));
-    return actions.length === 1 ? actions[0] : null;
   }
 
   async function syncMilitary(session, tiers, weaponName = 'Sang 9mm') {
@@ -134,31 +124,20 @@
     if (!card) return false;
     const target = militaryControl(weapon, tier, card);
     const done = { session, cursor: tiers.length };
-    const ready = { session, cursor: state.cursor };
-    if (target?.count >= tier || (!target && state.pending && !militaryIncomplete(weapon) &&
-        (state.pendingTier ?? tier) === tier)) {
+    if (target?.count >= tier) {
       await extension.storage.local.set({ [key]: done });
       return false;
     }
-    if (!target) return false;
-    if (state.pending) {
-      if (target.count >= (state.pendingTier ?? tier))
-        await extension.storage.local.set({ [key]: ready });
-      return false;
-    }
+    const action = target?.button;
+    if (!action?.isConnected || action.disabled || action.closest('[aria-disabled="true"],button:disabled')) return false;
+    if (state.pending && target.count < (state.pendingTier ?? tier)) return false;
 
-    // Some cards expose only the next Military action, even when several tiers are already unlocked in-game.
-    const nextTier = target.count + 1;
-    const targetAction = militaryAction(card, target, tier);
-    const clickTier = targetAction ? tier : nextTier;
-    const control = targetAction ? target : militaryControl(weapon, nextTier, card);
-    const action = targetAction ?? militaryAction(card, control, clickTier);
-    if (!action || control?.count !== target.count) return false;
-    await extension.storage.local.set({ [key]: { ...ready, pending: true, pendingTier: clickTier } });
-    const current = militaryControl(weapon, clickTier, card);
-    if (!multiplayerSelected() || !focusedWeapon(weapon) || !current || current.header !== control.header ||
-        current.button !== control.button || current.count !== control.count ||
-        militaryAction(card, current, clickTier) !== action || !action.isConnected) {
+    const ready = { session, cursor: state.cursor };
+    await extension.storage.local.set({ [key]: { ...ready, pending: true, pendingTier: tier } });
+    const current = militaryControl(weapon, tier, grindingCard(weapon) || card);
+    if (!multiplayerSelected() || !focusedWeapon(weapon) || current?.header !== target.header ||
+        current?.button !== action || current.count !== target.count || !action.isConnected ||
+        action.disabled || action.closest('[aria-disabled="true"],button:disabled')) {
       await extension.storage.local.set({ [key]: ready });
       return false;
     }
@@ -167,14 +146,13 @@
       await pause(150);
       if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
       const observed = militaryControl(weapon, tier, grindingCard(weapon) || card);
-      const reachedTarget = observed?.count >= tier || (!observed && clickTier === tier && !militaryIncomplete(weapon));
-      if (reachedTarget || observed?.count >= clickTier) {
-        await extension.storage.local.set({ [key]: reachedTarget ? done : ready });
-        show(weaponName + ' | Military ' + (observed?.count ?? tier) + '/8 synced');
+      if (observed?.count >= tier) {
+        await extension.storage.local.set({ [key]: done });
+        show(weaponName + ' | Military ' + observed.count + '/8 synced');
         return true;
       }
     }
-    show(weaponName + ' Military ' + clickTier + ' clicked | waiting to verify');
+    show(weaponName + ' Military ' + tier + ' clicked | waiting to verify');
     return false;
   }
 
