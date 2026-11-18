@@ -83,24 +83,30 @@ internal sealed class HudCapture : IDisposable
 
     public async Task<(WeaponRead? Weapon, bool Replay)> DetectAsync(Bitmap frame, CancellationToken cancel)
     {
+        // Read the current weapon label below the ammo counter before wider HUD regions.
+        var labelArea = (.683, .876, .141, .027);
+        foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast })
+        {
+            var (label, _) = await ReadTextAsync(frame, labelArea, cancel, pageMode: 7, adjustment: adjustment);
+            if (WeaponRecognition.Read(Lines(label), false) is { } weapon)
+                return await IsReplayAsync(frame, cancel) ? (null, true) : (weapon, false);
+        }
         foreach (var area in WeaponAreas)
         {
             var read = WeaponRecognition.Read(await ReadAsync(frame, area, cancel), area.W >= .15);
-            if (read == null) continue;
-            return await IsReplayAsync(frame, cancel) ? (null, true) : (read, false);
+            if (read != null) return await IsReplayAsync(frame, cancel) ? (null, true) : (read, false);
         }
-        // Short labels are right-aligned under the ammo counter. Read that
-        // line by itself when the wider crops do not yield a weapon name.
-        var (hudLabel, _) = await ReadTextAsync(frame, (.742, .876, .082, .026), cancel, pageMode: 7);
-        if (WeaponRecognition.Read(Lines(hudLabel), false) is { } weapon)
-            return await IsReplayAsync(frame, cancel) ? (null, true) : (weapon, false);
-        foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast })
+        // Short labels need less background in the crop to separate them from the ammo display.
+        foreach (var area in new[] { (.742, .876, .082, .026), (.782, .877, .048, .026) })
         {
-            var (shortHudLabel, _) = await ReadTextAsync(frame, (.782, .877, .048, .026), cancel,
-                pageMode: 7, adjustment: adjustment);
-            if (WeaponRecognition.Read(Lines(shortHudLabel), false) is { Name: ".50 GS" } pistol)
-                return await IsReplayAsync(frame, cancel) ? (null, true) : (pistol, false);
+            var (label, _) = await ReadTextAsync(frame, area, cancel, pageMode: 7);
+            if (WeaponRecognition.Read(Lines(label), false) is { } weapon)
+                return await IsReplayAsync(frame, cancel) ? (null, true) : (weapon, false);
         }
+        var (shortLabel, _) = await ReadTextAsync(frame, (.782, .877, .048, .026), cancel,
+            pageMode: 7, adjustment: PixelAdjustment.Contrast);
+        if (WeaponRecognition.Read(Lines(shortLabel), false) is { Name: ".50 GS" } pistol)
+            return await IsReplayAsync(frame, cancel) ? (null, true) : (pistol, false);
         return (null, false);
     }
 

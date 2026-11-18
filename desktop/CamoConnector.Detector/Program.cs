@@ -257,8 +257,15 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 }, cancel);
             }
         }
-        if (confirmation.Observe(result.Weapon, result.Replay || matchPhase is "match-voting" or "match-ended", now) is { } weapon)
+        if (confirmation.Observe(result.Weapon, result.Replay, now) is { } weapon)
         {
+            // Two matching, replay-checked HUD reads also prove gameplay resumed if the lobby transition was missed.
+            if (matchPhase is "match-ended" or "match-voting")
+            {
+                if (matchPhase == "match-ended") match++;
+                matchPhase = "match-started";
+                await AppendAsync(log, new { kind = matchPhase, source = "live", match, at = now }, cancel);
+            }
             menuConfirmation.Reset();
             confirmedWeapon = weapon.Name;
             var record = JsonSerializer.Serialize(new

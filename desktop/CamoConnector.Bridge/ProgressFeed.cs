@@ -80,7 +80,7 @@ public sealed class ProgressFeed
             if (kind is "match-voting" or "match-confirmed" or "match-started" or "match-ended")
             {
                 matchState = new { kind, match = Optional(item, "match"), matchMode = Text(item, "matchMode") };
-                if (kind == "match-voting") weapon = null;
+                if (kind is "match-voting" or "match-ended" or "match-confirmed") weapon = null;
             }
             if (Text(item, "mode") != "mp") return;
             if (!historical && Text(item, "key") == "signal-50:sp-3" && Number(item, "delta") == 1) count++;
