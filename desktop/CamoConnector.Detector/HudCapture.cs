@@ -137,7 +137,10 @@ internal sealed class HudCapture : IDisposable
             var detail = string.Join(" ", await ReadAsync(frame, (.827, .045, .155, .405), cancel));
             return CombatRecognition.ReadLobby(result + " " + detail);
         }
-        return CombatRecognition.ReadLobby(string.Join(" ", await ReadAsync(frame, (0, 0, .99, .42), cancel)));
+        var notice = CombatRecognition.ReadLobby(string.Join(" ", await ReadAsync(frame, (0, 0, .99, .42), cancel)));
+        if (notice != null) return notice;
+        var matchmaking = await ReadTextAsync(frame, (.34, .70, .32, .06), cancel, pageMode: 7);
+        return CombatRecognition.ReadLobby(matchmaking.Text);
     }
 
     public async Task<string?> DetectCompletionistGoldAsync(Bitmap frame, string? weapon, CancellationToken cancel)
@@ -205,6 +208,10 @@ internal sealed class HudCapture : IDisposable
         if (!LooksCompleted(heading))
             heading = await ReadBannerText((.350, .250, .300, .047), "unlockHeadingOriginal", pageMode: 6);
         var completed = LooksCompleted(heading);
+        // HUD notices can cover the middle of the completion text. Require the camo artwork as corroboration.
+        if (!completed && (heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
+            heading.Contains("OMPLETED", StringComparison.OrdinalIgnoreCase)))
+            completed = IdentifySpecialBanner(frame, null, null) != null;
         if (!goldTile && !completed) return (null, false, null);
         var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)

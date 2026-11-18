@@ -181,6 +181,10 @@ if ($state.Kills -or $state.Deaths -or $state.Best) { throw 'Match reset left co
 if ($combat::ReadLobby('VICTORY') -or $combat::ReadLobby('VICTORY SCORE LIMIT REACHED') -ne 'match-ended') {
     throw 'Victory end detection ignored required context.'
 }
+if ($combat::ReadLobby('SEARCHING FOR A MATCH 1-21MS PING') -ne 'match-ended' -or
+    $combat::ReadLobby('MATCH IN PROGRESS')) {
+    throw 'Matchmaking lobby must reset combat counters without mistaking the in-match pause screen for a lobby.'
+}
 if (!$combat::IsLongshot('L0NG-SHOT') -or $combat::IsLongshot('Longshotting') -or
     !$combat::HasCompletionistGold('COMPLETIONIST [1/4]') -or $combat::HasCompletionistGold('COMPLETIONIST [0/4]')) {
     throw 'Medal or completionist parsing failed.'

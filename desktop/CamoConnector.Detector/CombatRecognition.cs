@@ -30,6 +30,8 @@ public static class CombatRecognition
             Regex.IsMatch(text, @"\bTIME\s+REMAINING\b", IgnoreCase)) return "match-voting";
         if (Regex.IsMatch(text, @"\b(?:VICTORY|DEFEAT|DRAW)\b", IgnoreCase) &&
             Regex.IsMatch(text, @"\b(?:LIMIT\s+REACHED|MATCH\s+ENDED)\b", IgnoreCase)) return "match-ended";
+        if (Regex.IsMatch(text, @"\bSEARCHING\s+FOR\s+A\s+MATCH\b", IgnoreCase))
+            return "match-ended";
         return null;
     }
 

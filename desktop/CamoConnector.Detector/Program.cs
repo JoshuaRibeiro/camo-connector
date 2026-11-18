@@ -271,16 +271,21 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             lastConfirmedWeapon = now;
         if (result.Weapon is { Akimbo: true }) lastAkimbo = now;
         else if (result.Weapon != null) lastAkimbo = DateTimeOffset.MinValue;
-        if (!result.Replay && matchPhase is not ("match-ended" or "match-voting"))
+        var combatFrame = await combatRead;
+        // A lobby notice can be missed between scans. A first-kill card outside a replay can start the next match.
+        var resumedAfterLobby = matchPhase is "match-ended" or "match-voting" &&
+            combatFrame.Ordinal == 1 && !result.Replay &&
+            !await capture.IsReplayAsync(frame, cancel);
+        if (!result.Replay && (matchPhase is not ("match-ended" or "match-voting") || resumedAfterLobby))
         {
-            var read = await combatRead;
+            var read = combatFrame;
             if (!(read.Kill || read.Death) || result.Weapon != null || !await capture.IsReplayAsync(frame, cancel))
             {
                 foreach (var entry in combat.Observe(read, now))
                 {
                     if (matchPhase != "match-started")
                     {
-                        if (matchPhase == null) match++;
+                        if (matchPhase is null or "match-ended") match++;
                         matchPhase = "match-started";
                         await AppendAsync(log, new { kind = matchPhase, source = "live", match, at = now }, cancel);
                     }
