@@ -177,18 +177,25 @@
     return uniqueCamoControl(candidates);
   }
 
+  const completionFocusAttempts = new Map();
+
   async function syncGrindingCompletion(weapon, name, key, state, done) {
+    const now = Date.now();
     if (!focusedWeapon(weapon)) {
-      if (Date.now() - lastFocusAttempt >= 3500) {
-        lastFocusAttempt = Date.now();
-        return focusWeapon(weapon);
-      }
-      return false;
+      if (now - lastFocusAttempt < 3500 || now - (completionFocusAttempts.get(weapon) || 0) < 15000)
+        return false;
+      lastFocusAttempt = now;
+      completionFocusAttempts.set(weapon, now);
+      return focusWeapon(weapon);
     }
     const control = grindingCompletion(weapon, name);
-    if (!control) return false;
+    if (!control) {
+      completionFocusAttempts.set(weapon, now);
+      return false;
+    }
     if (control.done) {
       await extension.storage.local.set({ [key]: done });
+      Object.assign(state, done);
       return false;
     }
     if (!control.button?.isConnected) return false;
@@ -221,29 +228,21 @@
       show('Paused after an unverified challenge tick · check the tracker before restarting the bridge');
       return true;
     }
-    const entry = challenges[state.cursor];
-    if (!entry) return false;
-    const fromSelection = entry.startsWith('selected-');
-    const challenge = fromSelection ? entry.slice('selected-'.length) : entry;
-    const confirmedName = ({
-      'menu-autumn': 'autumn', 'menu-snakeskin': 'snakeskin', 'menu-space-time': 'space time',
-      'ads-25': 'autumn', 'streak-3x5': 'snakeskin'
-    })[challenge];
-    if (!focusedWeapon('sang9mm')) {
-      if (fromSelection) {
-        show('Challenge seen · possible Sang 9mm match. Select Grind this on Sang 9mm to apply.');
-        return true;
-      }
-      if (Date.now() - lastFocusAttempt >= 3500) {
-        lastFocusAttempt = Date.now();
-        focusWeapon('sang9mm');
-      }
-      show('Sang 9mm challenge queued · locating weapon card');
-      return true;
+    for (const entry of challenges.slice(state.cursor || 0)) {
+      if (state.handled?.includes(entry)) continue;
+      const fromSelection = entry.startsWith('selected-');
+      if (fromSelection && !focusedWeapon('sang9mm')) continue;
+      const challenge = fromSelection ? entry.slice('selected-'.length) : entry;
+      const name = ({
+        'menu-autumn': 'autumn', 'menu-snakeskin': 'snakeskin', 'menu-space-time': 'space time',
+        'ads-25': 'autumn', 'streak-3x5': 'snakeskin'
+      })[challenge];
+      if (name && await syncGrindingCompletion('sang9mm', name, key, state,
+        { ...state, handled: [...(state.handled || []), entry] })) return true;
     }
-    if (!confirmedName) return false;
-    return syncGrindingCompletion('sang9mm', confirmedName, key, state, { session, cursor: state.cursor + 1 });
+    return false;
   }
+
   function multiplayerSelected() {
     const modeButtons = ['Multiplayer', 'DMZ', 'Warzone'].map(mode =>
       buttons(document).filter(button => label(button) === mode));
@@ -541,14 +540,19 @@
     const pending = rows.filter(row => row.type === 'camo' && row.camo &&
       (sunburnOnly ? isSunburn(row) && row.confirmed === true && row.value === 40 && row.goal === 40 : !isSunburn(row)) &&
       !state.handled.includes(row.id));
-    const snapshot = (latestWeapon && pending.find(row => weaponKey(row.weapon) === weaponKey(latestWeapon))) || pending[0];
+    const handled = row => ({ ...state, handled: [...state.handled, row.id],
+      akimboThrough: Math.max(state.akimboThrough || 0, row.akimboThrough || 0) });
+    const completions = pending.filter(row => row.confirmed === true);
+    completions.sort((a, b) => Number(focusedWeapon(weaponKey(b.weapon))) - Number(focusedWeapon(weaponKey(a.weapon))));
+    for (const row of completions) {
+      if (await syncGrindingCompletion(weaponKey(row.weapon), row.camo, key, state, handled(row))) return true;
+    }
+    const counters = pending.filter(row => row.confirmed !== true);
+    const snapshot = counters.find(row => latestWeapon && weaponKey(row.weapon) === weaponKey(latestWeapon)) || counters[0];
     if (!snapshot) return false;
     const name = weaponKey(snapshot.weapon);
-    const handled = { ...state, handled: [...state.handled, snapshot.id],
-      akimboThrough: Math.max(state.akimboThrough || 0, snapshot.akimboThrough || 0) };
-    if (snapshot.confirmed === true)
-      return syncGrindingCompletion(name, snapshot.camo, key, state, handled);
-    if (weaponDetails(name)) return reconcileDetails(snapshot, key, state, handled);
+    const done = handled(snapshot);
+    if (weaponDetails(name)) return reconcileDetails(snapshot, key, state, done);
     if (!focusedWeapon(name)) {
       if (Date.now() - lastFocusAttempt >= 3500) {
         lastFocusAttempt = Date.now();
@@ -559,11 +563,11 @@
     }
     const target = trackedControl(snapshot);
     if (target && (target.completed || target.count === snapshot.value)) {
-      await extension.storage.local.set({ [key]: handled });
+      await extension.storage.local.set({ [key]: done });
       show(snapshot.weapon + ' · ' + snapshot.camo + ' progress verified');
       return true;
     }
-    return reconcileDetails(snapshot, key, state, handled);
+    return reconcileDetails(snapshot, key, state, done);
   }
   async function syncAkimbo(session, count, timing, receivedTimes) {
     if (!count || !multiplayerSelected()) return false;
@@ -644,10 +648,13 @@
     const saved = (await extension.storage.local.get(key))[key];
     const state = saved?.session === session ? saved : { session, handled: [] };
     if (state.pending) return false;
-    const name = names.find(name => !state.handled.includes(name));
-    if (!name) return false;
-    return syncGrindingCompletion(weaponKey(name), 'Gold', key, state,
-      { ...state, handled: [...state.handled, name] });
+    const pending = names.filter(name => !state.handled.includes(name));
+    pending.sort((a, b) => Number(focusedWeapon(weaponKey(b))) - Number(focusedWeapon(weaponKey(a))));
+    for (const name of pending) {
+      if (await syncGrindingCompletion(weaponKey(name), 'Gold', key, state,
+        { ...state, handled: [...state.handled, name] })) return true;
+    }
+    return false;
   }
   let busy = false;
   let timingSession = null;

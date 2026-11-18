@@ -75,6 +75,46 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
   assert.deepEqual([...data.sunburnCompletion.handled], [4]);
 });
 
+test('unavailable camo checkoffs leave later checkoffs runnable and retry when visible', async () => {
+  const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
+    /  poll\(\);\s*setInterval\(poll, 500\);/,
+    '  multiplayerSelected = () => true; focusedWeapon = key => key === globalThis.focused;\n' +
+    '  focusWeapon = () => false; grindingCompletion = globalThis.control;\n' +
+    '  Object.assign(globalThis, { syncTrackedRows, syncChallenges, syncGold });');
+  const data = {};
+  const available = new Set(['snakeskin', 'Red Tiger', 'sang9mm:Gold']);
+  const clicked = [];
+  const controls = new Map();
+  const page = {
+    document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
+    chrome: { storage: { local: { get: async () => data, set: async value => Object.assign(data, value) } } },
+    focused: 'sang9mm',
+    setTimeout: callback => callback(),
+    control: (weapon, name) => {
+      const key = name === 'Gold' ? weapon + ':Gold' : name;
+      if (!available.has(key)) return null;
+      if (!controls.has(key)) controls.set(key, { isConnected: true, click: () => clicked.push(key) });
+      return { button: controls.get(key), done: clicked.includes(key) };
+    }
+  };
+  vm.runInNewContext(tracker, page);
+  const challenges = ['menu-autumn', 'menu-snakeskin'];
+  await page.syncChallenges('session', challenges);
+  available.add('autumn');
+  await page.syncChallenges('session', challenges);
+  await page.syncChallenges('session', challenges);
+  await page.syncGold('session', ['.50 GS', 'Sang 9mm']);
+  page.focused = '50gs';
+  const rows = ['Frosted', 'Red Tiger'].map((camo, id) =>
+    ({ id, camo, type: 'camo', weapon: '.50 GS', confirmed: true }));
+  await page.syncTrackedRows('session', rows);
+  available.add('Frosted');
+  await page.syncTrackedRows('session', rows);
+  available.add('50gs:Gold');
+  await page.syncGold('session', ['.50 GS', 'Sang 9mm']);
+  assert.deepEqual(clicked, ['snakeskin', 'autumn', 'sang9mm:Gold', 'Red Tiger', 'Frosted', '50gs:Gold']);
+});
+
 test('the details panel recognizes a completed Special camo by its prefixed title', () => {
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8')
     .replace(/  poll\(\);\s*setInterval\(poll, 500\);/, '  globalThis.detailCounter = detailCounter;');
