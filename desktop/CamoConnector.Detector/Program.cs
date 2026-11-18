@@ -169,6 +169,7 @@ try
 catch (OperationCanceledException) when (stop.IsCancellationRequested) { return 0; }
 catch (Exception error)
 {
+    Console.Error.WriteLine(error.StackTrace);
     Console.Error.WriteLine("Detector error: " + error.Message.ReplaceLineEndings(" | "));
     return 1;
 }
@@ -373,13 +374,12 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     context = "camo-menu", at = now
                 }, cancel);
             }
-            var goldRead = ReadSnapshotAsync(frame, copy => capture.DetectCompletionistGoldAsync(copy, menuWeapon, cancel));
-            var specialRead = ReadSnapshotAsync(frame, copy => capture.DetectSpecialUnlocksAsync(copy, menuWeapon, cancel));
-            var progressRead = ReadSnapshotAsync(frame, copy => ReadProgressAsync(copy, capture, menuWeapon, result.Replay, cancel));
-            var militaryRead = menuWeapon == null ? Task.FromResult<int?>(null) :
-                ReadSnapshotAsync(frame, copy => capture.ReadMilitaryMenuCountAsync(copy, cancel));
-            await Task.WhenAll(goldRead, specialRead, progressRead, militaryRead);
-            var menuMilitary = menuWeapon != null && await militaryRead is int tier && tier > 0
+            // GDI+ bitmap clones can share backing storage. Keep this menu scan on one reader.
+            var gold = await capture.DetectCompletionistGoldAsync(frame, menuWeapon, cancel);
+            var specials = await capture.DetectSpecialUnlocksAsync(frame, menuWeapon, cancel);
+            var militaryTier = menuWeapon == null ? null : await capture.ReadMilitaryMenuCountAsync(frame, cancel);
+            var reads = await ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
+            var menuMilitary = menuWeapon != null && militaryTier is int tier && tier > 0
                 ? new MilitaryUnlock(menuWeapon, tier) : null;
             if (menuMilitary != null && menuMilitary == previousMenuMilitary && seenUnlocks.Add(menuMilitary))
             {
@@ -390,21 +390,18 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 }, cancel);
             }
             previousMenuMilitary = menuMilitary;
-            var gold = await goldRead;
             if (gold != null && gold == goldCandidate && goldUnlocked.Add(gold))
                 await AppendAsync(log, new
                 {
                     kind = "completionist-unlock", source = "live", mode = "mp", weapon = gold, challenge = "Gold", at = now
                 }, cancel);
             goldCandidate = gold;
-            var specials = await specialRead;
             foreach (var special in specialConfirmation.Observe(specials))
                 await AppendAsync(log, new
                 {
                     kind = special.Kind, source = "live", mode = "mp",
                     weapon = special.Weapon, challenge = special.Challenge, at = now
                 }, cancel);
-            var reads = await progressRead;
             camoReads += reads.Length;
             foreach (var progress in progressConfirmation.ObserveRows(reads))
             {
@@ -435,7 +432,9 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
 
 static async Task<T> ReadSnapshotAsync<T>(Bitmap frame, Func<Bitmap, Task<T>> read)
 {
-    using var copy = (Bitmap)frame.Clone();
+    using var copy = new Bitmap(frame.Width, frame.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+    using (var graphics = Graphics.FromImage(copy))
+        graphics.DrawImageUnscaled(frame, 0, 0);
     return await read(copy);
 }
 
