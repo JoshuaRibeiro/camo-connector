@@ -115,11 +115,20 @@ internal sealed class HudCapture : IDisposable
     {
         var (header, _) = await ReadTextAsync(frame, (.900, .210, .080, .041), cancel, pageMode: 7,
             adjustment: PixelAdjustment.WhiteText);
+        if (!WeaponRecognition.IsUnlockHeader(header))
+            (header, _) = await ReadTextAsync(frame, (.911, .216, .058, .025), cancel, pageMode: 7);
         MilitaryUnlock? badge = null;
         if (WeaponRecognition.IsUnlockHeader(header))
         {
             var body = await ReadAsync(frame, (.833, .242, .144, .065), cancel);
             badge = WeaponRecognition.ReadMilitaryUnlock([header, .. body]);
+            if (badge == null)
+            {
+                // Container seams and other bright edges can join the weapon text in the combined crop.
+                var (weapon, _) = await ReadTextAsync(frame, (.833, .246, .099, .025), cancel, pageMode: 7);
+                var (tier, _) = await ReadTextAsync(frame, (.836, .268, .135, .030), cancel, pageMode: 7);
+                badge = WeaponRecognition.ReadMilitaryUnlock([header, weapon, tier]);
+            }
         }
         badge ??= WeaponRecognition.ReadMilitaryUnlock(await ReadAsync(frame, (.827, .045, .155, .405), cancel));
         if (badge == null) badge = await DetectMilitarySummaryAsync(frame, cancel);

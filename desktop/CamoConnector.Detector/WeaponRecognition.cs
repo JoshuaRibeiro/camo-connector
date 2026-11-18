@@ -65,7 +65,7 @@ public static class WeaponRecognition
     }
 
     internal static bool IsUnlockHeader(string text) =>
-        Regex.IsMatch(Key(text), @"\Ai?un[l1i][o0]c[i1]?ked\z");
+        Regex.IsMatch(Key(text), @"\Ai?un[l1iu][o0][ceg][i1]?ked\z");
 
     public static MilitaryUnlock? ReadMilitaryUnlock(string[] lines)
     {
