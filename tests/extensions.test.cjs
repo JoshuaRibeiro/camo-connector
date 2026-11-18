@@ -115,7 +115,7 @@ test('unavailable camo checkoffs leave later checkoffs runnable and retry when v
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
     '  multiplayerSelected = () => true; grindingCard = () => null; focusedWeapon = key => key === globalThis.focused;\n' +
-    '  focusWeapon = () => false; grindingCompletion = globalThis.control;\n' +
+    '  focusWeapon = () => false; grindingCompletion = globalThis.control; findTarget = globalThis.fallback;\n' +
     '  Object.assign(globalThis, { syncTrackedRows, syncChallenges, syncGold });');
   const data = {};
   const available = new Set(['snakeskin', 'Red Tiger', 'sang9mm:Gold']);
@@ -126,7 +126,13 @@ test('unavailable camo checkoffs leave later checkoffs runnable and retry when v
     chrome: { storage: { local: { get: async () => data, set: async value => Object.assign(data, value) } } },
     focused: 'sang9mm',
     setTimeout: callback => callback(),
+    fallback: (weapon, name, goal) => {
+      if (weapon !== '50gs' || name !== 'Frosted' || goal !== 20 || !available.has(name)) return null;
+      if (!controls.has(name)) controls.set(name, { isConnected: true, click: () => clicked.push(name) });
+      return { button: controls.get(name), count: clicked.includes(name) ? 20 : 19 };
+    },
     control: (weapon, name) => {
+      if (name === 'Frosted') return null;
       const key = name === 'Gold' ? weapon + ':Gold' : name;
       if (!available.has(key)) return null;
       if (!controls.has(key)) controls.set(key, { isConnected: true, click: () => clicked.push(key) });
@@ -142,7 +148,7 @@ test('unavailable camo checkoffs leave later checkoffs runnable and retry when v
   await page.syncGold('session', ['.50 GS', 'Sang 9mm']);
   page.focused = '50gs';
   const rows = ['Frosted', 'Red Tiger'].map((camo, id) =>
-    ({ id, camo, type: 'camo', weapon: '.50 GS', confirmed: true }));
+    ({ id, camo, type: 'camo', weapon: '.50 GS', confirmed: true, goal: 20 }));
   await page.syncTrackedRows('session', rows);
   available.add('Frosted');
   await page.syncTrackedRows('session', rows);
@@ -208,6 +214,31 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   assert.equal(page.pastCompletionStage('50gs', 'Platinum'), true);
   assert.equal(page.pastCompletionStage('50gs', 'Harmonic Break'), false);
   assert.deepEqual(clicked, [7, 8]);
+});
+
+test('named Now Grinding actions work for any camo and only the matching weapon', () => {
+  const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
+    /  poll\(\);\s*setInterval\(poll, 500\);/,
+    '  multiplayerSelected = () => true; focusedWeapon = () => true; globalThis.readTick = grindingCompletion;');
+  const nodes = ['.50 GS', 'Signal 50'].map(textContent => {
+    const heading = { textContent, children: [], getClientRects: () => [{}] };
+    const buttons = ['Frosted', 'Sunburn', 'Gold'].map(name => ({
+      name, getClientRects: () => [{}], getAttribute: key => key === 'aria-label' ? 'Mark ' + name + ' done' : null
+    }));
+    return { heading, buttons, contains: node => node === heading, querySelectorAll: () => buttons };
+  });
+  const page = {
+    document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} },
+      querySelectorAll: selector => selector.startsWith('section[') ? nodes :
+        selector.startsWith('h1,') ? nodes.map(node => node.heading) : [] },
+    getComputedStyle: () => ({ visibility: 'visible' })
+  };
+  vm.runInNewContext(tracker, page);
+  assert.equal(page.readTick('50gs', 'Frosted').button, nodes[0].buttons[0]);
+  assert.equal(page.readTick('signal50', 'Sunburn').button, nodes[1].buttons[1]);
+  assert.equal(page.readTick('signal50', 'Gold').button, nodes[1].buttons[2]);
+  nodes[1].buttons[1].disabled = true;
+  assert.equal(page.readTick('signal50', 'Sunburn'), null);
 });
 
 test('the details panel recognizes a completed Special camo by its prefixed title', () => {

@@ -188,6 +188,14 @@
   function grindingCompletion(weapon, name) {
     if (!multiplayerSelected() || !focusedWeapon(weapon)) return null;
     const headings = weaponHeadings().filter(title => weaponKey(label(title)) === weapon);
+    const namedButtons = [...document.querySelectorAll('section[aria-label="Now grinding"]')]
+      .filter(card => headings.some(heading => card.contains(heading)))
+      .flatMap(card => buttons(card).filter(button => !button.disabled &&
+        button.getAttribute('aria-disabled') !== 'true' &&
+        button.getAttribute('aria-label')?.trim().toLowerCase() === 'mark ' + name.toLowerCase() + ' done')
+        .map(button => ({ button, card })));
+    if (namedButtons.length === 1) return { ...namedButtons[0], done: false };
+    if (namedButtons.length > 1) return null;
     const candidates = new Map();
     const isTick = button => {
       const text = [label(button), button.title, button.getAttribute('aria-label')].filter(Boolean).join(' ');
@@ -219,7 +227,7 @@
 
   const completionFocusAttempts = new Map();
 
-  async function syncGrindingCompletion(weapon, name, key, state, done) {
+  async function syncGrindingCompletion(weapon, name, key, state, done, goal) {
     const now = Date.now();
     if (!focusedWeapon(weapon)) {
       if (now - lastFocusAttempt < 3500 || now - (completionFocusAttempts.get(weapon) || 0) < 15000)
@@ -231,10 +239,10 @@
     if (militaryIncomplete(weapon)) return false;
     const readControl = () => {
       const control = grindingCompletion(weapon, name);
-      if (control || weapon !== 'signal50' || camoKey(name) !== 'sunburn') return control;
-      const row = findTarget();
-      if (!row || row.count < 39 || row.count > 40) return null;
-      return { button: row.count === 39 ? row.tick || row.button : null, done: row.count === 40, card: row.card };
+      if (control || !Number.isInteger(goal) || goal < 1) return control;
+      const row = findTarget(weapon, name, goal);
+      if (!row || row.count < goal - 1 || row.count > goal) return null;
+      return { button: row.count === goal - 1 ? row.tick || row.button : null, done: row.count === goal, card: row.card };
     };
     const control = readControl();
     if (!control && !pastCompletionStage(weapon, name)) {
@@ -258,7 +266,8 @@
       await pause(150);
       if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
       const observed = readControl();
-      if (observed?.done || (!observed && !control.button.isConnected && control.card?.isConnected &&
+      if (observed?.done || (!observed && pastCompletionStage(weapon, name)) ||
+          (!observed && !control.button.isConnected && control.card?.isConnected &&
           !camoRowIdentity(control.card, name))) {
         await extension.storage.local.set({ [key]: done });
         show(name + ' completed');
@@ -305,28 +314,29 @@
       +rgb[3] <= 110 && fills[0] !== fills[1] && fills[0] !== fills[2];
   }
 
-  function findTarget() {
+  function findTarget(weaponKeyName = 'signal50', camo = 'Sunburn', goal = 40) {
     if (!multiplayerSelected()) return null;
     const exact = text => [...document.querySelectorAll('h1,h2,h3,h4,span,div,p,strong,b')]
       .filter(element => visible(element) && label(element).toLowerCase() === text &&
         ![...element.children].some(child => label(child).toLowerCase() === text));
     // The focused card must contain the weapon, its grinding label and Sunburn.
     const targets = new Map();
-    for (const name of exact('sunburn')) {
+    const titles = weaponHeadings().filter(heading => weaponKey(label(heading)) === weaponKeyName);
+    for (const name of exact(camo.toLowerCase())) {
       let row = name.parentElement;
       while (row && row !== document.body && !/NOW\s+GRINDING/i.test(label(row))) {
         const text = label(row);
-        const counts = [...text.matchAll(/(\d+)\s*\/\s*40\b/g)];
+        const counts = [...text.matchAll(/(\d+)\s*\/\s*(\d+)\b/g)];
         if (counts.length === 1) {
           const rowButtons = buttons(row);
           const controls = rowButtons.filter(button => label(button) === '+1' && !button.disabled);
           const ticks = rowButtons.filter(button => !button.disabled && button.getAttribute('aria-disabled') !== 'true' &&
             /^[\u2713\u2714]\uFE0F?$/.test(label(button)));
           const count = Number(counts[0][1]);
-          if (controls.length === 1 || count === 40) {
+          if (Number(counts[0][2]) === goal && (controls.length === 1 || count === goal)) {
             for (let card = row.parentElement; card && card !== document.body; card = card.parentElement) {
               if (!/NOW\s+GRINDING/i.test(label(card))) continue;
-              if (exact('signal 50').some(weapon => card.contains(weapon))) {
+              if (titles.some(weapon => card.contains(weapon))) {
                 targets.set(controls[0] || row, { button: controls[0], count, tick: ticks.length === 1 ? ticks[0] : null, card });
               }
               break;
@@ -596,7 +606,7 @@
     const completions = pending.filter(row => row.confirmed === true);
     completions.sort((a, b) => Number(focusedWeapon(weaponKey(b.weapon))) - Number(focusedWeapon(weaponKey(a.weapon))));
     for (const row of completions) {
-      if (await syncGrindingCompletion(weaponKey(row.weapon), row.camo, key, state, handled(row))) return true;
+      if (await syncGrindingCompletion(weaponKey(row.weapon), row.camo, key, state, handled(row), row.goal)) return true;
     }
     const counters = pending.filter(row => row.confirmed !== true);
     const snapshot = counters.find(row => latestWeapon && weaponKey(row.weapon) === weaponKey(latestWeapon)) || counters[0];

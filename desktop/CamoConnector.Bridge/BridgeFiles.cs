@@ -32,7 +32,8 @@ internal sealed class BridgeFiles(string data, ProgressFeed feed)
     public async Task FollowAsync(CancellationToken cancellationToken)
     {
         var initial = new FileInfo(eventLog);
-        var offset = initial.Exists ? initial.Length : 0;
+        var historicalEnd = initial.Exists ? initial.Length : 0;
+        long offset = 0;
         var created = initial.Exists ? initial.CreationTimeUtc : DateTime.MinValue;
         var buffer = new byte[65536];
         using var line = new MemoryStream();
@@ -46,6 +47,7 @@ internal sealed class BridgeFiles(string data, ProgressFeed feed)
                 {
                     created = info.Exists ? info.CreationTimeUtc : DateTime.MinValue;
                     offset = 0;
+                    historicalEnd = 0;
                     line.SetLength(0);
                     oversized = false;
                 }
@@ -60,7 +62,8 @@ internal sealed class BridgeFiles(string data, ProgressFeed feed)
                     {
                         if (buffer[i] == (byte)'\n')
                         {
-                            if (!oversized) feed.Accept(Encoding.UTF8.GetString(line.GetBuffer(), 0, (int)line.Length));
+                            if (!oversized) feed.Accept(Encoding.UTF8.GetString(line.GetBuffer(), 0, (int)line.Length),
+                                historical: offset - size + i < historicalEnd);
                             line.SetLength(0);
                             oversized = false;
                         }

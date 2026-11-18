@@ -35,7 +35,13 @@ function Check-Events($Status, $Headers = @{}) {
 
 try {
     [IO.File]::WriteAllText((Join-Path $data 'bridge-pairing.key'), $key)
-    [IO.File]::WriteAllText($eventLog, $event)
+    $historical = @(
+        '{"kind":"catalog-special-unlocked","source":"live","mode":"mp","weapon":"Signal 50","challenge":"Sunburn"}'
+        '{"kind":"catalog-special-unlocked","source":"live","mode":"mp","weapon":".50 GS","challenge":"Frosted"}'
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":"Sang 9mm"}'
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"Signal 50","key":"signal-50:sp-3","count":4,"goal":40}'
+    )
+    [IO.File]::WriteAllText($eventLog, $event + (($historical -join "`n") + "`n"))
     $process = Start-Process -FilePath $application -ArgumentList ('"' + $data + '"') -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
     $deadline = [DateTime]::UtcNow.AddSeconds(10)
     do {
@@ -52,7 +58,16 @@ try {
     $message = [Text.Encoding]::UTF8.GetBytes("Camo Connector browser v1:$origin")
     $token = [Convert]::ToHexString([Security.Cryptography.HMACSHA256]::HashData($secret, $message)).ToLowerInvariant()
     $headers = @{ Origin = $origin; 'X-Camo-Client' = $origin; Authorization = "Bearer $token" }
-    $before = Check-Events 200 $headers
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $before = Check-Events 200 $headers
+        if ($before.trackedRows.Count -ge 2) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if (@($before.trackedRows | Where-Object { $_.confirmed -and $_.camo -in 'Sunburn','Frosted' }).Count -ne 2) {
+        throw 'The bridge lost confirmed camo unlocks on startup.'
+    }
+    if ($before.weapon -or $before.progress) { throw 'The bridge replayed stale focus or a progress snapshot.' }
     if ($before.count -ne 0) { throw 'The bridge replayed an existing progress event.' }
     [IO.File]::AppendAllText($eventLog, $event)
     $deadline = [DateTime]::UtcNow.AddSeconds(5)

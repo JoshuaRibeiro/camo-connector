@@ -46,7 +46,7 @@ public sealed class ProgressFeed
 
     private static string CamoKey(string value) => Regex.Replace(value.ToLowerInvariant(), "[^a-z0-9]", "");
 
-    public void Accept(string line)
+    public void Accept(string line, bool historical = false)
     {
         JsonDocument document;
         try { document = JsonDocument.Parse(line.Trim().TrimStart('\uFEFF')); }
@@ -58,13 +58,16 @@ public sealed class ProgressFeed
             if (Text(item, "source") != "live") return;
             var kind = Text(item, "kind");
             var name = Text(item, "weapon");
+            if (historical && (!IsWeapon(name) || kind is not
+                ("completionist-unlock" or "military-unlock" or "challenge-completed" or "catalog-special-unlocked")))
+                return;
             if (kind is "match-voting" or "match-confirmed" or "match-started" or "match-ended")
             {
                 matchState = new { kind, match = Optional(item, "match"), matchMode = Text(item, "matchMode") };
                 if (kind == "match-voting") weapon = null;
             }
             if (Text(item, "mode") != "mp") return;
-            if (Text(item, "key") == "signal-50:sp-3" && Number(item, "delta") == 1) count++;
+            if (!historical && Text(item, "key") == "signal-50:sp-3" && Number(item, "delta") == 1) count++;
             switch (kind)
             {
                 case "weapon" when IsWeapon(name):
