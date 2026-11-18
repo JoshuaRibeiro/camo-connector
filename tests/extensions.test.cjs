@@ -6,6 +6,39 @@ const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '..');
 const base = require('../manifest.json');
+test('popup checks extension releases and compares version components numerically', async () => {
+  const elements = new Map();
+  const document = {
+    querySelectorAll: () => [],
+    querySelector: selector => {
+      if (!elements.has(selector)) elements.set(selector, {
+        addEventListener(event, handler) { this[event] = handler; }
+      });
+      return elements.get(selector);
+    }
+  };
+  const chrome = {
+    runtime: { getManifest: () => ({ version: '1.9.9' }), sendMessage: async () => ({ connected: true }) },
+    permissions: { request: async () => true }
+  };
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'pairing.js'), 'utf8'), {
+    document, chrome, AbortSignal,
+    fetch: async () => ({ ok: true, json: async () => [
+      { tag_name: 'v9.0.0', draft: false },
+      { tag_name: 'extension-v2.0.0', draft: true },
+      { tag_name: 'extension-v1.9.10', draft: false, prerelease: true }
+    ] })
+  });
+  await elements.get('#check-update').click();
+  assert.equal(elements.get('#extension-version').textContent, 'Extension v1.9.9');
+  assert.equal(elements.get('#update-status').textContent, 'Extension v1.9.10 is available.');
+  assert.equal(elements.get('#update-release').href,
+    'https://github.com/JoshuaRibeiro/camo-connector/releases/tag/extension-v1.9.10');
+  chrome.permissions.request = async () => false;
+  await elements.get('#check-update').click();
+  assert.equal(elements.get('#update-release').hidden, true);
+});
+
 test('Sunburn ignores absolute reads and applies queued longshots only with +1', async () => {
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
