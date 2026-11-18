@@ -221,7 +221,14 @@
       return focusWeapon(weapon);
     }
     if (militaryIncomplete(weapon)) return false;
-    const control = grindingCompletion(weapon, name);
+    const readControl = () => {
+      const control = grindingCompletion(weapon, name);
+      if (control || weapon !== 'signal50' || camoKey(name) !== 'sunburn') return control;
+      const row = findTarget();
+      if (!row || row.count < 39 || row.count > 40) return null;
+      return { button: row.count === 39 ? row.tick || row.button : null, done: row.count === 40, card: row.card };
+    };
+    const control = readControl();
     if (!control && !pastCompletionStage(weapon, name)) {
       completionFocusAttempts.set(weapon, now);
       return false;
@@ -233,7 +240,7 @@
     }
     if (!control.button?.isConnected) return false;
     await extension.storage.local.set({ [key]: { ...state, pending: true } });
-    const current = grindingCompletion(weapon, name);
+    const current = readControl();
     if (militaryIncomplete(weapon) || current?.button !== control.button || !control.button.isConnected) {
       await extension.storage.local.set({ [key]: state });
       return false;
@@ -242,8 +249,8 @@
     for (let attempt = 0; attempt < 8; attempt++) {
       await pause(150);
       if (!multiplayerSelected() || !focusedWeapon(weapon)) continue;
-      const observed = grindingCompletion(weapon, name);
-      if (observed?.done || (!observed && !control.button.isConnected && control.card.isConnected &&
+      const observed = readControl();
+      if (observed?.done || (!observed && !control.button.isConnected && control.card?.isConnected &&
           !camoRowIdentity(control.card, name))) {
         await extension.storage.local.set({ [key]: done });
         show(name + ' completed');
@@ -303,13 +310,16 @@
         const text = label(row);
         const counts = [...text.matchAll(/(\d+)\s*\/\s*40\b/g)];
         if (counts.length === 1) {
-          const controls = buttons(row).filter(button => label(button) === '+1' && !button.disabled);
+          const rowButtons = buttons(row);
+          const controls = rowButtons.filter(button => label(button) === '+1' && !button.disabled);
+          const ticks = rowButtons.filter(button => !button.disabled && button.getAttribute('aria-disabled') !== 'true' &&
+            /^[\u2713\u2714]\uFE0F?$/.test(label(button)));
           const count = Number(counts[0][1]);
           if (controls.length === 1 || count === 40) {
             for (let card = row.parentElement; card && card !== document.body; card = card.parentElement) {
               if (!/NOW\s+GRINDING/i.test(label(card))) continue;
               if (exact('signal 50').some(weapon => card.contains(weapon))) {
-                targets.set(controls[0] || row, { button: controls[0], count });
+                targets.set(controls[0] || row, { button: controls[0], count, tick: ticks.length === 1 ? ticks[0] : null, card });
               }
               break;
             }
@@ -767,13 +777,17 @@
             if (focusWeapon(key)) return show('Switching focus to ' + weapon);
           }
         }
-        if (await syncMilitary(session, military)) return;
+        const detected = weapon ? weaponKey(weapon) : null;
+        const activeWeapon = aliases.get(detected) || detected;
+        const canSync = name => !activeWeapon || weaponKey(name) === activeWeapon;
+        const activeRows = trackedRows?.filter(row => canSync(row.weapon));
+        if (canSync('Sang 9mm') && await syncMilitary(session, military)) return;
         for (const [name, tiers] of catalogMilitary || []) {
-          if (await syncMilitary(session, tiers, name)) return;
+          if (canSync(name) && await syncMilitary(session, tiers, name)) return;
         }
-        if (await syncTrackedRows(session, trackedRows, true)) return;
+        if (await syncTrackedRows(session, activeRows, true)) return;
         const target = findTarget();
-        const signalIsCurrent = !weapon || weaponKey(weapon) === 'signal50';
+        const signalIsCurrent = canSync('Signal 50');
         if (!state.pending && signalIsCurrent && state.cursor < count && (target?.count === 40 ||
             (!target && multiplayerSelected() && focusedWeapon('signal50')))) {
           state = { ...state, cursor: count };
@@ -781,14 +795,14 @@
         }
         const sunburnPending = signalIsCurrent && !state.pending && state.cursor < count;
 
-        if (!sunburnPending && await syncTrackedRows(session, trackedRows)) return;
+        if (!sunburnPending && await syncTrackedRows(session, activeRows)) return;
 
-        if (!sunburnPending && challenges?.includes('menu-space-time') &&
+        if (!sunburnPending && canSync('Sang 9mm') && challenges?.includes('menu-space-time') &&
             await syncChallenges(session, ['menu-space-time'], 'spaceTimeCompletion')) return;
-        if (!sunburnPending &&
+        if (!sunburnPending && canSync('Sang 9mm') &&
             await syncAkimbo(session, akimboCount, akimboTiming, firstReceived)) return;
-        if (!sunburnPending && await syncChallenges(session, challenges)) return;
-        if (!sunburnPending && await syncGold(session, goldUnlocks)) return;
+        if (!sunburnPending && canSync('Sang 9mm') && await syncChallenges(session, challenges)) return;
+        if (!sunburnPending && await syncGold(session, goldUnlocks?.filter(canSync))) return;
         const desired = weapon || (sunburnPending ? 'Signal 50' : null);
         if (desired && multiplayerSelected()) {
           const normalized = weaponKey(desired);

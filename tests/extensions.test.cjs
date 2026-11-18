@@ -42,7 +42,7 @@ test('popup checks extension releases and compares version components numericall
 test('Sunburn ignores absolute reads and applies queued longshots only with +1', async () => {
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
-    '  findTarget = globalThis.target; multiplayerSelected = () => true; grindingCard = () => null;\n' +
+    '  findTarget = () => globalThis.target(); multiplayerSelected = () => true; grindingCard = () => null;\n' +
     '  focusedWeapon = key => key === globalThis.focused; reportTrackerFocus = () => {};\n' +
     '  syncGold = globalThis.syncGold; globalThis.pollOnce = poll;\n' +
     '  openWeaponDetails = () => { throw new Error("Completion opened weapon details"); };\n' +
@@ -98,7 +98,9 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
 
   let completionClicks = 0;
   const tick = { isConnected: true, click() { completionClicks++; trackerCount = 40; } };
-  page.readCompletion = name => name === 'Sunburn' ? { button: tick, done: trackerCount === 40 } : null;
+  page.target = () => ({ count: trackerCount, button, tick });
+  events.goldUnlocks = ['Sang 9mm'];
+  page.seenGold = null;
   events.trackedRows.push({ id: 4, type: 'camo', weapon: 'Signal 50', camo: 'Sunburn', value: 40, goal: 40, confirmed: true });
   await page.pollOnce();
   await page.pollOnce();
@@ -106,6 +108,7 @@ test('Sunburn ignores absolute reads and applies queued longshots only with +1',
   assert.equal(trackerCount, 40);
   assert.equal(clicks, 1);
   assert.deepEqual([...data.sunburnCompletion.handled], [4]);
+  assert.deepEqual(page.seenGold, []);
 });
 
 test('unavailable camo checkoffs leave later checkoffs runnable and retry when visible', async () => {
