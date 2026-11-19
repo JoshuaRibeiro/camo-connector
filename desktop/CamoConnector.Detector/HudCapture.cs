@@ -431,13 +431,15 @@ internal sealed class HudCapture : IDisposable
                 ? CamoMenuRecognition.ReadProgress(weapon, title, [counter], names) : null;
         }
 
+        var catalogGoal = catalog.GetValueOrDefault(weapon)?.FirstOrDefault(camo => camo.Name == title)?.Goal;
+        CamoProgress? Validate(CamoProgress? candidate) => CamoMenuRecognition.CheckObjectiveGoal(candidate, catalogGoal, objectives);
         var isolated = await ReadCounter(PixelAdjustment.Normal, "camoCounter");
         if (progress != null || isolated == null)
-            return CamoMenuRecognition.ConfirmCounter(progress, isolated, null);
+            return Validate(CamoMenuRecognition.ConfirmCounter(progress, isolated, null));
         // If the wider read contains a rejected fraction, avoid substituting a different row's count.
         if (System.Text.RegularExpressions.Regex.IsMatch(objectives, @"\d\s*/\s*\d")) return null;
         var alternate = await ReadCounter(PixelAdjustment.Contrast, "camoCounterContrast");
-        return CamoMenuRecognition.ConfirmCounter(null, isolated, alternate);
+        return Validate(CamoMenuRecognition.ConfirmCounter(null, isolated, alternate));
     }
 
     public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null, bool requireHeading = false)

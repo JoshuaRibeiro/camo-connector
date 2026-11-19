@@ -67,6 +67,16 @@ public static class CamoMenuRecognition
         return matches.Length == 1 ? matches[0] : null;
     }
 
+    public static CamoProgress? CheckObjectiveGoal(CamoProgress? progress, int? catalogGoal, string objectives)
+    {
+        if (progress == null || catalogGoal == null || progress.Goal == catalogGoal) return progress;
+        var goal = catalogGoal.Value;
+        // Correct a trailing zero read as eight only when the objective text independently agrees with the catalog.
+        if (goal % 10 != 0 || progress.Goal != goal + 8 || progress.Count > goal ||
+            !Regex.IsMatch(objectives, @"(?im)^\s*[-–—]*\s*get\s+" + goal + @"\b")) return null;
+        return progress with { Goal = goal };
+    }
+
     public static CamoProgress? ConfirmCounter(CamoProgress? context, CamoProgress? counter, CamoProgress? alternate)
     {
         if (counter == null || (context != null && context != counter)) return null;
