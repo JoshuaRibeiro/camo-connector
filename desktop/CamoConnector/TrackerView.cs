@@ -36,10 +36,6 @@ internal sealed partial class ConnectorWindow
         {
             if (pages.SelectedTab == trackerPage && trackerView == null) await OpenTrackerAsync(message);
         };
-        Resize += (_, _) =>
-        {
-            if (trackerView != null && Visible && WindowState == FormWindowState.Minimized) HideTrackerToTray();
-        };
         ResizeBegin += (_, _) => trackerResizing = true;
         ResizeEnd += async (_, _) =>
         {
@@ -226,7 +222,7 @@ internal sealed partial class ConnectorWindow
             var menu = new ContextMenuStrip();
             menu.Items.Add("Open Camo Connector", null, (_, _) => RestoreTracker());
             menu.Items.Add("Exit", null, (_, _) => Close());
-            trackerTray = new NotifyIcon { Icon = SystemIcons.Application, Text = "Camo Connector", ContextMenuStrip = menu };
+            trackerTray = new NotifyIcon { Icon = Icon, Text = "Camo Connector", ContextMenuStrip = menu };
             trackerTray.DoubleClick += (_, _) => RestoreTracker();
         }
         trackerTray.Visible = true;
