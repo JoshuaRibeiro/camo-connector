@@ -647,7 +647,6 @@
       show('Tracked progress · locating ' + snapshot.weapon);
       return true;
     }
-    if (militaryIncomplete(name)) return false;
     const readTarget = () => findTarget(name, snapshot.camo, snapshot.goal) ?? trackedControl(snapshot);
     const target = readTarget();
     if (target && (target.completed || target.count >= snapshot.value)) {
@@ -656,6 +655,7 @@
       return true;
     }
     if (target?.button?.isConnected && !target.button.disabled &&
+        target.button.getAttribute?.('aria-disabled') !== 'true' &&
         Number.isInteger(snapshot.value) && Number.isInteger(snapshot.goal) &&
         target.count < snapshot.value && snapshot.value <= snapshot.goal) {
       await extension.storage.local.set({ [key]: { ...state, pendingId: snapshot.id } });
@@ -683,6 +683,8 @@
       show(snapshot.camo + ' · could not verify the automatic +1');
       return true;
     }
+    // A visible, enabled +1 can belong to a Special unlocked before Military 8.
+    if (militaryIncomplete(name)) return false;
     return reconcileDetails(snapshot, key, state, done);
   }
   async function syncAkimbo(session, count, timing, receivedTimes) {
