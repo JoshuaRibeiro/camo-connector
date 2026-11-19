@@ -145,11 +145,11 @@
     const action = target?.button;
     if (!action?.isConnected || action.disabled || action.closest('[aria-disabled="true"],button:disabled')) {
       show(weaponName + ' | Military ' + tier + (target ? ' tile unavailable' : ' row unavailable'));
-      return true;
+      return false;
     }
     if (state.pending && target.count < (state.pendingTier ?? tier)) {
       show(weaponName + ' | Military ' + tier + ' tile clicked, count still ' + target.count + '/8');
-      return true;
+      return false;
     }
 
     const ready = { session, cursor: state.cursor };
@@ -634,7 +634,14 @@
       if (await syncGrindingCompletion(weaponKey(row.weapon), row.camo, key, state, handled(row), row.goal)) return true;
     }
     const counters = pending.filter(row => row.confirmed !== true);
-    const snapshot = counters.find(row => latestWeapon && weaponKey(row.weapon) === weaponKey(latestWeapon)) || counters[0];
+    const readCounter = row => findTarget(weaponKey(row.weapon), row.camo, row.goal) ?? trackedControl(row);
+    const hasEnabledCounter = row => {
+      const button = readCounter(row)?.button;
+      return button?.isConnected && !button.disabled && button.getAttribute?.('aria-disabled') !== 'true';
+    };
+    // A locked or unavailable row must not hide another Special that is already actionable.
+    const snapshot = counters.find(hasEnabledCounter) ||
+      counters.find(row => latestWeapon && weaponKey(row.weapon) === weaponKey(latestWeapon)) || counters[0];
     if (!snapshot) return false;
     const name = weaponKey(snapshot.weapon);
     const done = handled(snapshot);
@@ -647,7 +654,7 @@
       show('Tracked progress · locating ' + snapshot.weapon);
       return true;
     }
-    const readTarget = () => findTarget(name, snapshot.camo, snapshot.goal) ?? trackedControl(snapshot);
+    const readTarget = () => readCounter(snapshot);
     const target = readTarget();
     if (target && (target.completed || target.count >= snapshot.value)) {
       await extension.storage.local.set({ [key]: done });
@@ -661,7 +668,8 @@
       await extension.storage.local.set({ [key]: { ...state, pendingId: snapshot.id } });
       const current = readTarget();
       if (!multiplayerSelected() || !focusedWeapon(name) || current?.button !== target.button ||
-          current.count !== target.count || !target.button.isConnected || target.button.disabled) {
+          current.count !== target.count || !target.button.isConnected || target.button.disabled ||
+          target.button.getAttribute?.('aria-disabled') === 'true') {
         await extension.storage.local.set({ [key]: state });
         return true;
       }

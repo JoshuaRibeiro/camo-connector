@@ -166,7 +166,7 @@ test('tracked progress applies verified increments on the visible weapon card', 
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
     '  multiplayerSelected = focusedWeapon = () => true; grindingCard = weaponDetails = () => null;\n' +
-    '  findTarget = globalThis.readCounter; militaryIncomplete = () => globalThis.incomplete; globalThis.sync = syncTrackedRows;');
+    '  findTarget = globalThis.readCounter; trackedControl = () => null; militaryIncomplete = () => globalThis.incomplete; globalThis.sync = syncTrackedRows;');
   const data = {};
   let count = 8;
   let clicks = 0;
@@ -190,10 +190,15 @@ test('tracked progress applies verified increments on the visible weapon card', 
   assert.equal(clicks, 4);
   page.incomplete = true;
   count = 0;
-  await page.sync('session', [{ id: 15, type: 'camo', weapon: 'Cronen Squall', camo: 'Oni', goal: 20, value: 1 }]);
-  assert.equal(count, 1);
-  assert.equal(clicks, 5);
-  assert.deepEqual([...data.trackedProgress.handled], [13, 14, 15]);
+  const specialRows = [
+    { id: 15, type: 'camo', weapon: 'Cronen Squall', camo: 'Optical Reverb', goal: 20, value: 1 },
+    { id: 16, type: 'camo', weapon: 'Cronen Squall', camo: 'Oni', goal: 20, value: 2 }
+  ];
+  await page.sync('session', specialRows);
+  await page.sync('session', specialRows);
+  assert.equal(count, 2);
+  assert.equal(clicks, 6);
+  assert.deepEqual([...data.trackedProgress.handled], [13, 14, 16]);
 });
 
 test('Military clicks only the highest tier and later visible stages acknowledge earlier unlocks', async () => {
