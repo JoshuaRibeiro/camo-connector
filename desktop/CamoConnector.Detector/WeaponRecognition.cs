@@ -94,7 +94,10 @@ public static class WeaponRecognition
         for (var header = 0; header + 2 < lines.Length; header++)
         {
             if (!IsUnlockHeader(lines[header])) continue;
-            var weapon = Read(new[] { lines[header + 1] }, false);
+            var weaponLabel = lines[header + 1];
+            var weapon = Read(new[] { weaponLabel }, false);
+            if (weapon == null && Key(weaponLabel) is "rpcb" or "robb" or "rpbb" or "rpb8")
+                weapon = new WeaponRead("RPG-8", false);
             if (weapon == null || weapon.Akimbo) continue;
             var military = Key(lines[header + 2]);
             if (military == "militarycamo" && header + 3 < lines.Length)

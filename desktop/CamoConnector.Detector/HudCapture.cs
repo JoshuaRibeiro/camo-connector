@@ -222,7 +222,7 @@ internal sealed class HudCapture : IDisposable
         var (header, _) = await ReadTextAsync(frame, (.900, .210, .080, .041), cancel, pageMode: 7,
             adjustment: PixelAdjustment.WhiteText);
         if (!WeaponRecognition.IsUnlockHeader(header))
-            (header, _) = await ReadTextAsync(frame, (.911, .216, .058, .025), cancel, pageMode: 7);
+            (header, _) = await ReadTextAsync(frame, (.909, .218, .063, .024), cancel, pageMode: 7);
         MilitaryUnlock? badge = null;
         if (WeaponRecognition.IsUnlockHeader(header))
         {
@@ -234,6 +234,12 @@ internal sealed class HudCapture : IDisposable
                 var (weapon, _) = await ReadTextAsync(frame, (.833, .246, .099, .025), cancel, pageMode: 7);
                 var (tier, _) = await ReadTextAsync(frame, (.836, .268, .135, .030), cancel, pageMode: 7);
                 badge = WeaponRecognition.ReadMilitaryUnlock([header, weapon, tier]);
+                if (badge == null)
+                {
+                    var (yellowTier, _) = await ReadTextAsync(frame, (.833, .269, .135, .030), cancel,
+                        pageMode: 7, adjustment: PixelAdjustment.YellowText);
+                    badge = WeaponRecognition.ReadMilitaryUnlock([header, weapon, yellowTier]);
+                }
             }
         }
         badge ??= WeaponRecognition.ReadMilitaryUnlock(await ReadAsync(frame, (.827, .045, .155, .405), cancel));
@@ -609,7 +615,7 @@ internal sealed class HudCapture : IDisposable
         return rgb;
     }
 
-    private enum PixelAdjustment { Normal, Contrast, Invert, CyanText, WhiteText }
+    private enum PixelAdjustment { Normal, Contrast, Invert, CyanText, WhiteText, YellowText }
 
     private async Task<string[]> ReadAsync(Bitmap frame, (double X, double Y, double W, double H) area,
         CancellationToken cancel, PixelAdjustment adjustment = PixelAdjustment.Normal)
@@ -631,7 +637,7 @@ internal sealed class HudCapture : IDisposable
         {
             graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
             var destination = new Rectangle(Point.Empty, crop.Size);
-            if (adjustment is PixelAdjustment.Normal or PixelAdjustment.CyanText or PixelAdjustment.WhiteText)
+            if (adjustment is PixelAdjustment.Normal or PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText)
                 graphics.DrawImage(frame, destination, region, GraphicsUnit.Pixel);
             else
             {
@@ -646,7 +652,7 @@ internal sealed class HudCapture : IDisposable
                 graphics.DrawImage(frame, destination, region.X, region.Y, region.Width, region.Height, GraphicsUnit.Pixel, attributes);
             }
         }
-        if (adjustment is PixelAdjustment.CyanText or PixelAdjustment.WhiteText)
+        if (adjustment is PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText)
         {
             var pixels = crop.LockBits(new Rectangle(Point.Empty, crop.Size), ImageLockMode.ReadWrite, crop.PixelFormat);
             try
@@ -658,10 +664,14 @@ internal sealed class HudCapture : IDisposable
                     Marshal.Copy(address, row, 0, row.Length);
                     for (var x = 0; x < row.Length; x += 3)
                     {
-                        var ink = adjustment == PixelAdjustment.WhiteText
-                            ? Math.Min(row[x], Math.Min(row[x + 1], row[x + 2])) >= 205
-                            : row[x] >= 165 && row[x + 1] >= 165 &&
-                            Math.Min(row[x], row[x + 1]) - row[x + 2] >= 22;
+                        var ink = adjustment switch
+                        {
+                            PixelAdjustment.WhiteText => Math.Min(row[x], Math.Min(row[x + 1], row[x + 2])) >= 205,
+                            PixelAdjustment.YellowText => Math.Min(row[x + 1], row[x + 2]) >= 155 &&
+                                Math.Min(row[x + 1], row[x + 2]) - row[x] >= 24,
+                            _ => row[x] >= 165 && row[x + 1] >= 165 &&
+                                Math.Min(row[x], row[x + 1]) - row[x + 2] >= 22
+                        };
                         row[x] = row[x + 1] = row[x + 2] = ink ? (byte)0 : (byte)255;
                     }
                     Marshal.Copy(row, 0, address, row.Length);

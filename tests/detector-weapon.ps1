@@ -43,6 +43,11 @@ $badge = $reader::ReadMilitaryUnlock(@('UNLOCKED','SANG 9MM','MILITARY CAMO 7'))
 if ($badge.Weapon -ne 'Sang 9mm' -or $badge.Tier -ne 7) { throw 'Camo 7 badge recognition failed' }
 $badge = $reader::ReadMilitaryUnlock(@('UNL0CKED','Signal 50','MILITARY CAMO','8'))
 if ($badge.Weapon -ne 'Signal 50' -or $badge.Tier -ne 8) { throw 'Split title recognition failed' }
+$badge = $reader::ReadMilitaryUnlock(@('UNLOCKED }','RPCB','MILITARY CAMO 4'))
+if ($badge.Weapon -ne 'RPG-8' -or $badge.Tier -ne 4 -or
+    $reader::ReadMilitaryUnlock(@('UNLOCKED','RPCB','MILITARY CAMO 9'))) {
+    throw 'RPG-8 badge OCR variant must require a valid Military tier'
+}
 if ($reader::ReadMilitaryUnlock(@('Signal 50','Military Camo 8'))) { throw 'Badge accepted without header' }
 if ($reader::ReadMilitaryUnlock(@('Unlocked','Unknown weapon','Military Camo 8'))) { throw 'Unknown weapon attributed' }
 if ($reader::ReadMilitaryUnlock(@('Unlocked','Sang 9mm','Military Camo 17'))) { throw 'Invalid tier accepted' }
