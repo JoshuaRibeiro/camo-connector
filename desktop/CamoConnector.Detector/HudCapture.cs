@@ -204,7 +204,7 @@ internal sealed class HudCapture : IDisposable
         return SpecialUnlocks.Resolve(weapon, count.Value, scores, catalog.GetValueOrDefault(weapon) ?? []);
     }
 
-    private static double PadlockScore(Bitmap frame, double tileX)
+    private static double PadlockScore(Bitmap frame, double tileX, double tileY = .426)
     {
         var best = 0d;
         const int count = 140;
@@ -214,7 +214,7 @@ internal sealed class HudCapture : IDisposable
         for (var dy = 0; dy <= 12; dy++)
         {
             var x = tileX + dx * .00085;
-            var y = .426 + dy * .0011;
+            var y = tileY + dy * .0011;
             double sum = 0, squares = 0, covariance = 0;
             for (var py = 0; py < 14; py++)
             for (var px = 0; px < 10; px++)
@@ -378,7 +378,27 @@ internal sealed class HudCapture : IDisposable
     {
         var (military, _) = await ReadTextAsync(frame, (.071, .163, .095, .029), cancel, pageMode: 7,
             trace: trace, regionName: "militaryRow");
-        return CamoMenuRecognition.ReadMilitaryMenuCount(military);
+        var count = CamoMenuRecognition.ReadMilitaryMenuCount(military);
+        if (count is not > 0) return count;
+
+        // A stable OCR error can survive multiple frames. Require a second read of just the fraction.
+        var (counter, _) = await ReadTextAsync(frame, (.119, .163, .043, .029), cancel, pageMode: 7,
+            trace: trace, regionName: "militaryCounter");
+        if (!CamoMenuRecognition.ConfirmsMilitaryCounter(count.Value, counter))
+        {
+            var (alternate, _) = await ReadTextAsync(frame, (.115, .160, .049, .033), cancel, pageMode: 7,
+                adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "militaryCounterContrast");
+            if (!CamoMenuRecognition.ConfirmsMilitaryCounter(count.Value, alternate)) return null;
+        }
+
+        // A visible padlock contradicts a claim that the tile has already been unlocked.
+        for (var tile = 0; tile < count.Value; tile++)
+        {
+            var x = .075 + tile % 4 * .0563;
+            var y = tile < 4 ? .193 : .293;
+            if (PadlockScore(frame, x, y) >= .70) return null;
+        }
+        return count;
     }
 
     public async Task<CamoProgress[]> DetectTrackedCamosAsync(Bitmap frame, CancellationToken cancel, bool savedImage = false,

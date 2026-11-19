@@ -21,10 +21,14 @@ public static class CamoMenuRecognition
 
     public static int? ReadMilitaryMenuCount(string text)
     {
-        var match = Regex.Match(text, @"\bMILITARY\s*\[?\s*([0-8])\s*/\s*8\b",
+        var match = Regex.Match(text, @"\bMILITARY\s*[\[|L1]?\s*([0-8])\s*/\s*8\b",
             RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         return match.Success ? match.Groups[1].Value[0] - '0' : null;
     }
+
+    public static bool ConfirmsMilitaryCounter(int tier, string text) =>
+        Regex.IsMatch(text.Trim(), @"\A[\[|(L1]?\s*" + tier + @"\s*/\s*8\s*[\]|)]?\z",
+            RegexOptions.CultureInvariant);
 
     public static string? ReadProgressionWeapon(string text)
     {

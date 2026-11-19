@@ -406,7 +406,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 await AppendAsync(log, new
                 {
                     kind = "military-unlock", source = "live", mode = "mp", weapon = menuMilitary.Weapon,
-                    tier = menuMilitary.Tier, context = "camo-menu", at = now
+                    tier = menuMilitary.Tier, context = "camo-menu", verified = true, at = now
                 }, cancel);
             }
             var confirmingMilitary = menuMilitary != null && menuMilitary != previousMenuMilitary &&

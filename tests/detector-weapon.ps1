@@ -64,6 +64,10 @@ if (!$menu::IsCamoMenu('CAMO SELECT MW4') -or $menu::ReadMilitaryMenuCount('MILI
     $null -ne $menu::ReadMilitaryMenuCount('SPECIAL [2/3]') -or $menu::ReadProgressionWeapon('50 6S PROGRESSION') -ne '.50 GS') {
     throw 'Camo menu fallback OCR failed'
 }
+if ($menu::ConfirmsMilitaryCounter(6, '[0/8]') -or $menu::ConfirmsMilitaryCounter(8, 'L0/8]') -or
+    !$menu::ConfirmsMilitaryCounter(6, '[6/8]') -or !$menu::ConfirmsMilitaryCounter(1, 'L1/8)')) {
+    throw 'Military tier confirmation accepted a mismatched numerator or rejected a valid count'
+}
 if ($menu::ReadProgressionWeapon('.50 GS PROGRESSION') -ne '.50 GS' -or
     $menu::ReadProgressionWeapon('.08 GS PROGRESSION') -ne '.50 GS' -or
     $menu::ReadProgressionWeapon('.08 GS PROGRESSION MOD')) {

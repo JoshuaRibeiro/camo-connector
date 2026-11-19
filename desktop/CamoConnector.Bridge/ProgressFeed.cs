@@ -77,6 +77,9 @@ public sealed class ProgressFeed
             if (historical && (!IsWeapon(name) || kind is not
                 ("completionist-unlock" or "military-unlock" or "challenge-completed" or "catalog-special-unlocked")))
                 return;
+            // Older menu reads may contain a stable OCR error. Re-read the game before replaying those tiers.
+            if (historical && kind == "military-unlock" && Text(item, "context") == "camo-menu" &&
+                Field(item, "verified").ValueKind != JsonValueKind.True) return;
             if (kind is "match-voting" or "match-confirmed" or "match-started" or "match-ended")
             {
                 matchState = new { kind, match = Optional(item, "match"), matchMode = Text(item, "matchMode") };
