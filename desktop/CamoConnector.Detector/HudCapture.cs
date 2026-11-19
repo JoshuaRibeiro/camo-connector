@@ -256,7 +256,7 @@ internal sealed class HudCapture : IDisposable
     {
         var (heading, _) = await ReadTextAsync(frame, (.052, .080, .150, .039), cancel, pageMode: 7);
         if (!WeaponRecognition.IsWeaponSummary(heading)) return null;
-        var (weapon, _) = await ReadTextAsync(frame, (.048, .128, .285, .051), cancel, pageMode: 7);
+        var (weapon, _) = await ReadTextAsync(frame, (.048, .128, .365, .051), cancel, pageMode: 7);
         MilitaryUnlock? best = null;
         foreach (var (x, width) in new[] { (.453, .094), (.527, .103), (.349, .137) })
         {
