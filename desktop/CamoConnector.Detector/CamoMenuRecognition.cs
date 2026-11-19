@@ -63,7 +63,8 @@ public static class CamoMenuRecognition
     public static string? ReadKnownCamoTitle(string text, string[] knownCamos)
     {
         var lines = text.Split('\n').Select(Key).ToHashSet(StringComparer.Ordinal);
-        var matches = knownCamos.Where(name => lines.Contains(Key(name))).Distinct().Take(2).ToArray();
+        var matches = knownCamos.Where(name => lines.Contains(Key(name)) ||
+            (name == "Oni" && (lines.Contains("uni") || lines.Contains("oonl")))).Distinct().Take(2).ToArray();
         return matches.Length == 1 ? matches[0] : null;
     }
 
