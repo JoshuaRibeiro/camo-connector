@@ -28,6 +28,9 @@ var pairing = new SemaphoreSlim(1);
 var lastPrompt = DateTimeOffset.MinValue;
 var shutdown = app.Lifetime.ApplicationStopping;
 var reader = files.FollowAsync(shutdown);
+var syncOwnerLock = new object();
+long trackerLeaseUntil = 0;
+bool? embeddedSyncOwner = null;
 
 app.Run(async context =>
 {
@@ -100,10 +103,44 @@ app.Run(async context =>
         response.StatusCode = 401;
         return;
     }
-    if (request.Path == "/events" && HttpMethods.IsGet(request.Method))
+    if (request.Path == "/tracker-events" && HttpMethods.IsGet(request.Method))
     {
+        if (claimed.Length != 0 || origin.Length != 0)
+        {
+            response.StatusCode = 403;
+            return;
+        }
+        string snapshot;
+        lock (syncOwnerLock)
+        {
+            if (embeddedSyncOwner == false) feed.StartSyncSession();
+            embeddedSyncOwner = true;
+            trackerLeaseUntil = Environment.TickCount64 + 3000;
+            snapshot = feed.Snapshot();
+        }
         response.ContentType = "application/json";
-        await response.WriteAsync(feed.Snapshot());
+        await response.WriteAsync(snapshot);
+    }
+    else if (request.Path == "/events" && HttpMethods.IsGet(request.Method))
+    {
+        string? snapshot = null;
+        lock (syncOwnerLock)
+        {
+            if (trackerLeaseUntil <= Environment.TickCount64)
+            {
+                if (embeddedSyncOwner == true) feed.StartSyncSession();
+                embeddedSyncOwner = false;
+                snapshot = feed.Snapshot();
+            }
+        }
+        if (snapshot == null)
+        {
+            response.StatusCode = 409;
+            await response.WriteAsync("Sync is active in the desktop Tracker tab.");
+            return;
+        }
+        response.ContentType = "application/json";
+        await response.WriteAsync(snapshot);
     }
     else if (request.Path == "/focus")
     {

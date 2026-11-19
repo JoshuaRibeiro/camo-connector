@@ -1,5 +1,5 @@
-(() => {
-  const extension = globalThis.browser ?? globalThis.chrome;
+((host) => {
+  const extension = host?.extension ?? globalThis.browser ?? globalThis.chrome;
   const storageKey = 'sunburnCursor';
   const banner = document.createElement('div');
   banner.setAttribute('role', 'status');
@@ -381,7 +381,7 @@
     return targets.size === 1 ? [...targets.values()][0] : null;
   }
 
-  const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const pause = ms => host ? host.pause(ms) : new Promise(resolve => setTimeout(resolve, ms));
   const camoKey = value => (value || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   function camoRowIdentity(row, name) {
     const expected = camoKey(name);
@@ -938,8 +938,12 @@
     }
   }
   show('Connecting');
-  poll();
-  setInterval(poll, 500);
-})();
+  if (host) {
+    host.subscribe(poll);
+  } else {
+    poll();
+    setInterval(poll, 500);
+  }
+})(typeof camoTrackerHost === 'undefined' ? null : camoTrackerHost);
 
 

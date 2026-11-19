@@ -11,7 +11,7 @@ namespace CamoConnector.Bridge;
 public sealed class ProgressFeed
 {
     private readonly JsonElement catalog;
-    private readonly string session = Guid.NewGuid().ToString();
+    private string session = Guid.NewGuid().ToString();
     private readonly Dictionary<int, object> akimboTiming = new();
     private readonly Dictionary<string, TrackedRow> trackedRows = new();
     private readonly Dictionary<string, List<int>> catalogMilitary = new();
@@ -43,6 +43,19 @@ public sealed class ProgressFeed
     {
         lock (stateLock)
             return DateTimeOffset.UtcNow - trackerFocusAt < TimeSpan.FromSeconds(15) ? trackerFocus : null;
+    }
+
+    public void StartSyncSession()
+    {
+        lock (stateLock)
+        {
+            // The two clients keep separate cursors. Only replay idempotent updates across a handoff.
+            session = Guid.NewGuid().ToString();
+            count = akimboCount = 0;
+            akimboTiming.Clear();
+            if (trackedRows.TryGetValue("sang9mm:space-time", out var spaceTime))
+                trackedRows["sang9mm:space-time"] = spaceTime with { akimboThrough = null };
+        }
     }
 
     internal static JsonElement Field(JsonElement item, string name) =>

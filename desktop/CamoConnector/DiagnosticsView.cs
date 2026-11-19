@@ -41,6 +41,7 @@ internal sealed partial class ConnectorWindow
         pages.TabPages.AddRange([capturePage, logsPage]);
         pages.DrawItem += DrawTab;
         Controls.Add(pages);
+        AddTrackerPage();
         pages.SelectedIndexChanged += (_, _) => RefreshLogs();
         diagnosticsTimer.Tick += (_, _) =>
         {

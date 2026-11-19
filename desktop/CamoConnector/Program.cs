@@ -91,7 +91,7 @@ internal sealed partial class ConnectorWindow : Form
         layout.Controls.Add(new Label
         {
             AutoSize = true, MaximumSize = new Size(510, 0),
-            Text = "Open the browser extension and choose Connect automatically. Approve the request on this computer."
+            Text = "Open the Tracker tab to sync here, or connect the browser extension."
         });
         AddPages(layout);
         Shown += async (_, _) => await RefreshSourcesAsync();
@@ -161,7 +161,7 @@ internal sealed partial class ConnectorWindow : Form
                     var keyFile = Path.Combine(data, "bridge-pairing.key");
                     if (File.Exists(keyFile))
                     {
-                        using var request = new HttpRequestMessage(HttpMethod.Get, "http://127.0.0.1:47150/events");
+                        using var request = new HttpRequestMessage(HttpMethod.Get, "http://127.0.0.1:47150/focus");
                         request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(
                             "Bearer", File.ReadAllText(keyFile).Trim());
                         using var response = await client.SendAsync(request, readyTimeout.Token);
@@ -187,6 +187,7 @@ internal sealed partial class ConnectorWindow : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         closing.Cancel();
+        StopTracker();
         diagnosticsTimer.Dispose();
         logFont.Dispose();
         previewTimer.Dispose();

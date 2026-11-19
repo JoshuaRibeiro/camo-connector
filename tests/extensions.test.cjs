@@ -6,6 +6,44 @@ const { test } = require('node:test');
 
 const root = path.resolve(__dirname, '..');
 const base = require('../manifest.json');
+test('desktop messages drive tracker sync and verification without page timers', async () => {
+  const host = fs.readFileSync(path.join(root, 'desktop/CamoConnector/TrackerHost.js'), 'utf8');
+  const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
+    '    host.subscribe(poll);',
+    '    multiplayerSelected = () => true; focusedWeapon = key => key === "rpg8";\n' +
+    '    syncMilitary = async (session, tiers, weapon) => {\n' +
+    '      if (!tiers?.length) return false;\n' +
+    '      if (globalThis.checked.length) return true;\n' +
+    '      globalThis.checked.push([session, tiers[0], weapon]);\n' +
+    '      await pause(150);\n' +
+    '      await extension.storage.local.set({ verified: tiers[0] });\n' +
+    '      return true;\n' +
+    '    };\n' +
+    '    host.subscribe(poll);');
+  const saved = new Map();
+  let deliver, now = 0;
+  const page = {
+    window: { chrome: { webview: { addEventListener: (_, callback) => { deliver = callback; } } } },
+    document: { createElement: () => ({ style: {}, setAttribute() {} }), body: { append() {} } },
+    localStorage: { getItem: key => saved.get(key) ?? null, setItem: (key, value) => saved.set(key, value) },
+    navigator: { locks: { request: (_name, _options, work) => work({}) } },
+    performance: { now: () => now },
+    setInterval: () => assert.fail('Embedded sync started a page interval'),
+    setTimeout: () => assert.fail('Embedded sync started a page timeout'),
+    checked: []
+  };
+  vm.runInNewContext(host + '\n' + tracker, page);
+  const data = { events: { session: 'desktop', weapon: 'RPG-8', catalogMilitary: [['RPG-8', [4]]] } };
+  deliver({ data });
+  await new Promise(setImmediate);
+  assert.deepEqual(Array.from(page.checked[0]), ['desktop', 4, 'RPG-8']);
+  assert.equal(saved.has('camo-connector:verified'), false);
+  now = 350;
+  deliver({ data });
+  await new Promise(setImmediate);
+  assert.equal(saved.get('camo-connector:verified'), '4');
+});
+
 test('popup checks extension releases and compares version components numerically', async () => {
   const elements = new Map();
   const document = {

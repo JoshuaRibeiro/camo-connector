@@ -15,8 +15,8 @@ $client = [Net.Http.HttpClient]::new($handler)
 $client.Timeout = [TimeSpan]::FromSeconds(2)
 $process = $null
 
-function Check-Events($Status, $Headers = @{}) {
-    $request = [Net.Http.HttpRequestMessage]::new('GET', 'http://127.0.0.1:47150/events')
+function Check-Events($Status, $Headers = @{}, $Route = 'events') {
+    $request = [Net.Http.HttpRequestMessage]::new('GET', "http://127.0.0.1:47150/$Route")
     try {
         foreach ($header in $Headers.GetEnumerator()) {
             [void]$request.Headers.TryAddWithoutValidation($header.Key, $header.Value)
@@ -79,6 +79,26 @@ try {
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
     if ($after.count -ne 1) { throw 'The bridge missed the new progress event.' }
+    Check-Events 403 $headers 'tracker-events'
+    $native = @{ Authorization = "Bearer $key" }
+    $embedded = Check-Events 200 $native 'tracker-events'
+    if ($embedded.count -ne 0 -or $embedded.session -eq $after.session -or $embedded.trackedRows.Count -lt 2) {
+        throw 'The embedded tracker replayed browser deltas or lost confirmed unlocks.'
+    }
+    Check-Events 409 $headers
+    [IO.File]::AppendAllText($eventLog, $event)
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $embedded = Check-Events 200 $native 'tracker-events'
+        if ($embedded.count -eq 1) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($embedded.count -ne 1) { throw 'The embedded tracker missed a new progress event.' }
+    Start-Sleep -Milliseconds 3100
+    $resumed = Check-Events 200 $headers
+    if ($resumed.count -ne 0 -or $resumed.session -eq $embedded.session) {
+        throw 'Browser sync failed to resume without replaying desktop deltas.'
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {
