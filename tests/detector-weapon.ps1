@@ -69,6 +69,21 @@ if ($menu::ReadProgressionWeapon('.50 GS PROGRESSION') -ne '.50 GS' -or
     $menu::ReadProgressionWeapon('.08 GS PROGRESSION MOD')) {
     throw 'The .50 GS progression tab OCR fallback failed'
 }
+$progressionReads = @{
+    'SIGNAL 5@ PROGRESSION' = 'Signal 50'
+    'SIGNAL 58 PROGRESSION' = 'Signal 50'
+    'PM-4@ ANVIL PROGRESSION MODE MAST' = 'PM-40 Anvil'
+    'PM-48 ANVIL PROGRESSION' = 'PM-40 Anvil'
+    'TSO NIGHTSHADE PROGRESSION' = 'ISO Nightshade'
+    '| FSS CARBON EDGE 1695 PROGRESSION fi' = 'FSS Carbon Edge 1095'
+    'FSS CARBON EDGE 1895 PROGRESSION' = 'FSS Carbon Edge 1095'
+    '-58 GS PROGRESSION' = '.50 GS'
+}
+foreach ($read in $progressionReads.GetEnumerator()) {
+    if ($menu::ReadProgressionWeapon($read.Key) -cne $read.Value) {
+        throw "Incorrect camo progression weapon for $($read.Key)"
+    }
+}
 if ($menu::ReadProgressionWeapon('UNKNOWN PROGRESSION')) { throw 'Progression weapon gate failed' }
 if ($menu::ReadProgressionWeapon('SIGNAL 50 PROGRESSION MODE MASTERY') -ne 'Signal 50' -or
     $menu::ReadProgressionWeapon('UNKNOWN PROGRESSION MODE MASTERY')) {

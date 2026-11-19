@@ -28,14 +28,21 @@ public static class CamoMenuRecognition
 
     public static string? ReadProgressionWeapon(string text)
     {
-        var key = Key(text);
+        // The tab font can make a zero look like an at sign in OCR.
+        var key = Key(text.Replace('@', '0'));
         const string suffix = "progression";
-        // Longer tabs sometimes share the OCR line with the next navigation label.
-        const string adjacentTab = "modemastery";
-        if (key.EndsWith(suffix + adjacentTab, StringComparison.Ordinal))
-            key = key[..^adjacentTab.Length];
+        // The crop can end partway through the neighboring Mode Mastery label.
+        key = Regex.Replace(key, @"(?<=progression)modemast(?:e(?:ry?)?)?\z", "");
+        if (Regex.IsMatch(key, @"\Afsscarbonedge1[068]95progressionfi\z"))
+            return "FSS Carbon Edge 1095";
         if (!key.EndsWith(suffix, StringComparison.Ordinal)) return null;
         var name = key[..^suffix.Length];
+        // Exact confusions observed in the progression tab at lower capture resolutions.
+        if (name == "signal58") return "Signal 50";
+        if (name == "pm48anvil") return "PM-40 Anvil";
+        if (name == "tsonightshade") return "ISO Nightshade";
+        if (name is "fsscarbonedge1695" or "fsscarbonedge1895") return "FSS Carbon Edge 1095";
+        if (name == "58gs") return ".50 GS";
         if (name == "08gs" || Regex.IsMatch(name, @"\A[5s][0o][g6][s5]\z")) return ".50 GS";
         if (Regex.IsMatch(name, @"\A(?:krait|karit|crate)p[g6][8b]\z")) return "Krait P68";
         return WeaponRecognition.Read(new[] { name }, false)?.Name;
