@@ -176,10 +176,13 @@ internal sealed class HudCapture : IDisposable
         var highlighted = 0;
         for (var column = 0; column < 8; column++)
         {
-            var pixel = frame.GetPixel((int)((.909 + column * .008) * frame.Width), (int)(.852 * frame.Height));
-            if (pixel.G >= pixel.R + 4 && pixel.R >= pixel.B + 10) highlighted++;
+            var x = (int)((.909 + column * .008) * frame.Width);
+            var upper = frame.GetPixel(x, (int)(.846 * frame.Height));
+            var lower = frame.GetPixel(x, (int)(.852 * frame.Height));
+            if (IsOlive(upper) || IsOlive(lower)) highlighted++;
         }
-        if (highlighted < 6) return false;
+        if (highlighted < 5) return false;
+        static bool IsOlive(Color pixel) => pixel.G >= pixel.R + 4 && pixel.R >= pixel.B + 6;
         string[] silhouette =
         [
             "0000000000000000000000000000000000000000",
