@@ -874,9 +874,11 @@
           return (!activeWeapon || key === activeWeapon) && focusedWeapon(key);
         };
         const activeRows = trackedRows?.filter(row => canSync(row.weapon));
-        if (canSync('Sang 9mm') && await syncMilitary(session, military)) return;
+        // Post-match reward cards can name a different weapon from the last HUD read.
+        // Military unlocks carry their own weapon and still require its tracker card to be focused.
+        if (focusedWeapon('sang9mm') && await syncMilitary(session, military)) return;
         for (const [name, tiers] of catalogMilitary || []) {
-          if (canSync(name) && await syncMilitary(session, tiers, name)) return;
+          if (focusedWeapon(weaponKey(name)) && await syncMilitary(session, tiers, name)) return;
         }
         if (await syncTrackedRows(session, activeRows, true)) return;
         const target = findTarget();
