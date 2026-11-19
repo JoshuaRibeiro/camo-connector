@@ -1,5 +1,6 @@
 (() => {
-  const extension = globalThis.browser ?? globalThis.chrome;
+  const extension = typeof camoTrackerHost === 'undefined'
+    ? globalThis.browser ?? globalThis.chrome : camoTrackerHost.extension;
   const storageKey = 'mw4-camo-progress';
   let lastBackup;
   let saving = false;

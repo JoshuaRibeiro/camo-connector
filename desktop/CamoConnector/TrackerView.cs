@@ -13,7 +13,9 @@ internal sealed partial class ConnectorWindow
     private readonly System.Windows.Forms.Timer trackerTimer = new() { Interval = 350 };
     private WebView2? trackerView;
     private NotifyIcon? trackerTray;
-    private bool trackerLoading, trackerBusy, trackerDocumentReady;
+    private bool trackerLoading, trackerBusy, trackerDocumentReady, trackerResizing;
+    private int trackerNavigation;
+    private string? lastTrackerSnapshot;
 
     private void AddTrackerPage()
     {
@@ -37,6 +39,12 @@ internal sealed partial class ConnectorWindow
         Resize += (_, _) =>
         {
             if (trackerView != null && Visible && WindowState == FormWindowState.Minimized) HideTrackerToTray();
+        };
+        ResizeBegin += (_, _) => trackerResizing = true;
+        ResizeEnd += async (_, _) =>
+        {
+            trackerResizing = false;
+            await PublishTrackerEventsAsync();
         };
         trackerTimer.Tick += async (_, _) => await PublishTrackerEventsAsync();
     }
@@ -68,6 +76,8 @@ internal sealed partial class ConnectorWindow
                     return;
                 }
                 trackerDocumentReady = false;
+                trackerNavigation++;
+                lastTrackerSnapshot = null;
             };
             core.NewWindowRequested += (_, args) => args.Handled = true;
             core.NavigationCompleted += async (_, args) =>
@@ -76,8 +86,9 @@ internal sealed partial class ConnectorWindow
                 message.Text = trackerDocumentReady ? "Sync stays active in the tray." : "Tracker page failed to load.";
                 if (trackerDocumentReady) await PublishTrackerEventsAsync();
             };
-            core.WebMessageReceived += async (_, args) => await ReportEmbeddedFocusAsync(args);
-            var script = ReadTrackerResource("TrackerHost") + "\n" + ReadTrackerResource("Tracker");
+            core.WebMessageReceived += async (_, args) => await HandleTrackerMessageAsync(core, args);
+            var script = ReadTrackerResource("TrackerHost") + "\n" + ReadTrackerResource("Tracker") +
+                "\n" + ReadTrackerResource("Backup");
             await core.AddScriptToExecuteOnDocumentCreatedAsync(
                 "(() => { if (window.top !== window || location.origin !== " +
                 JsonSerializer.Serialize(TrackerUri.GetLeftPart(UriPartial.Authority)) +
@@ -133,8 +144,13 @@ internal sealed partial class ConnectorWindow
             using var response = await client.SendAsync(request, closing.Token);
             if (!response.IsSuccessStatusCode) return;
             var snapshot = await response.Content.ReadAsStringAsync(closing.Token);
-            if (!IsDisposed && trackerDocumentReady && IsTrackerAddress(core.Source))
-                core.PostWebMessageAsJson("{\"events\":" + snapshot + "}");
+            // Keep the bridge lease alive while the page lays out at the new size.
+            if (!IsDisposed && !trackerResizing && trackerDocumentReady && IsTrackerAddress(core.Source))
+            {
+                core.PostWebMessageAsJson(snapshot == lastTrackerSnapshot ? "{\"tick\":true}" :
+                    "{\"events\":" + snapshot + "}");
+                lastTrackerSnapshot = snapshot;
+            }
         }
         catch (Exception error) when (error is HttpRequestException or IOException or
             OperationCanceledException or InvalidOperationException or System.Runtime.InteropServices.COMException)
@@ -144,7 +160,7 @@ internal sealed partial class ConnectorWindow
         finally { trackerBusy = false; }
     }
 
-    private async Task ReportEmbeddedFocusAsync(CoreWebView2WebMessageReceivedEventArgs args)
+    private async Task HandleTrackerMessageAsync(CoreWebView2 core, CoreWebView2WebMessageReceivedEventArgs args)
     {
         if (!trackerDocumentReady || !bridgeReady || !IsTrackerAddress(args.Source)) return;
         try
@@ -152,8 +168,13 @@ internal sealed partial class ConnectorWindow
             using var message = JsonDocument.Parse(args.WebMessageAsJson);
             var rootElement = message.RootElement;
             if (rootElement.ValueKind != JsonValueKind.Object ||
-                !rootElement.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String ||
-                type.GetString() != "mw4-focus" || !rootElement.TryGetProperty("weapon", out var value) ||
+                !rootElement.TryGetProperty("type", out var type) || type.ValueKind != JsonValueKind.String) return;
+            if (type.GetString() is "mw4-read-backup" or "mw4-save-backup")
+            {
+                await HandleTrackerBackupAsync(core, rootElement, type.GetString() == "mw4-save-backup");
+                return;
+            }
+            if (type.GetString() != "mw4-focus" || !rootElement.TryGetProperty("weapon", out var value) ||
                 value.ValueKind != JsonValueKind.String || value.GetString() is not { } weapon ||
                 !Regex.IsMatch(weapon, @"\A[a-zA-Z0-9 .-]{2,32}\z")) return;
             using var request = TrackerBridgeRequest(HttpMethod.Post, "focus?weapon=" + Uri.EscapeDataString(weapon));
@@ -163,8 +184,39 @@ internal sealed partial class ConnectorWindow
         catch (Exception error) when (error is JsonException or HttpRequestException or IOException or
             OperationCanceledException or InvalidOperationException)
         {
-            LogLine(bridgeMessages, "Embedded tracker focus: " + error.Message);
+            LogLine(bridgeMessages, "Embedded tracker message: " + error.Message);
         }
+    }
+
+    private async Task HandleTrackerBackupAsync(CoreWebView2 core, JsonElement message, bool save)
+    {
+        if (!message.TryGetProperty("backupRequestId", out var id) ||
+            id.ValueKind != JsonValueKind.Number || !id.TryGetInt32(out var requestId) || requestId <= 0) return;
+        var navigation = trackerNavigation;
+        object result = new { error = "Local backup unavailable" };
+        try
+        {
+            using var request = TrackerBridgeRequest(save ? HttpMethod.Post : HttpMethod.Get, "backup");
+            request.Headers.Add("X-MW4-Connector", "backup-v1");
+            if (save && message.TryGetProperty("backup", out var backup) && backup.ValueKind == JsonValueKind.Object)
+                request.Content = new StringContent(backup.GetRawText(), System.Text.Encoding.UTF8, "application/json");
+            if (!save || request.Content != null)
+            {
+                using var response = await client.SendAsync(request, closing.Token);
+                if (response.IsSuccessStatusCode)
+                {
+                    using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(closing.Token));
+                    result = document.RootElement.Clone();
+                }
+            }
+        }
+        catch (Exception error) when (error is JsonException or HttpRequestException or IOException or
+            OperationCanceledException or InvalidOperationException)
+        {
+            LogLine(bridgeMessages, "Embedded tracker backup: " + error.Message);
+        }
+        if (!IsDisposed && trackerDocumentReady && trackerNavigation == navigation && IsTrackerAddress(core.Source))
+            core.PostWebMessageAsJson(JsonSerializer.Serialize(new { backupRequestId = requestId, result }));
     }
 
     private void HideTrackerToTray()

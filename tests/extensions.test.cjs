@@ -44,6 +44,39 @@ test('desktop messages drive tracker sync and verification without page timers',
   assert.equal(saved.get('camo-connector:verified'), '4');
 });
 
+test('embedded tracker restores the latest backup through the existing file input', async () => {
+  const host = fs.readFileSync(path.join(root, 'desktop/CamoConnector/TrackerHost.js'), 'utf8');
+  const backupScript = fs.readFileSync(path.join(root, 'backup.js'), 'utf8');
+  const backup = { v: 1, mode: 'mp', updatedAt: 1, counts: { example: 4 } };
+  let deliver, restore, imported;
+  const label = { textContent: 'Restore from file', after: button => { restore = button; } };
+  const input = { labels: [label], dispatchEvent() { imported = this.files[0]; } };
+  const page = {
+    window: { confirm: () => true, chrome: { webview: {
+      addEventListener: (_, callback) => { deliver = callback; },
+      postMessage: ({ backupRequestId, type }) => {
+        assert.equal(type, 'mw4-read-backup');
+        deliver({ data: { backupRequestId, result: { backup } } });
+      }
+    } } },
+    document: {
+      createElement: () => ({ style: {}, setAttribute() {}, addEventListener: function (_, callback) { this.click = callback; } }),
+      querySelectorAll: () => [input]
+    },
+    localStorage: { getItem: () => null },
+    location: { pathname: '/settings' },
+    DataTransfer: class { files = []; items = { add: file => this.files.push(file) }; },
+    File: class { constructor(parts) { this.data = parts[0]; } },
+    Event: class {},
+    setTimeout, clearTimeout, setInterval: () => {}
+  };
+  vm.runInNewContext(host + '\n' + backupScript, page);
+  assert.equal(restore.textContent, 'Restore latest local backup');
+  await restore.click();
+  assert.deepEqual(JSON.parse(imported.data), backup);
+  assert.equal(restore.disabled, false);
+});
+
 test('popup checks extension releases and compares version components numerically', async () => {
   const elements = new Map();
   const document = {

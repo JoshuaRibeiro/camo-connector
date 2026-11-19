@@ -11,7 +11,10 @@
   });
   document.body.append(banner);
   let matchNotice = '';
-  const show = message => { banner.textContent = 'Camo Connector · ' + (matchNotice ? matchNotice + ' | ' : '') + message; };
+  const show = message => {
+    const text = 'Camo Connector · ' + (matchNotice ? matchNotice + ' | ' : '') + message;
+    if (banner.textContent !== text) banner.textContent = text;
+  };
   const label = element => (element.innerText ?? element.textContent).trim().replace(/\s+/g, ' ');
   const visible = element => element.getClientRects().length > 0 &&
     getComputedStyle(element).visibility !== 'hidden';
@@ -19,8 +22,9 @@
   const weaponKey = value => value.toLowerCase().replace(/[^a-z0-9]/g, '')
     .replace(/^(?:crate|karit)p68$/, 'kraitp68');
   const grinding = element => /NOW\s+GRINDING/i.test(label(element));
-  const weaponHeadings = () => [...document.querySelectorAll('h1,h2,h3,h4,button,span,div,strong,b,a,p')]
-    .filter(element => visible(element) &&
+  const weaponHeadings = key => [...document.querySelectorAll('h1,h2,h3,h4,button,span,div,strong,b,a,p')]
+    .filter(element => weaponKey(element.textContent ?? '') === key && visible(element) &&
+      weaponKey(label(element)) === key &&
       ![...element.children].some(child => label(child) === label(element)));
   const aliases = new Map([
     ['mosinnagan', 'mosinnagant'], ['signal5o', 'signal50'],
@@ -30,8 +34,7 @@
 
   function grindingCard(key) {
     const cards = new Set();
-    for (const heading of weaponHeadings()) {
-      if (weaponKey(label(heading)) !== key) continue;
+    for (const heading of weaponHeadings(key)) {
       for (let card = heading.parentElement; card && card !== document.body; card = card.parentElement) {
         if (buttons(card).some(button => label(button) === 'Grind this')) break;
         if (grinding(card)) {
@@ -50,7 +53,7 @@
   function focusWeapon(key) {
     const controls = buttons(document);
     const targets = new Set();
-    for (const title of weaponHeadings().filter(element => weaponKey(label(element)) === key)) {
+    for (const title of weaponHeadings(key)) {
       for (let card = title.parentElement; card && card !== document.body; card = card.parentElement) {
         if (grinding(card)) break;
         const grind = buttons(card).filter(button => label(button) === 'Grind this' && !button.disabled);
@@ -120,7 +123,7 @@
 
   const militaryFocusAttempts = new Map();
 
-  async function syncMilitary(session, tiers, weaponName = 'Sang 9mm') {
+  async function syncMilitary(session, tiers, weaponName = 'Sang 9mm', allowFocus = true) {
     if (!tiers?.length || !multiplayerSelected()) return false;
     const weapon = weaponKey(weaponName);
     const key = weapon === 'sang9mm' ? 'sangMilitaryCursor' : 'militaryCursor-' + weapon;
@@ -131,7 +134,7 @@
     const tier = Math.max(...remaining);
     if (!focusedWeapon(weapon)) {
       const now = Date.now();
-      if (!openedDetails && now - lastFocusAttempt >= 3500 &&
+      if (allowFocus && !openedDetails && now - lastFocusAttempt >= 3500 &&
           now - (militaryFocusAttempts.get(weapon) || 0) >= 15000) {
         lastFocusAttempt = now;
         militaryFocusAttempts.set(weapon, now);
@@ -212,7 +215,7 @@
 
   function grindingCompletion(weapon, name) {
     if (!multiplayerSelected() || !focusedWeapon(weapon)) return null;
-    const headings = weaponHeadings().filter(title => weaponKey(label(title)) === weapon);
+    const headings = weaponHeadings(weapon);
     const namedButtons = [...document.querySelectorAll('section[aria-label="Now grinding"]')]
       .filter(card => headings.some(heading => card.contains(heading)))
       .flatMap(card => buttons(card).filter(button => !button.disabled &&
@@ -332,8 +335,9 @@
   }
 
   function multiplayerSelected() {
+    const controls = buttons(document);
     const modeButtons = ['Multiplayer', 'DMZ', 'Warzone'].map(mode =>
-      buttons(document).filter(button => label(button) === mode));
+      controls.filter(button => button.textContent?.trim() === mode && label(button) === mode));
     if (modeButtons.some(matches => matches.length !== 1)) return false;
     const [mp, dmz, warzone] = modeButtons.map(matches => matches[0]);
     if (['aria-current', 'aria-selected', 'aria-pressed', 'data-state'].some(attribute =>
@@ -352,7 +356,7 @@
         ![...element.children].some(child => label(child).toLowerCase() === text));
     // The focused card must contain the weapon, its grinding label and Sunburn.
     const targets = new Map();
-    const titles = weaponHeadings().filter(heading => weaponKey(label(heading)) === weaponKeyName);
+    const titles = weaponHeadings(weaponKeyName);
     for (const name of exact(camo.toLowerCase())) {
       let row = name.parentElement;
       while (row && row !== document.body && !/NOW\s+GRINDING/i.test(label(row))) {
@@ -415,7 +419,7 @@
   function trackedControl(snapshot, doneName) {
     const key = weaponKey(snapshot.weapon);
     if (!multiplayerSelected() || !focusedWeapon(key)) return null;
-    const names = weaponHeadings().filter(heading => weaponKey(label(heading)) === key);
+    const names = weaponHeadings(key);
     if (!snapshot.camo) return null;
     const candidates = new Map();
     for (const plus of buttons(document).filter(button => label(button).replace(/\s+/g, '') === '+1')) {
@@ -459,7 +463,7 @@
   const activatedCountFields = new WeakSet();
   function weaponDetails(weapon) {
     const modals = new Map();
-    for (const title of weaponHeadings().filter(node => weaponKey(label(node)) === weapon)) {
+    for (const title of weaponHeadings(weapon)) {
       for (let panel = title.parentElement; panel && panel !== document.body && !grinding(panel); panel = panel.parentElement) {
         if (![...panel.querySelectorAll('h2,h3,h4,div,span,p,strong')].some(node =>
           label(node).toLowerCase() === 'challenges')) continue;
@@ -476,7 +480,7 @@
 
   function openWeaponDetails(weapon) {
     const openers = new Set();
-    for (const title of weaponHeadings().filter(node => weaponKey(label(node)) === weapon)) {
+    for (const title of weaponHeadings(weapon)) {
       const opener = title.closest('button');
       if (!opener || opener.disabled || weaponKey(label(opener)) !== weapon) continue;
       for (let card = opener.parentElement; card && card !== document.body; card = card.parentElement) {
@@ -810,7 +814,7 @@
     try {
       const focus = JSON.parse(localStorage.getItem('mw4-camo-progress'))?.focus;
       if (typeof focus !== 'string' || !focusedWeapon(weaponKey(focus))) return;
-      const heading = weaponHeadings().find(node => weaponKey(label(node)) === weaponKey(focus));
+      const heading = weaponHeadings(weaponKey(focus))[0];
       void extension.runtime.sendMessage({ type: 'mw4-focus', weapon: heading ? label(heading) : focus }).catch(() => {
   const extension = globalThis.browser ?? globalThis.chrome;});
     } catch {}
@@ -883,11 +887,11 @@
         const militaryUpdates = [['Sang 9mm', military], ...(catalogMilitary || [])];
         for (const [name, tiers] of militaryUpdates) {
           const key = weaponKey(name);
-          if ((focusedWeapon(key) || key === activeWeapon) && await syncMilitary(session, tiers, name)) return;
+          if (await syncMilitary(session, tiers, name, key === activeWeapon)) return;
         }
         if (await syncTrackedRows(session, activeRows, true)) return;
-        const target = findTarget();
         const signalIsCurrent = canSync('Signal 50');
+        const target = signalIsCurrent && (state.pending || state.cursor < count) ? findTarget() : null;
         if (!state.pending && signalIsCurrent && state.cursor < count && (target?.count === 40 ||
             (!target && multiplayerSelected() && focusedWeapon('signal50')))) {
           state = { ...state, cursor: count };
