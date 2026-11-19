@@ -50,6 +50,9 @@ internal sealed partial class ConnectorWindow
         void PositionUpdateButton()
         {
             if (!pages.IsHandleCreated) return;
+            var rowHeight = LogicalToDeviceUnits(30);
+            if (pages.ItemSize.Height != rowHeight)
+                pages.ItemSize = new Size(pages.ItemSize.Width, rowHeight);
             var tab = pages.GetTabRect(0);
             var padding = LogicalToDeviceUnits(8);
             var width = TextRenderer.MeasureText(update.Text, update.Font).Width + padding * 2;
