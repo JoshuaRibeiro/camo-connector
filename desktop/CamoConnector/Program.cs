@@ -55,7 +55,7 @@ internal sealed partial class ConnectorWindow : Form
         Timeout = TimeSpan.FromSeconds(1)
     };
     private readonly Label status = new() { Text = "Starting the local bridge…", AutoSize = true };
-    private readonly Button update = new() { Text = "Check for updates", AutoSize = true };
+    private readonly Button update = new() { Text = "Check for updates" };
     private readonly Label updateStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly Label extensionStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly string? updateKey = UpdateEnvironment.TrustedKey();
@@ -77,13 +77,7 @@ internal sealed partial class ConnectorWindow : Form
             Dock = DockStyle.Fill, Padding = new Padding(20),
             FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true
         };
-        var updateBar = new FlowLayoutPanel
-        {
-            Width = 510, Height = 34, FlowDirection = FlowDirection.RightToLeft, WrapContents = false
-        };
-        updateBar.Controls.Add(update);
-        updateBar.Controls.Add(updateStatus);
-        layout.Controls.Add(updateBar);
+        layout.Controls.Add(updateStatus);
         layout.Controls.Add(extensionStatus);
         layout.Controls.Add(status);
         AddCaptureControls(layout);

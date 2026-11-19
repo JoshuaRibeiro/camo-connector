@@ -40,8 +40,27 @@ internal sealed partial class ConnectorWindow
         logsPage.Controls.Add(logs);
         pages.TabPages.AddRange([capturePage, logsPage]);
         pages.DrawItem += DrawTab;
-        Controls.Add(pages);
+        var pageHost = new Panel { Dock = DockStyle.Fill };
+        pageHost.Controls.Add(pages);
+        pageHost.Controls.Add(update);
+        update.BringToFront();
         AddTrackerPage();
+        Controls.Add(pageHost);
+
+        void PositionUpdateButton()
+        {
+            if (!pages.IsHandleCreated) return;
+            var tab = pages.GetTabRect(0);
+            var padding = LogicalToDeviceUnits(8);
+            var width = TextRenderer.MeasureText(update.Text, update.Font).Width + padding * 2;
+            update.Bounds = new Rectangle(pageHost.ClientSize.Width - padding - width, tab.Top, width, tab.Height);
+        }
+        pages.HandleCreated += (_, _) => PositionUpdateButton();
+        pageHost.SizeChanged += (_, _) => PositionUpdateButton();
+        pages.FontChanged += (_, _) => PositionUpdateButton();
+        update.TextChanged += (_, _) => PositionUpdateButton();
+        DpiChanged += (_, _) => PositionUpdateButton();
+        Shown += (_, _) => PositionUpdateButton();
         pages.SelectedIndexChanged += (_, _) => RefreshLogs();
         diagnosticsTimer.Tick += (_, _) =>
         {
