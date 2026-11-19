@@ -81,33 +81,95 @@ internal sealed class HudCapture : IDisposable
     private static extern bool BitBlt(IntPtr destination, int x, int y, int width, int height,
         IntPtr source, int sourceX, int sourceY, uint rasterOperation);
 
-    public async Task<(WeaponRead? Weapon, bool Replay)> DetectAsync(Bitmap frame, CancellationToken cancel)
+    public async Task<(WeaponRead? Weapon, bool Replay)> DetectAsync(Bitmap frame, CancellationToken cancel,
+        Action<string, string, Bitmap>? trace = null)
     {
         // Read the current weapon label below the ammo counter before wider HUD regions.
         var labelArea = (.683, .876, .141, .027);
         foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast })
         {
-            var (label, _) = await ReadTextAsync(frame, labelArea, cancel, pageMode: 7, adjustment: adjustment);
-            if (WeaponRecognition.Read(Lines(label), false) is { } weapon)
+            var (label, _) = await ReadTextAsync(frame, labelArea, cancel, pageMode: 7, adjustment: adjustment,
+                trace: trace, regionName: "hudLabel" + adjustment);
+            if (WeaponRecognition.ReadHud(Lines(label), false) is { } weapon)
                 return await IsReplayAsync(frame, cancel) ? (null, true) : (weapon, false);
         }
         foreach (var area in WeaponAreas)
         {
-            var read = WeaponRecognition.Read(await ReadAsync(frame, area, cancel), area.W >= .15);
+            var (text, _) = await ReadTextAsync(frame, area, cancel, trace: trace, regionName: $"hudBlock{area.X}");
+            var read = WeaponRecognition.ReadHud(Lines(text), area.W >= .15);
             if (read != null) return await IsReplayAsync(frame, cancel) ? (null, true) : (read, false);
         }
         // Short labels need less background in the crop to separate them from the ammo display.
         foreach (var area in new[] { (.742, .876, .082, .026), (.782, .877, .048, .026) })
         {
-            var (label, _) = await ReadTextAsync(frame, area, cancel, pageMode: 7);
-            if (WeaponRecognition.Read(Lines(label), false) is { } weapon)
+            var (label, _) = await ReadTextAsync(frame, area, cancel, pageMode: 7, trace: trace, regionName: $"hudLine{area.Item1}");
+            if (WeaponRecognition.ReadHud(Lines(label), false) is { } weapon)
                 return await IsReplayAsync(frame, cancel) ? (null, true) : (weapon, false);
         }
         var (shortLabel, _) = await ReadTextAsync(frame, (.782, .877, .048, .026), cancel,
-            pageMode: 7, adjustment: PixelAdjustment.Contrast);
-        if (WeaponRecognition.Read(Lines(shortLabel), false) is { Name: ".50 GS" } pistol)
+            pageMode: 7, adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "hudShortContrast");
+        if (WeaponRecognition.ReadHud(Lines(shortLabel), false) is { } pistol)
             return await IsReplayAsync(frame, cancel) ? (null, true) : (pistol, false);
+        foreach (var area in new[] { (.744, .879, .082, .024), (.782, .879, .043, .024), (.767, .882, .057, .020) })
+        {
+            var (label, _) = await ReadTextAsync(frame, area, cancel, pageMode: 7, adjustment: PixelAdjustment.WhiteText,
+                trace: trace, regionName: $"hudWhite{area.Item1}");
+            if (WeaponRecognition.ReadHud(Lines(label), false) is { } weapon)
+                return await IsReplayAsync(frame, cancel) ? (null, true) : (weapon, false);
+        }
+        var (tightLabel, _) = await ReadTextAsync(frame, (.807, .878, .018, .024), cancel, pageMode: 7,
+            trace: trace, regionName: "hudTight");
+        if (WeaponRecognition.ReadHud(Lines(tightLabel), false) is { Name: "M4" } rifle)
+            return await IsReplayAsync(frame, cancel) ? (null, true) : (rifle, false);
+        if (HasSelectedKnife(frame))
+            return await IsReplayAsync(frame, cancel) ? (null, true) : (new("FSS Carbon Edge 1095", false), false);
         return (null, false);
+    }
+
+    private static bool HasSelectedKnife(Bitmap frame)
+    {
+        // The knife slot stays visible when inactive. The active slot has an olive selection band.
+        var highlighted = 0;
+        for (var column = 0; column < 8; column++)
+        {
+            var pixel = frame.GetPixel((int)((.909 + column * .008) * frame.Width), (int)(.852 * frame.Height));
+            if (pixel.G >= pixel.R + 4 && pixel.R >= pixel.B + 10) highlighted++;
+        }
+        if (highlighted < 6) return false;
+        string[] silhouette =
+        [
+            "0000000000000000000000000000000000000000",
+            "0000000000000000000000000000000000000000",
+            "0000000111111111110001000000000000000000",
+            "0000111111111111111110110111100000000000",
+            "0001111111111111111110111111111111000000",
+            "0000111111111111011111111111111111101000",
+            "0000011111111111111111111111111111110000",
+            "0000001111111111111111111111111111111100",
+            "0000000001111111111111111111111111111100",
+            "0000000000000000011100111111111111111100",
+            "0000000000000000000000110000000000001100",
+            "0000000000000000000000000000000000000000"
+        ];
+        for (var dy = -1; dy <= 1; dy++)
+        for (var dx = -1; dx <= 1; dx++)
+        {
+            var overlap = 0;
+            var union = 0;
+            for (var y = 0; y < silhouette.Length; y++)
+            for (var x = 0; x < silhouette[y].Length; x++)
+            {
+                var pixel = frame.GetPixel(
+                    (int)Math.Round((.939 + (x + dx) * .034 / 40) * frame.Width),
+                    (int)Math.Round((.856 + (y + dy) * .010 / 12) * frame.Height));
+                var bright = Math.Min(pixel.R, Math.Min(pixel.G, pixel.B)) >= 172;
+                var expected = silhouette[y][x] == '1';
+                if (bright && expected) overlap++;
+                if (bright || expected) union++;
+            }
+            if (overlap >= union * .72) return true;
+        }
+        return false;
     }
 
     public async Task<MilitaryUnlock?> DetectMilitaryUnlockAsync(Bitmap frame, CancellationToken cancel,

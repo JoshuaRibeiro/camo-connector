@@ -72,7 +72,7 @@ try
         }
         else if (args[0] == "--probe-unlock-image")
         {
-            var (weapon, replay) = await capture.DetectAsync(frame, stop.Token);
+            var (weapon, replay) = await capture.DetectAsync(frame, stop.Token, RecordCrop);
             var banner = await capture.DetectChallengeBannerAsync(frame, stop.Token, RecordCrop);
             var special = banner.Completed && banner.Challenge == null && !replay
                 ? capture.IdentifySpecialBanner(frame, weapon?.Name, banner.Details) : null;

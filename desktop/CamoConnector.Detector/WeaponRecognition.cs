@@ -49,6 +49,28 @@ public static class WeaponRecognition
         return null;
     }
 
+    public static WeaponRead? ReadHud(string[] lines, bool wideRegion)
+    {
+        var read = Read(lines, wideRegion);
+        if (read != null || wideRegion) return read;
+        foreach (var line in lines)
+        {
+            var name = Key(line) switch
+            {
+                "08gs" => ".50 GS",
+                "patrietxmr" or "patrietkmr" => "Patriot XMR",
+                "skgfergiean" => "KG-7 Vulcan",
+                "mare" => "Mar-9",
+                "anvil" => "PM-40 Anvil",
+                "w225striga" => "WZ.55 Striga",
+                "raze12" or "razi12" or "razin12" => "Rezi 12",
+                _ => null
+            };
+            if (name != null) return new(name, false);
+        }
+        return null;
+    }
+
     public static bool IsReplay(string text) => Regex.IsMatch(text,
         @"KILL\s*CAM|FINAL\s+KILL|BEST\s+PLAY|SPECTAT(?:ING|OR)|SKIP\s+(?:THE\s+)?KILL",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
