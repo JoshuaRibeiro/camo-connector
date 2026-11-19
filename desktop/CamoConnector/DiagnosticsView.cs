@@ -23,7 +23,7 @@ internal sealed partial class ConnectorWindow
         WordWrap = false, Dock = DockStyle.Fill
     };
 
-    private void AddPages(FlowLayoutPanel setup)
+    private void AddPages(Control setup)
     {
         var capturePage = new TabPage("Setup");
         capturePage.Controls.Add(setup);

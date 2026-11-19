@@ -12,12 +12,12 @@ internal sealed partial class ConnectorWindow
     }
 
     private sealed record Device(string Name, string Input);
-    private readonly ComboBox sources = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 320 };
+    private readonly ComboBox sources = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
     private readonly Button refreshSources = new() { Text = "Refresh sources", AutoSize = true };
     private readonly Button startDetection = new() { Text = "Start detection", AutoSize = true };
     private readonly Button stopDetection = new() { Text = "Stop", AutoSize = true };
     private readonly Label detectorStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
-    private readonly PictureBox preview = new() { Width = 510, Height = 230, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
+    private readonly PictureBox preview = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
     private readonly Label previewStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly System.Windows.Forms.Timer previewTimer = new() { Interval = 66 };
     private byte[]? pendingPreview;
@@ -35,18 +35,8 @@ internal sealed partial class ConnectorWindow
     private bool detectorStopRequested;
     private bool scanning, bridgeReady;
 
-    private void AddCaptureControls(FlowLayoutPanel layout)
+    private void BindCaptureControls()
     {
-        layout.Controls.Add(new Label { Text = "Capture source", AutoSize = true });
-        var picker = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
-        picker.Controls.AddRange([sources, refreshSources]);
-        layout.Controls.Add(picker);
-        var controls = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = Padding.Empty };
-        controls.Controls.AddRange([startDetection, stopDetection]);
-        layout.Controls.Add(controls);
-        layout.Controls.Add(detectorStatus);
-        layout.Controls.Add(preview);
-        layout.Controls.Add(previewStatus);
         sources.SelectedIndexChanged += (_, _) => { UpdateCaptureButtons(); StartPreview(); };
         refreshSources.Click += async (_, _) => await RefreshSourcesAsync();
         startDetection.Click += async (_, _) => await RunDetectorAsync();
@@ -67,6 +57,9 @@ internal sealed partial class ConnectorWindow
         startDetection.Enabled = bridgeReady && detector == null && !scanning && sources.SelectedItem != null &&
             MissingDetectionComponent == null;
         stopDetection.Enabled = detector != null;
+        if (detectionSummary != null)
+            detectionSummary.Text = scanning ? "Finding capture sources…" : detector != null ? "Detection running" :
+                startDetection.Enabled ? "Ready to detect" : "Detection stopped";
     }
 
     private async Task RefreshSourcesAsync()

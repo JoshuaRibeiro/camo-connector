@@ -156,6 +156,13 @@ $rows = $tracked::ReadRows($lines, $catalog, [Func[double,byte[]]]{ param($y) re
 if ($rows.Length -ne 1 -or $rows[0].Camo -ne 'Red Tiger' -or $rows[0].Identity -ne 'artwork') {
     throw 'Thumbnail fallback failed.'
 }
+$lines[1] = [CamoConnector.Detector.HudLine]::new('Get 75 kills while prone 19/75', .20)
+$rows = $tracked::ReadRows($lines, $catalog, [Func[double,byte[]]]{ param($y) return ,$wrongThumbnail })
+if ($rows.Length -ne 1 -or $rows[0].Camo -ne 'Platinum') { throw 'Platinum was attributed to a Special camo.' }
+$lines[1] = [CamoConnector.Detector.HudLine]::new('19/75', .20)
+if ($tracked::ReadRows($lines, $catalog, [Func[double,byte[]]]{ param($y) return ,$wrongThumbnail })) {
+    throw 'Unverified 75-kill progress was attributed by Special artwork alone.'
+}
 $trackedLines = [CamoConnector.Detector.HudLine[]]@(
     [CamoConnector.Detector.HudLine]::new('Signal 50', .02)
     [CamoConnector.Detector.HudLine]::new('32 / 40', .22)

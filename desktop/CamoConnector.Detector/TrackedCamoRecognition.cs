@@ -65,6 +65,12 @@ public static class TrackedCamoRecognition
             }
 
             if (!catalog.TryGetValue(name!, out var entries)) continue;
+            if (goal == 75 && Regex.IsMatch(text,
+                @"\b(?:platinum|(?:kills?\s+)?while\s+prone)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            {
+                result.Add(new(name!, "Platinum", count, goal, "name"));
+                continue;
+            }
             var names = rows.Select(row => Key(Regex.Split(row, @"\s*[·•:]\s*|\s+(?:[-–—]|[0-9]+\s*[/|]\s*[0-9]+)", RegexOptions.CultureInvariant)[0]))
                 .ToHashSet(StringComparer.Ordinal);
             var named = entries.Select(entry => entry.Name).Where(camo => names.Contains(Key(camo))).Distinct().ToArray();
@@ -76,7 +82,13 @@ public static class TrackedCamoRecognition
                 _ => null
             } : null;
             if (objectiveCamo != null && !entries.Any(entry => entry.Name == objectiveCamo)) objectiveCamo = null;
-            var camo = named.SingleOrDefault() ?? objectiveCamo ?? MatchArtwork(thumbnail(y), entries);
+            var camo = named.SingleOrDefault() ?? objectiveCamo;
+            if (camo == null)
+            {
+                var artwork = MatchArtwork(thumbnail(y), entries);
+                if (entries.Any(entry => entry.Name == artwork &&
+                    (entry.Goal == goal || (entry.Goal == null && goal != 75)))) camo = artwork;
+            }
             if (camo != null) result.Add(new(name!, camo, count, goal, named.Length == 1 || objectiveCamo != null ? "name" : "artwork"));
         }
         return result.GroupBy(row => (row.Weapon, row.Camo))

@@ -25,15 +25,24 @@ internal static class Program
         };
         var status = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
             Padding = new Padding(16), Text = "Waiting for Camo Connector to close…" };
+        var progressArea = new Panel { Dock = DockStyle.Bottom, Height = 40, Padding = new Padding(16, 0, 16, 16) };
+        var bar = new ProgressBar { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee, AccessibleName = "Update progress" };
+        progressArea.Controls.Add(bar);
         window.Controls.Add(status);
+        window.Controls.Add(progressArea);
         var finished = false;
         window.FormClosing += (_, e) => e.Cancel = !finished && e.CloseReason == CloseReason.UserClosing;
         window.Shown += async (_, _) =>
         {
-            IProgress<string> progress = new Progress<string>(message => status.Text = message);
+            var progress = new Progress<(string Message, int? Percent)>(step =>
+            {
+                status.Text = step.Message;
+                bar.Style = step.Percent.HasValue ? ProgressBarStyle.Continuous : ProgressBarStyle.Marquee;
+                if (step.Percent is int percent) bar.Value = percent;
+            });
             try
             {
-                await Task.Run(() => Run(root, parentId, expected, recovery, progress.Report,
+                await Task.Run(() => Run(root, parentId, expected, recovery, ((IProgress<(string, int?)>)progress).Report,
                     (message, title) => window.Invoke(() =>
                     {
                         status.Text = title;
@@ -49,8 +58,10 @@ internal static class Program
         Application.Run(window);
     }
 
-    private static void Run(string root, int parentId, Version? expected, bool recovery, Action<string> report, Action<string, string> showError)
+    private static void Run(string root, int parentId, Version? expected, bool recovery,
+        Action<(string Message, int? Percent)> progress, Action<string, string> showError)
     {
+        void report(string message) => progress((message, null));
         var restart = false;
         try
         {
@@ -78,14 +89,15 @@ internal static class Program
                 using var archive = new FileStream(staged, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
                     65536, FileOptions.DeleteOnClose);
                 var totalMiB = manifest.Size / 1048576d;
-                report($"Downloading 0.0 / {totalMiB:F1} MiB.");
+                progress(($"Downloading 0.0 / {totalMiB:F1} MiB.", 0));
                 var lastReport = Stopwatch.GetTimestamp();
                 release.DownloadArchiveAsync(manifest, archive, CancellationToken.None, bytes =>
                 {
                     if (bytes < manifest.Size && Stopwatch.GetElapsedTime(lastReport) < TimeSpan.FromMilliseconds(500))
                         return;
                     lastReport = Stopwatch.GetTimestamp();
-                    report($"Downloading {bytes / 1048576d:F1} / {totalMiB:F1} MiB ({bytes * 100 / manifest.Size}%).");
+                    var percent = (int)Math.Clamp(bytes * 100d / manifest.Size, 0, 100);
+                    progress(($"Downloading {bytes / 1048576d:F1} / {totalMiB:F1} MiB ({percent}%).", percent));
                 }).GetAwaiter().GetResult();
                 report("Preparing the verified update.");
                 transaction.Apply(archive, manifest, report: report);

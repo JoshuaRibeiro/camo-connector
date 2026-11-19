@@ -72,22 +72,8 @@ internal sealed partial class ConnectorWindow : Form
         StartPosition = FormStartPosition.CenterScreen;
         ClientSize = new Size(570, 575);
         MinimumSize = new Size(500, 300);
-        var layout = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Fill, Padding = new Padding(20),
-            FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoScroll = true
-        };
-        layout.Controls.Add(updateStatus);
-        layout.Controls.Add(extensionStatus);
-        layout.Controls.Add(status);
-        AddCaptureControls(layout);
         update.Click += async (_, _) => await UpdateAsync();
-        layout.Controls.Add(new Label
-        {
-            AutoSize = true, MaximumSize = new Size(510, 0),
-            Text = "Open the Tracker tab to sync here, or connect the browser extension."
-        });
-        AddPages(layout);
+        AddPages(CreateSetupView());
         Shown += async (_, _) => await RefreshSourcesAsync();
         Shown += async (_, _) => await StartBridgeAsync();
     }
@@ -181,6 +167,7 @@ internal sealed partial class ConnectorWindow : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         closing.Cancel();
+        setupHeadingFont?.Dispose();
         StopTracker();
         diagnosticsTimer.Dispose();
         logFont.Dispose();
