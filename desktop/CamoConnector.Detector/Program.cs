@@ -52,7 +52,10 @@ try
     if (probe)
     {
         var monitor = args[0].EndsWith("-monitor", StringComparison.Ordinal) ? FindMonitor(args[1]) : null;
-        using var frame = monitor == null ? new Bitmap(args[1]) : HudCapture.Desktop(monitor);
+        using var captured = monitor == null ? new Bitmap(args[1]) : HudCapture.Desktop(monitor);
+        using var viewport = args[0].StartsWith("--probe-menu-", StringComparison.Ordinal)
+            ? HudCapture.CropPaddedViewport(captured) : null;
+        var frame = viewport ?? captured;
         var cropDirectory = saveMenuCrops
             ? Directory.CreateDirectory(Path.Combine(Path.GetFullPath(args[3]), $"camo-probe-{Guid.NewGuid():N}")).FullName
             : null;
@@ -213,8 +216,12 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     var firstFrame = true;
     while (!cancel.IsCancellationRequested)
     {
-        using var frame = acceptedFrames != null ? await acceptedFrames.ReadAsync(cancel) :
+        using var captured = acceptedFrames != null ? await acceptedFrames.ReadAsync(cancel) :
             external == null ? HudCapture.Desktop(screen!) : await external.NextAsync(cancel);
+        using var viewport = HudCapture.CropPaddedViewport(captured);
+        var paddedMenu = viewport == null ? null :
+            await capture.ReadCamoMenuWeaponAsync(viewport, cancel, requireHeading: true);
+        var frame = paddedMenu != null ? viewport! : captured;
         if (firstFrame)
         {
             Console.Error.WriteLine($"First frame from {screen?.DeviceName ?? "capture device"}: {frame.Width} × {frame.Height}.");
@@ -224,7 +231,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         var scanStarted = Stopwatch.GetTimestamp();
         var pollProgress = lastMenuWeapon != null || now - lastProgressScan >= TimeSpan.FromMilliseconds(400) ||
             (previousMenuMilitary != null && !seenUnlocks.Contains(previousMenuMilitary));
-        var menuWeapon = pollProgress ? await capture.ReadCamoMenuWeaponAsync(frame, cancel, requireHeading: true) : null;
+        var menuWeapon = paddedMenu ?? (pollProgress ? await capture.ReadCamoMenuWeaponAsync(frame, cancel, requireHeading: true) : null);
         var scanGameplay = menuWeapon == null;
         var scanLobby = scanGameplay && now - lastLobbyScan >= TimeSpan.FromSeconds(1);
         var scanChallenge = scanGameplay && now - lastChallengeScan >= TimeSpan.FromMilliseconds(200);
@@ -377,7 +384,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             });
             await File.AppendAllTextAsync(log, record + "\n", cancel);
         }
-        if (pollProgress)
+        if (pollProgress || paddedMenu != null)
         {
             lastProgressScan = now;
             if (menuWeapon == null && result is { Weapon: null, Replay: false })

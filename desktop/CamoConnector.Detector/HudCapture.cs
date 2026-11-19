@@ -70,6 +70,50 @@ internal sealed class HudCapture : IDisposable
         catch { frame.Dispose(); throw; }
     }
 
+    internal static Bitmap? CropPaddedViewport(Bitmap frame)
+    {
+        // Sample the middle of each axis so controls outside the video do not define its bounds.
+        bool HasContent(bool vertical, int position)
+        {
+            var lit = 0;
+            var length = vertical ? frame.Height : frame.Width;
+            for (var i = 0; i < 24; i++)
+            {
+                var across = (int)(length * (.23 + i * .54 / 23));
+                var pixel = vertical ? frame.GetPixel(position, across) : frame.GetPixel(across, position);
+                if (Math.Max(pixel.R, Math.Max(pixel.G, pixel.B)) >= (vertical ? 9 : 5) &&
+                    ++lit >= (vertical ? 5 : 3)) return true;
+            }
+            return false;
+        }
+
+        int FindSide(bool reverse)
+        {
+            var length = frame.Width;
+            for (var offset = 0; offset < length / 5; offset++)
+            {
+                var position = reverse ? length - 1 - offset : offset;
+                if (HasContent(true, position)) return position;
+            }
+            return reverse ? length - 1 : 0;
+        }
+
+        // Skip ordinary edge-to-edge captures quickly.
+        if (HasContent(true, 0) || HasContent(true, frame.Width - 1)) return null;
+        var left = FindSide(false);
+        var right = FindSide(true);
+        if (left < frame.Width * .015 || frame.Width - 1 - right < frame.Width * .015) return null;
+        var width = right - left + 1;
+        var height = (int)Math.Round(width * 9d / 16);
+        if (height >= frame.Height) return null;
+        var top = 0;
+        while (top <= frame.Height - height &&
+            !(HasContent(false, top) && HasContent(false, top + 1) && HasContent(false, top + 2))) top++;
+        if (top > frame.Height - height) top = (frame.Height - height) / 2;
+        var bounds = new Rectangle(left, top, width, height);
+        return frame.Clone(bounds, PixelFormat.Format24bppRgb);
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     private static extern IntPtr GetDC(IntPtr window);
 
