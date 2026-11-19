@@ -256,7 +256,8 @@
       completionFocusAttempts.set(weapon, now);
       return focusWeapon(weapon);
     }
-    if (militaryIncomplete(weapon)) return false;
+    const canComplete = () => Number.isInteger(goal) && goal > 0 || !militaryIncomplete(weapon);
+    if (!canComplete()) return false;
     const readControl = () => {
       const control = grindingCompletion(weapon, name);
       if (control || !Number.isInteger(goal) || goal < 1) return control;
@@ -265,7 +266,7 @@
       return { button: row.count === goal - 1 ? row.tick || row.button : null, done: row.count === goal, card: row.card };
     };
     const control = readControl();
-    if (!control && !pastCompletionStage(weapon, name)) {
+    if (!control && (militaryIncomplete(weapon) || !pastCompletionStage(weapon, name))) {
       completionFocusAttempts.set(weapon, now);
       return false;
     }
@@ -280,7 +281,9 @@
       : { ...state, pending: true };
     await extension.storage.local.set({ [key]: interrupted });
     const current = readControl();
-    if (militaryIncomplete(weapon) || current?.button !== control.button || !control.button.isConnected) {
+    if (!multiplayerSelected() || !focusedWeapon(weapon) || !canComplete() ||
+        current?.button !== control.button || !control.button.isConnected || control.button.disabled ||
+        control.button.getAttribute?.('aria-disabled') === 'true') {
       await extension.storage.local.set({ [key]: state });
       return false;
     }

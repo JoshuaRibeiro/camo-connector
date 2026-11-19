@@ -116,6 +116,7 @@ test('unavailable camo checkoffs leave later checkoffs runnable and retry when v
     /  poll\(\);\s*setInterval\(poll, 500\);/,
     '  multiplayerSelected = () => true; grindingCard = () => null; focusedWeapon = key => key === globalThis.focused;\n' +
     '  focusWeapon = () => false; grindingCompletion = globalThis.control; findTarget = globalThis.fallback;\n' +
+    '  militaryIncomplete = weapon => weapon === "pila";\n' +
     '  Object.assign(globalThis, { syncTrackedRows, syncChallenges, syncGold });');
   const data = {};
   const available = new Set(['snakeskin', 'Red Tiger', 'sang9mm:Gold']);
@@ -160,6 +161,13 @@ test('unavailable camo checkoffs leave later checkoffs runnable and retry when v
   await page.syncTrackedRows('session', rows);
   assert.equal(clicked.filter(name => name === 'Frosted').length, 1);
   assert.deepEqual([...data.trackedProgress.handled], [0, 1]);
+  page.focused = 'pila';
+  available.add('Frontier');
+  const frontier = { id: 2, camo: 'Frontier', type: 'camo', weapon: 'Pila', confirmed: true, goal: 10, value: 10 };
+  await page.syncTrackedRows('session', [frontier]);
+  await page.syncTrackedRows('session', [frontier]);
+  assert.equal(clicked.filter(name => name === 'Frontier').length, 1);
+  assert.deepEqual([...data.trackedProgress.handled], [0, 1, 2]);
 });
 
 test('tracked progress applies verified increments on the visible weapon card', async () => {
