@@ -14,6 +14,12 @@ if ($weapon.Name -ne 'Sang 9mm' -or !$weapon.Akimbo) { throw 'Akimbo OCR failed'
 if ($reader::Read(@('Signal 50'), $true)) { throw 'Wide HUD accepted an ordinary name' }
 if ($reader::Read(@('Signal 50'), $false).Name -ne 'Signal 50') { throw 'Narrow HUD failed' }
 if ($reader::Read(@('KG-7 VU1CAN'), $false).Name -ne 'KG-7 Vulcan') { throw 'Known OCR substitution failed' }
+if ($reader::ReadHud(@('KG-7 Drillcharge'), $false).Name -ne 'KG-7 Vulcan' -or
+    $reader::ReadHud(@('KG-7'), $false).Name -ne 'KG-7 Vulcan' -or
+    $reader::ReadHud(@('KG-7 Drillcharge'), $true) -or
+    $reader::ReadHud(@('RPG-8'), $false).Name -ne 'RPG-8') {
+    throw 'KG-7 Apex HUD alias did not preserve weapon identity'
+}
 if ($reader::Read(@('.50 6S'), $false).Name -ne '.50 GS' -or
     $reader::Read(@('021 .50 6S'), $false) -or $reader::Read(@('.50 6S'), $true)) {
     throw 'Short pistol HUD OCR matched incorrectly'

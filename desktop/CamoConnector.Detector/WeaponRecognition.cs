@@ -59,6 +59,7 @@ public static class WeaponRecognition
             {
                 "08gs" or "58gs" => ".50 GS",
                 "patrietxmr" or "patrietkmr" => "Patriot XMR",
+                "kg7drillcharge" or "k67drillcharge" or "kg7" or "k67" => "KG-7 Vulcan",
                 "skgfergiean" => "KG-7 Vulcan",
                 "mare" => "Mar-9",
                 "anvil" => "PM-40 Anvil",
