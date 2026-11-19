@@ -115,6 +115,11 @@ if ($menu::ReadBreadcrumbWeapon('CREATE A CLASS / EDIT CUSTOM CLASS / SIGNAL 5O 
     $menu::ReadBreadcrumbWeapon('LOADOUT / EDIT CUSTOM CLASS / SIGNAL 50 /')) {
     throw 'Camo menu breadcrumb recognition failed'
 }
+$optical = $menu::ReadKnownCamoTitle('6 OPTICAL-REVERB', @('Oni','Urban Smoke','Optical Reverb'))
+if ($optical -ne 'Optical Reverb' -or
+    $menu::ReadProgress('Cronen Squall', $optical, @('2/15'), @($optical)).Count -ne 2) {
+    throw 'Lock glyph corrupted the Optical Reverb identity'
+}
 $redTiger = $menu::ReadProgress('.50 GS','RED-TIGER', @('Complete 3 Special Camos','2/3','Point blank kills','3/30'),$camos)
 if ($redTiger.Camo -ne 'Red Tiger' -or $redTiger.Count -ne 3 -or $redTiger.Goal -ne 30) { throw 'Named camo count failed' }
 $differentGoal = $menu::ReadProgress('.50 GS','Frosted', @('Different wording 5/10'),$camos)
@@ -277,7 +282,9 @@ $unlock = $specials::Resolve('Krait P68',2,[double[]]@(.3,.2,.8),$camos)
 if (($unlock.Challenge -join ',') -ne 'A,B' -or $unlock[0].Kind -ne 'catalog-special-unlocked') { throw 'Wrong Special slots applied' }
 if ($specials::Resolve('Krait P68',2,[double[]]@(.3,.60,.8),$camos).Length -or
     $specials::Resolve('Krait P68',2,[double[]]@(.3,.19,.2),$camos).Length) { throw 'Ambiguous Special locks accepted' }
-$unlock = $specials::Resolve('Sang 9mm',3,[double[]]@(),$camos)
+if ($specials::Resolve('Krait P68',3,[double[]]@(.3,.2,.8),$camos).Length -or
+    $specials::Resolve('Krait P68',0,[double[]]@(.3,.2,.1),$camos).Length) { throw 'Contradictory Special count accepted' }
+$unlock = $specials::Resolve('Sang 9mm',3,[double[]]@(.3,.2,.1),$camos)
 if (($unlock.Challenge -join ',') -ne 'menu-autumn,menu-snakeskin,menu-space-time') { throw 'Sang menu unlock mapping failed' }
 $confirmation = [CamoConnector.Detector.SpecialUnlockConfirmation]::new()
 if ($confirmation.Observe($unlock).Length -or $confirmation.Observe($unlock).Length -ne 3 -or
@@ -288,7 +295,7 @@ $osprey = [CamoConnector.Detector.CamoReference[]]@(
         [CamoConnector.Detector.CamoReference]::new($entry.name, $null, $entry.slot, $entry.goal)
     }
 )
-$unlocks = $specials::Resolve('Cronen Osprey', 3, [double[]]@(), $osprey)
+$unlocks = $specials::Resolve('Cronen Osprey', 3, [double[]]@(.3,.2,.1), $osprey)
 if (($unlocks.Challenge -join ',') -ne 'In the Weeds,Dark Ichor,Chained') {
     throw 'Cronen Osprey Specials were dropped when their numeric goals were absent'
 }

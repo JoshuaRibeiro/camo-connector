@@ -348,7 +348,7 @@ internal sealed class HudCapture : IDisposable
         var text = string.Join(" ", await ReadAsync(frame, (.070, .389, .090, .039), cancel));
         var count = SpecialUnlocks.ReadCount(text);
         if (count is not > 0) return [];
-        var scores = count == 3 ? [] : new[] { .075, .150, .225 }.Select(x => PadlockScore(frame, x)).ToArray();
+        var scores = new[] { .075, .150, .225 }.Select(x => PadlockScore(frame, x)).ToArray();
         return SpecialUnlocks.Resolve(weapon, count.Value, scores, catalog.GetValueOrDefault(weapon) ?? []);
     }
 
@@ -474,7 +474,12 @@ internal sealed class HudCapture : IDisposable
         }
 
         var catalogGoal = catalog.GetValueOrDefault(weapon)?.FirstOrDefault(camo => camo.Name == title)?.Goal;
-        CamoProgress? Validate(CamoProgress? candidate) => CamoMenuRecognition.CheckObjectiveGoal(candidate, catalogGoal, objectives);
+        CamoProgress? Validate(CamoProgress? candidate)
+        {
+            // A visible Special counter is an in-progress read. Unlocks are verified from the tiles or banner.
+            if (candidate != null && candidate.Count == candidate.Goal) return null;
+            return CamoMenuRecognition.CheckObjectiveGoal(candidate, catalogGoal, objectives);
+        }
         var isolated = await ReadCounter(PixelAdjustment.Normal, "camoCounter");
         if (progress != null || isolated == null)
             return Validate(CamoMenuRecognition.ConfirmCounter(progress, isolated, null));

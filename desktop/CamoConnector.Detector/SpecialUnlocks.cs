@@ -40,14 +40,10 @@ public static class SpecialUnlocks
     public static SpecialUnlock[] Resolve(string weapon, int count, double[] scores, CamoReference[] catalog)
     {
         if (count is <= 0 or > 3) return [];
-        var slots = Enumerable.Range(1, 3).ToArray();
-        if (count != 3)
-        {
-            if (scores.Length != 3 || scores.Any(score => !double.IsFinite(score) || score is >= .55 and < .70))
-                return [];
-            slots = slots.Where(slot => scores[slot - 1] < .55).ToArray();
-            if (slots.Length != count) return [];
-        }
+        if (scores.Length != 3 || scores.Any(score => !double.IsFinite(score) || score is >= .55 and < .70))
+            return [];
+        var slots = Enumerable.Range(1, 3).Where(slot => scores[slot - 1] < .55).ToArray();
+        if (slots.Length != count) return [];
         if (weapon == "Sang 9mm")
         {
             string[] names = ["menu-autumn", "menu-snakeskin", "menu-space-time"];
