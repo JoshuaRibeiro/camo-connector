@@ -251,6 +251,8 @@ internal sealed class HudCapture : IDisposable
         MilitaryUnlock? best = null;
         foreach (var (x, width) in new[] { (.453, .094), (.527, .103), (.349, .137) })
         {
+            // Reward names appear before the XP bar finishes. Completion lights both sides of the card.
+            if (!HasCompletedRewardBorder(frame, x + width / 2)) continue;
             foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast, PixelAdjustment.Invert })
             {
                 var (card, _) = await ReadTextAsync(frame, (x, .652, width, .026), cancel, pageMode: 7,
@@ -261,6 +263,28 @@ internal sealed class HudCapture : IDisposable
             }
         }
         return best;
+    }
+
+    private static bool HasCompletedRewardBorder(Bitmap frame, double center)
+    {
+        foreach (var side in new[] { -1, 1 })
+        {
+            var litRows = 0;
+            for (var row = 0; row < 12; row++)
+            {
+                var y = (int)((.535 + row * .013) * frame.Height);
+                for (var step = 0; step < 11; step++)
+                {
+                    var x = (int)((center + side * (.070 + step * .001)) * frame.Width);
+                    var pixel = frame.GetPixel(x, y);
+                    if (pixel.R < 175 || pixel.G < 185 || pixel.B > pixel.G - 20) continue;
+                    litRows++;
+                    break;
+                }
+            }
+            if (litRows < 8) return false;
+        }
+        return true;
     }
 
     public async Task<bool> IsReplayAsync(Bitmap frame, CancellationToken cancel)
