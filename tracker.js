@@ -118,6 +118,8 @@
     return null;
   }
 
+  const militaryFocusAttempts = new Map();
+
   async function syncMilitary(session, tiers, weaponName = 'Sang 9mm') {
     if (!tiers?.length || !multiplayerSelected()) return false;
     const weapon = weaponKey(weaponName);
@@ -128,8 +130,11 @@
     if (!remaining.length) return false;
     const tier = Math.max(...remaining);
     if (!focusedWeapon(weapon)) {
-      if (Date.now() - lastFocusAttempt >= 3500) {
-        lastFocusAttempt = Date.now();
+      const now = Date.now();
+      if (!openedDetails && now - lastFocusAttempt >= 3500 &&
+          now - (militaryFocusAttempts.get(weapon) || 0) >= 15000) {
+        lastFocusAttempt = now;
+        militaryFocusAttempts.set(weapon, now);
         if (focusWeapon(weapon)) return true;
       }
       return false;
@@ -874,11 +879,11 @@
           return (!activeWeapon || key === activeWeapon) && focusedWeapon(key);
         };
         const activeRows = trackedRows?.filter(row => canSync(row.weapon));
-        // Post-match reward cards can name a different weapon from the last HUD read.
-        // Military unlocks carry their own weapon and still require its tracker card to be focused.
-        if (focusedWeapon('sang9mm') && await syncMilitary(session, military)) return;
-        for (const [name, tiers] of catalogMilitary || []) {
-          if (focusedWeapon(weaponKey(name)) && await syncMilitary(session, tiers, name)) return;
+        // Apply updates on the current card before switching to a pending unlock's weapon.
+        const militaryUpdates = [['Sang 9mm', military], ...(catalogMilitary || [])];
+        militaryUpdates.sort(([a], [b]) => Number(focusedWeapon(weaponKey(b))) - Number(focusedWeapon(weaponKey(a))));
+        for (const [name, tiers] of militaryUpdates) {
+          if (await syncMilitary(session, tiers, name)) return;
         }
         if (await syncTrackedRows(session, activeRows, true)) return;
         const target = findTarget();
