@@ -22,10 +22,40 @@ jobs:
       - run: ./tests/detector-weapon.ps1
       - name: Prepare DirectShow capture runtime
         run: |
-          choco install ffmpeg --yes --no-progress
-          if ($LASTEXITCODE) { throw 'Could not install FFmpeg on the build runner.' }
-          $ffmpeg = Get-ChildItem "$env:ChocolateyInstall/lib/ffmpeg/tools" -Filter ffmpeg.exe -File -Recurse | Select-Object -First 1
-          if (!$ffmpeg) { throw 'Could not find the FFmpeg package executable.' }
+          $PSNativeCommandUseErrorActionPreference = $false
+          $packageTools = Join-Path $env:ChocolateyInstall 'lib/ffmpeg/tools'
+          $shimDirectory = Join-Path $env:ChocolateyInstall 'bin'
+
+          function Find-CaptureRuntime {
+            $candidates = @(
+              if (Test-Path -LiteralPath $packageTools -PathType Container) {
+                Get-ChildItem -LiteralPath $packageTools -Filter ffmpeg.exe -File -Recurse |
+                  ForEach-Object FullName
+              }
+              Get-Command ffmpeg.exe -CommandType Application -All -ErrorAction SilentlyContinue |
+                Where-Object { (Split-Path -Parent $_.Source) -ne $shimDirectory } |
+                ForEach-Object Source
+            )
+            foreach ($candidate in $candidates | Select-Object -Unique) {
+              $devices = & $candidate -hide_banner -devices
+              if ($LASTEXITCODE -eq 0 -and $devices -match '\bdshow\b') {
+                return Get-Item -LiteralPath $candidate
+              }
+            }
+          }
+
+          $ffmpeg = Find-CaptureRuntime
+          for ($attempt = 1; !$ffmpeg -and $attempt -le 3; $attempt++) {
+            choco install ffmpeg --yes --no-progress
+            $installExit = $LASTEXITCODE
+            $ffmpeg = Find-CaptureRuntime
+            if (!$ffmpeg -and $attempt -lt 3) {
+              Write-Warning "FFmpeg attempt $attempt did not provide a DirectShow runtime (Chocolatey exit $installExit). Retrying."
+              Start-Sleep -Seconds (10 * $attempt)
+            }
+          }
+          if (!$ffmpeg) { throw "Could not obtain an FFmpeg executable with DirectShow after three installs (last Chocolatey exit $installExit)." }
+          Write-Host "Bundling FFmpeg from $($ffmpeg.FullName)"
           "CAMO_CAPTURE_DIRECTORY=$($ffmpeg.DirectoryName)" >> $env:GITHUB_ENV
       - name: Prepare OCR runtime
         run: |
