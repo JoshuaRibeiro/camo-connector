@@ -115,6 +115,7 @@ try
             camoProgress = await capture.DetectCamoProgressAsync(image, menuWeapon, stop.Token),
             trackedCamos = replay ? [] : await capture.DetectTrackedCamosAsync(image, stop.Token, savedImage: true),
             combat = replay ? null : await capture.DetectCombatAsync(image, stop.Token),
+            matchNotice = replay ? null : await capture.DetectMatchNoticeAsync(image, stop.Token),
             longshot = !replay && await capture.DetectLongshotAsync(image, stop.Token),
             goldWeapon = await capture.DetectCompletionistGoldAsync(image, menuWeapon, stop.Token),
             goldBanner = challenge == "gold-15", challenge,

@@ -287,6 +287,15 @@ internal sealed class HudCapture : IDisposable
             var detail = string.Join(" ", await ReadAsync(frame, (.827, .045, .155, .405), cancel));
             return CombatRecognition.ReadLobby(result + " " + detail);
         }
+        // Gun Game Wager shows the result and its reason together in the upper left.
+        var wagerHeading = await ReadTextAsync(frame, (.039, .055, .19, .11), cancel, pageMode: 7);
+        if (System.Text.RegularExpressions.Regex.IsMatch(wagerHeading.Text, @"\b(?:VICTORY|DEFEAT|DRAW)\b",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+        {
+            var reason = await ReadTextAsync(frame, (.045, .216, .16, .034), cancel, pageMode: 7);
+            var wagerNotice = CombatRecognition.ReadLobby(wagerHeading.Text + " " + reason.Text);
+            if (wagerNotice != null) return wagerNotice;
+        }
         var notice = CombatRecognition.ReadLobby(string.Join(" ", await ReadAsync(frame, (0, 0, .99, .42), cancel)));
         if (notice != null) return notice;
         var matchmaking = await ReadTextAsync(frame, (.34, .70, .32, .06), cancel, pageMode: 7);
