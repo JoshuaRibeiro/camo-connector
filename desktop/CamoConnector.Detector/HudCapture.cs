@@ -485,6 +485,12 @@ internal sealed class HudCapture : IDisposable
         var (military, _) = await ReadTextAsync(frame, (.071, .163, .095, .029), cancel, pageMode: 7,
             trace: trace, regionName: "militaryRow");
         var count = CamoMenuRecognition.ReadMilitaryMenuCount(military);
+        if (count == null)
+        {
+            var (alternateRow, _) = await ReadTextAsync(frame, (.070, .160, .091, .033), cancel, pageMode: 7,
+                adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "militaryRowContrast");
+            count = CamoMenuRecognition.ReadMilitaryMenuCount(alternateRow);
+        }
         if (count is not > 0) return count;
 
         // A stable OCR error can survive multiple frames. Require a second read of just the fraction.
