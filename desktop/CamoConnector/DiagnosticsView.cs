@@ -41,8 +41,11 @@ internal sealed partial class ConnectorWindow
         pages.TabPages.AddRange([capturePage, logsPage]);
         pages.DrawItem += DrawTab;
         var pageHost = new Panel { Dock = DockStyle.Fill };
+        var tabStripBackground = new Panel { TabStop = false };
         pageHost.Controls.Add(pages);
+        pageHost.Controls.Add(tabStripBackground);
         pageHost.Controls.Add(update);
+        tabStripBackground.BringToFront();
         update.BringToFront();
         AddTrackerPage();
         Controls.Add(pageHost);
@@ -57,6 +60,9 @@ internal sealed partial class ConnectorWindow
             var padding = LogicalToDeviceUnits(8);
             var width = TextRenderer.MeasureText(update.Text, update.Font).Width + padding * 2;
             update.Bounds = new Rectangle(pageHost.ClientSize.Width - padding - width, tab.Top, width, tab.Height);
+            var lastTab = pages.GetTabRect(pages.TabCount - 1);
+            tabStripBackground.Bounds = new Rectangle(lastTab.Right, 0,
+                Math.Max(0, pageHost.ClientSize.Width - lastTab.Right), Math.Max(0, pages.DisplayRectangle.Top - 2));
         }
         pages.HandleCreated += (_, _) => PositionUpdateButton();
         pageHost.SizeChanged += (_, _) => PositionUpdateButton();
