@@ -57,7 +57,7 @@ public static class WeaponRecognition
         {
             var name = Key(line) switch
             {
-                "08gs" => ".50 GS",
+                "08gs" or "58gs" => ".50 GS",
                 "patrietxmr" or "patrietkmr" => "Patriot XMR",
                 "skgfergiean" => "KG-7 Vulcan",
                 "mare" => "Mar-9",

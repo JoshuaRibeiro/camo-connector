@@ -6,6 +6,10 @@ Add-Type -Path @((Join-Path $detector 'WeaponRecognition.cs'), (Join-Path $detec
 $reader = [CamoConnector.Detector.WeaponRecognition]
 $stability = [CamoConnector.Detector.WeaponConfirmation]::new()
 $weapon = $reader::Read(@('SANG 9mm AKIMB0'), $true)
+if ($reader::ReadHud(@('.58 GS'), $false).Name -ne '.50 GS' -or
+    $reader::ReadHud(@('021 .58 GS'), $false) -or $reader::ReadHud(@('.58 GS'), $true)) {
+    throw 'The .50 GS HUD fallback accepted an ambiguous read or missed the short label.'
+}
 if ($weapon.Name -ne 'Sang 9mm' -or !$weapon.Akimbo) { throw 'Akimbo OCR failed' }
 if ($reader::Read(@('Signal 50'), $true)) { throw 'Wide HUD accepted an ordinary name' }
 if ($reader::Read(@('Signal 50'), $false).Name -ne 'Signal 50') { throw 'Narrow HUD failed' }
