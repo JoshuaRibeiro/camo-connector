@@ -879,11 +879,11 @@
           return (!activeWeapon || key === activeWeapon) && focusedWeapon(key);
         };
         const activeRows = trackedRows?.filter(row => canSync(row.weapon));
-        // Apply updates on the current card before switching to a pending unlock's weapon.
+        // A stored unlock must not take focus away from the current weapon.
         const militaryUpdates = [['Sang 9mm', military], ...(catalogMilitary || [])];
-        militaryUpdates.sort(([a], [b]) => Number(focusedWeapon(weaponKey(b))) - Number(focusedWeapon(weaponKey(a))));
         for (const [name, tiers] of militaryUpdates) {
-          if (await syncMilitary(session, tiers, name)) return;
+          const key = weaponKey(name);
+          if ((focusedWeapon(key) || key === activeWeapon) && await syncMilitary(session, tiers, name)) return;
         }
         if (await syncTrackedRows(session, activeRows, true)) return;
         const target = findTarget();
