@@ -349,7 +349,8 @@
     {
       "slot": 2,
       "artworkRGB12": "aGhLVFpDS003bGpNR0s4LDIlNz0tOkEvOkAvMzoqQEQyRks2iH1WfnZRbWdIa2tQT1I9HiYcKC8iMjcoO0AvZmFEc25NXGFKb2pLhHlTdXJSaGZJXVo+HSUcHSUcSlE+Qkg3bmhHgnhTbm1QKzEkTlI9XGNMYWRKYVw9NjwsOD4vWF9JP0UzR0k1YF1Ah3tUREs4WmJLXGRMfXpaZWNFSk87Rkw4RUs3KC8hRUUua2VFiHxVXWRNXGNMfX5gcXNWO0EvOT8tOD8tMDcoMjgpVFI4cGhGh3tUW2BJfH1ej41qZmdNQ0g0TFA6YmRJdnZYdnVWbWhHZmBASEcxKS8jOT0ubGpKfnpYiohmjoxplpJtj4xmUU4yS0owNzsqIysfP0MxSkw4W1o+XFk5amhJi4lmjIdiW1g6S0gtSUguOkAuPkMwMzoqQkczR0s2WFY5SkoxUVM9TEszYVw9aWNCZ2ZIUVdBQEYzZmFDbWlKWF5HVVpDJSwfGSEWJSsdS0s1in9YiH1WfnZSZmJEeHBNhntUbWxPcG1PSE47GiIXMzgoUFM9V1hBc21Mh3tUeXRS",
-      "name": "Brushstroke"
+      "name": "Brushstroke",
+      "goal": 10
     },
     {
       "slot": 3,

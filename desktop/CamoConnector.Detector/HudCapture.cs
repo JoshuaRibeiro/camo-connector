@@ -502,16 +502,20 @@ internal sealed class HudCapture : IDisposable
         var progress = CamoMenuRecognition.ReadProgress(weapon, title, Lines(objectives), names);
         if (!names.Contains(title)) return progress;
 
+        var catalogGoal = catalog.GetValueOrDefault(weapon)?.FirstOrDefault(camo => camo.Name == title)?.Goal;
+        progress = CamoMenuRecognition.CheckObjectiveGoal(progress, catalogGoal, objectives);
+
         // Check the isolated counter even when the wider objective OCR returns a plausible value.
         async Task<CamoProgress?> ReadCounter((double X, double Y, double W, double H) area, PixelAdjustment adjustment, string region)
         {
             var (counter, _) = await ReadTextAsync(frame, area, cancel, pageMode: 7,
                 countersOnly: true, adjustment: adjustment, trace: trace, regionName: region);
             return System.Text.RegularExpressions.Regex.IsMatch(counter.Trim(), @"\A[0-9]+\s*/\s*[0-9]+\z")
-                ? CamoMenuRecognition.ReadProgress(weapon, title, [counter], names) : null;
+                ? CamoMenuRecognition.CheckObjectiveGoal(
+                    CamoMenuRecognition.ReadProgress(weapon, title, [counter], names), catalogGoal, objectives)
+                : null;
         }
 
-        var catalogGoal = catalog.GetValueOrDefault(weapon)?.FirstOrDefault(camo => camo.Name == title)?.Goal;
         CamoProgress? Validate(CamoProgress? candidate)
         {
             // A visible Special counter is an in-progress read. Unlocks are verified from the tiles or banner.

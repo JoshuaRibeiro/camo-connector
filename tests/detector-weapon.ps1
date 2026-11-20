@@ -388,3 +388,11 @@ $struckOil = $menuReader::ReadProgress('Rezi 12', 'STRUCK OIL', @(
 if ($struckOil.Camo -ne 'Struck Oil' -or $struckOil.Count -ne 16 -or $struckOil.Goal -ne 20) {
     throw 'Struck Oil should use the 16/20 objective counter.'
 }
+
+$brushstrokeObjective = 'Get 10 Longshot Kills against Players'
+$brushstrokeWide = $menuReader::ReadProgress('Rezi 12', 'Brushstroke', @($brushstrokeObjective, '1/18'), @('Brushstroke'))
+$brushstrokeTight = $menuReader::ReadProgress('Rezi 12', 'Brushstroke', @('1/10'), @('Brushstroke'))
+$brushstrokeWide = $menuReader::CheckObjectiveGoal($brushstrokeWide, 10, $brushstrokeObjective)
+if ($menuReader::ConfirmCounter($brushstrokeWide, $brushstrokeTight, $null).Count -ne 1) {
+    throw 'Brushstroke OCR reads must agree after goal correction.'
+}
