@@ -117,7 +117,7 @@ try
             combat = replay ? null : await capture.DetectCombatAsync(image, stop.Token),
             matchNotice = replay ? null : await capture.DetectMatchNoticeAsync(image, stop.Token),
             longshot = !replay && await capture.DetectLongshotAsync(image, stop.Token),
-            goldWeapon = await capture.DetectCompletionistGoldAsync(image, menuWeapon, stop.Token),
+            completionistCount = await capture.DetectCompletionistCountAsync(image, menuWeapon, stop.Token),
             goldBanner = challenge == "gold-15", challenge,
             specialBanner = banner.Completed && challenge == null ? capture.IdentifySpecialBanner(image, result.Weapon?.Name, banner.Details) : null,
             specialUnlocks = await capture.DetectSpecialUnlocksAsync(image, menuWeapon, stop.Token)
@@ -195,7 +195,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     var goldUnlocked = new HashSet<string>();
     var seenChallenges = new HashSet<string>();
     var seenSpecialBanners = new HashSet<SpecialUnlock>();
-    string? goldCandidate = null, matchPhase = null;
+    string? goldCandidate = null, platinumCandidate = null, matchPhase = null;
     string? confirmedWeapon = null;
     var lastConfirmedWeapon = DateTimeOffset.MinValue;
     var lastChallengeScan = DateTimeOffset.MinValue;
@@ -434,7 +434,9 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 await Task.Delay(75, cancel);
                 continue;
             }
-            var gold = await capture.DetectCompletionistGoldAsync(frame, menuWeapon, cancel);
+            var completionistCount = await capture.DetectCompletionistCountAsync(frame, menuWeapon, cancel);
+            var gold = completionistCount >= 1 ? menuWeapon : null;
+            var platinum = completionistCount >= 2 ? menuWeapon : null;
             var specials = await capture.DetectSpecialUnlocksAsync(frame, menuWeapon, cancel);
             var reads = await ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
             if (gold != null && gold == goldCandidate && goldUnlocked.Add(gold))
@@ -443,6 +445,13 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     kind = "completionist-unlock", source = "live", mode = "mp", weapon = gold, challenge = "Gold", at = now
                 }, cancel);
             goldCandidate = gold;
+            if (platinum != null && platinum == platinumCandidate && seenChallenges.Add(platinum + "|platinum"))
+                await AppendAsync(log, new
+                {
+                    kind = "completionist-unlock", source = "live", mode = "mp", weapon = platinum,
+                    challenge = "Platinum", context = "camo-menu", at = now
+                }, cancel);
+            platinumCandidate = platinum;
             foreach (var special in specialConfirmation.Observe(specials))
                 await AppendAsync(log, new
                 {

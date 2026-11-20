@@ -182,6 +182,16 @@ if ($rows.Length -ne 2 -or $rows[0].Weapon -ne 'Signal 50' -or $rows[0].Camo -ne
     $rows[0].Count -ne 29 -or $rows[0].Goal -ne 75 -or $rows[1].Weapon -ne 'Pila') {
     throw 'The lobby failed to associate Signal 50 Platinum with its own 29/75 counter.'
 }
+$firstCard = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('SIGNAL 50', 0)
+    [CamoConnector.Detector.HudLine]::new('Get 75 Player Kills while Prone', .12)
+)
+$firstCounter = [CamoConnector.Detector.HudLine[]]@([CamoConnector.Detector.HudLine]::new('51 / 75', .22))
+$rows = $tracked::ReadRows($firstCard, $catalog, [Func[double,byte[]]]{ param($y) return $null }, $firstCounter)
+if ($rows.Length -ne 1 -or $rows[0].Weapon -ne 'Signal 50' -or
+    $rows[0].Camo -ne 'Platinum' -or $rows[0].Count -ne 51) {
+    throw 'The isolated first lobby card failed to recover Signal 50 Platinum at 51/75.'
+}
 $trackedLines = [CamoConnector.Detector.HudLine[]]@(
     [CamoConnector.Detector.HudLine]::new('Signal 50', .02)
     [CamoConnector.Detector.HudLine]::new('32 / 40', .22)
@@ -261,7 +271,9 @@ if ($combat::ReadLobby('SEARCHING FOR A MATCH 1-21MS PING') -ne 'match-ended' -o
     throw 'Matchmaking lobby must reset combat counters without mistaking the in-match pause screen for a lobby.'
 }
 if (!$combat::IsLongshot('L0NG-SHOT') -or $combat::IsLongshot('Longshotting') -or
-    !$combat::HasCompletionistGold('COMPLETIONIST [1/4]') -or $combat::HasCompletionistGold('COMPLETIONIST [0/4]')) {
+    !($combat::ReadCompletionistCount('COMPLETIONIST [1/4]') -eq 1 -and
+        $combat::ReadCompletionistCount('COMPLETIONIST [2/4]') -eq 2 -and
+        $combat::ReadCompletionistCount('COMPLETIONIST [0/4]') -eq 0)) {
     throw 'Medal or completionist parsing failed.'
 }
 'Passed combat banner deduplication, streak resets, match end, longshots and completionist menu parsing.'

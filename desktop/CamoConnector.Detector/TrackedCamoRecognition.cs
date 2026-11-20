@@ -100,7 +100,7 @@ public static class TrackedCamoRecognition
             !primary.Any(confirmed => confirmed.Weapon == candidate.Weapon && confirmed.Camo == candidate.Camo)))
             .ToArray();
 
-    private static string? ReadWeapon(string label)
+    internal static string? ReadWeapon(string label)
     {
         label = Regex.Replace(label, @"\s*\bLAST\s+USED\b.*$", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         var key = Key(label);

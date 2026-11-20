@@ -35,8 +35,11 @@ public static class CombatRecognition
         return null;
     }
 
-    public static bool HasCompletionistGold(string text) =>
-        Regex.IsMatch(text, @"\bCOMPLETIONIST\s*\[?\s*[1-4]\s*/\s*4\b", IgnoreCase);
+    public static int ReadCompletionistCount(string text)
+    {
+        var counter = Regex.Match(text, @"\bCOMPLETIONIST\s*[\[|(]?\s*([0-4])\s*/\s*4\b", IgnoreCase);
+        return counter.Success ? counter.Groups[1].Value[0] - '0' : 0;
+    }
 
     // Interior of the Platinum swatch from a verified in-game completion banner.
     private static readonly byte[] PlatinumArtwork = Convert.FromBase64String(

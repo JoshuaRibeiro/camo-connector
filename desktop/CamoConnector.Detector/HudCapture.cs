@@ -335,11 +335,14 @@ internal sealed class HudCapture : IDisposable
         return CombatRecognition.ReadLobby(matchmaking.Text);
     }
 
-    public async Task<string?> DetectCompletionistGoldAsync(Bitmap frame, string? weapon, CancellationToken cancel)
+    public async Task<int> DetectCompletionistCountAsync(Bitmap frame, string? weapon, CancellationToken cancel)
     {
-        if (weapon == null) return null;
+        if (weapon == null) return 0;
         var completion = string.Join(" ", await ReadAsync(frame, (.070, .550, .110, .040), cancel));
-        return CombatRecognition.HasCompletionistGold(completion) ? weapon : null;
+        var count = CombatRecognition.ReadCompletionistCount(completion);
+        // Platinum is the second tile. A visible or ambiguous lock vetoes the counter.
+        if (count >= 2 && PadlockScore(frame, .1313, .595) >= .55) return 1;
+        return count;
     }
 
     public async Task<SpecialUnlock[]> DetectSpecialUnlocksAsync(Bitmap frame, string? weapon, CancellationToken cancel)
@@ -572,7 +575,7 @@ internal sealed class HudCapture : IDisposable
             : new[]
             {
                 (Heading: (.654, .383, .095, .035), Area: (.714, .432, .135, .278), Thumbnail: (.670, .039, .069, .004)),
-                (Heading: (.740, .117, .110, .037), Area: (.792, .159, .172, .335), Thumbnail: (.760, .039, .069, .004)),
+                (Heading: (.740, .117, .110, .037), Area: (.792, .159, .146, .335), Thumbnail: (.760, .039, .069, .004)),
                 (Heading: (.067, .114, .110, .038), Area: (.121, .156, .141, .335), Thumbnail: (.084, .039, .069, .004))
             };
         for (var i = 0; i < layouts.Length; i++)
@@ -594,6 +597,28 @@ internal sealed class HudCapture : IDisposable
                 .ToArray();
             var fallback = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail, counters);
             var merged = TrackedCamoRecognition.MergeRows(rows, fallback);
+            if (layouts.Length == 3 && i >= 1)
+            {
+                var firstWeapon = lines.Where(line => line.Y < .10)
+                    .Select(line => TrackedCamoRecognition.ReadWeapon(line.Text)).FirstOrDefault(name => name != null);
+                if (firstWeapon == null || !merged.Any(row => row.Weapon == firstWeapon))
+                {
+                    // Read the first lobby card in three crops so the badge and XP cannot be merged into its text.
+                    var (weapon, _) = await ReadTextAsync(frame, (x, .162, .077, .027), cancel, pageMode: 7,
+                        trace: trace, regionName: "trackedFirstWeapon");
+                    if (TrackedCamoRecognition.ReadWeapon(weapon) is { } recovered &&
+                        !merged.Any(row => row.Weapon == recovered))
+                    {
+                        var (objective, _) = await ReadTextAsync(frame, (x, .188, w, .030), cancel, pageMode: 7,
+                            trace: trace, regionName: "trackedFirstObjective");
+                        var (counter, _) = await ReadTextAsync(frame, (x + w * .56, .220, w * .44, .031), cancel,
+                            pageMode: 7, countersOnly: true, trace: trace, regionName: "trackedFirstCounter");
+                        var first = TrackedCamoRecognition.ReadRows(
+                            [new(recovered, 0), new(objective, .12)], catalog, static _ => null, [new(counter, .22)]);
+                        merged = TrackedCamoRecognition.MergeRows(merged, first);
+                    }
+                }
+            }
             if (merged.Length > 0) return merged;
         }
         return [];
