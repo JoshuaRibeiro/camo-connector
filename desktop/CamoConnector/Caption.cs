@@ -15,7 +15,44 @@ internal sealed partial class ConnectorWindow
         }
     }
 
-    private sealed class CaptionControl : Button { }
+    private enum CaptionAction { Minimize, Maximize, Restore, Close }
+
+    private sealed class CaptionControl : Button
+    {
+        internal CaptionAction Kind;
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            var size = LogicalToDeviceUnits(10);
+            var x = (ClientSize.Width - size) / 2;
+            var y = (ClientSize.Height - size) / 2;
+            using var pen = new Pen(ForeColor, LogicalToDeviceUnits(1));
+            switch (Kind)
+            {
+                case CaptionAction.Minimize:
+                    e.Graphics.DrawLine(pen, x, y + size, x + size, y + size);
+                    break;
+                case CaptionAction.Maximize:
+                    e.Graphics.DrawRectangle(pen, x, y, size, size);
+                    break;
+                case CaptionAction.Restore:
+                    var offset = LogicalToDeviceUnits(3);
+                    e.Graphics.DrawRectangle(pen, x, y + offset, size - offset, size - offset);
+                    e.Graphics.DrawLines(pen,
+                    [
+                        new Point(x + offset, y + offset), new Point(x + offset, y),
+                        new Point(x + size, y), new Point(x + size, y + size - offset),
+                        new Point(x + size - offset, y + size - offset)
+                    ]);
+                    break;
+                case CaptionAction.Close:
+                    e.Graphics.DrawLine(pen, x, y, x + size, y + size);
+                    e.Graphics.DrawLine(pen, x + size, y, x, y + size);
+                    break;
+            }
+        }
+    }
 
     private void AddCaption()
     {
@@ -49,28 +86,28 @@ internal sealed partial class ConnectorWindow
         title.MouseDown += Drag;
         icon.MouseDown += Drag;
 
-        var captionFont = ShellFont("Segoe MDL2 Assets", 10);
-        Button CaptionButton(string symbol, string name, Action action)
+        CaptionControl CaptionButton(CaptionAction kind, string name, Action action)
         {
             var button = new CaptionControl
             {
-                Dock = DockStyle.Right, Width = LogicalToDeviceUnits(46), Text = symbol, Font = captionFont, AccessibleName = name
+                Dock = DockStyle.Right, Width = LogicalToDeviceUnits(46), AccessibleName = name, Kind = kind
             };
             button.Click += (_, _) => action();
             return button;
         }
-        var maximize = CaptionButton("Ôûí", "Maximize", ToggleMaximized);
+        var maximize = CaptionButton(CaptionAction.Maximize, "Maximize", ToggleMaximized);
         Resize += (_, _) =>
         {
             var maximized = WindowState == FormWindowState.Maximized;
-            maximize.Text = maximized ? "ÔØÉ" : "Ôûí";
+            maximize.Kind = maximized ? CaptionAction.Restore : CaptionAction.Maximize;
             maximize.AccessibleName = maximized ? "Restore" : "Maximize";
+            maximize.Invalidate();
         };
         caption.Controls.Add(title);
         caption.Controls.Add(icon);
-        caption.Controls.Add(CaptionButton("ÔêÆ", "Minimize", () => WindowState = FormWindowState.Minimized));
+        caption.Controls.Add(CaptionButton(CaptionAction.Minimize, "Minimize", () => WindowState = FormWindowState.Minimized));
         caption.Controls.Add(maximize);
-        caption.Controls.Add(CaptionButton("├ù", "Close", Close));
+        caption.Controls.Add(CaptionButton(CaptionAction.Close, "Close", Close));
         Controls.Add(caption);
     }
 
