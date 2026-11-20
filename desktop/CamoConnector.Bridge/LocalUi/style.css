@@ -41,11 +41,11 @@ nav button[aria-current="true"] { border-color: #52734a; color: var(--accent); b
 .controls button[aria-pressed="true"] { color: var(--accent); border-color: #52734a; }
 dialog { max-width: min(33rem, 90vw); color: inherit; background: #172226; border: 1px solid #405156; border-radius: .5rem; }
 dialog form { display: grid; gap: .7rem; }
-.overlay { background: transparent; padding: 10px; }
-#overlay-card { background: #10191aee; padding: 14px 18px; max-width: 440px; border-radius: 10px; border-left: 4px solid var(--accent); }
-.overlay h1 { font-size: clamp(18px, 5vw, 25px); }
-.overlay h2 { font-size: 16px; color: var(--accent); margin-top: 3px; }
-.overlay p { margin: 5px 0 8px; color: #d8e4e6; }
+.overlay { background: transparent; padding: 12px; font-size: clamp(16px, 3.2vw, 22px); }
+#overlay-card { background: #10191aee; padding: .75em 1em; max-width: var(--overlay-width, 640px); border-radius: 10px; border-left: 4px solid var(--accent); }
+.overlay h1 { font-size: 1.45em; }
+.overlay h2 { font-size: 1.05em; color: var(--accent); margin-top: .15em; }
+.overlay p { margin: .25em 0 .45em; color: #d8e4e6; }
 #meter { display: flex; align-items: center; gap: .8rem; font-variant-numeric: tabular-nums; }
 #meter[hidden] { display: none; }
 progress { flex: 1; height: .72rem; accent-color: var(--accent); }
