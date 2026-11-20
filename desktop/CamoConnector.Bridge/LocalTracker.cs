@@ -87,6 +87,25 @@ internal sealed class LocalTracker
             var level = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-level")?.Count;
             var knownLevel = Math.Max(level ?? 0, ConfirmedMilitaryTotal(true));
             var unlocks = ConfirmedMilitaryTotal(false);
+            bool IsLaunchWeapon(Weapon item) =>
+                item.Id is not ("cronen-osprey" or "csg-35" or "jak-12" or "zlr-talonhawk");
+
+            (int Count, int Goal)? CompletionGate(Rule camo)
+            {
+                var required = Regex.Match(camo.Unlock ?? "", @"^Complete (\d+) ");
+                if (!required.Success) return null;
+                var goal = int.Parse(required.Groups[1].Value);
+                var count = camo.Id switch
+                {
+                    "platinum" => catalog.Weapons.Count(item => IsLaunchWeapon(item) &&
+                        item.Category == weapon.Category && HasCamo(item, "gold")),
+                    "harmonic-break" => catalog.Weapons.Count(item => IsLaunchWeapon(item) && HasCamo(item, "platinum")),
+                    "divergence" => catalog.Weapons.Count(item => IsLaunchWeapon(item) && HasCamo(item, "harmonic-break")),
+                    _ => -1
+                };
+                return count < 0 ? null : (Math.Min(count, goal), goal);
+            }
+
             bool Available(Rule camo)
             {
                 // Progress on the objective confirms that the game already opened the challenge.
@@ -97,16 +116,12 @@ internal sealed class LocalTracker
                 if (camo.Id == "gold")
                     return weapon.Camos.Where(item => item.Type is "Military" or "Special").All(item => Done(weapon, item));
 
-                var required = Regex.Match(camo.Unlock ?? "", @"^Complete (\d+) ");
-                var goal = required.Success ? int.Parse(required.Groups[1].Value) : 1;
+                if (CompletionGate(camo) is not { } gate || gate.Count < gate.Goal) return false;
                 return camo.Id switch
                 {
-                    "platinum" => HasCamo(weapon, "gold") && catalog.Weapons.Count(item =>
-                        item.Category == weapon.Category && HasCamo(item, "gold")) >= goal,
-                    "harmonic-break" => HasCamo(weapon, "platinum") &&
-                        catalog.Weapons.Count(item => HasCamo(item, "platinum")) >= goal,
-                    "divergence" => HasCamo(weapon, "harmonic-break") &&
-                        catalog.Weapons.Count(item => HasCamo(item, "harmonic-break")) >= goal,
+                    "platinum" => HasCamo(weapon, "gold"),
+                    "harmonic-break" => HasCamo(weapon, "platinum"),
+                    "divergence" => HasCamo(weapon, "harmonic-break"),
                     _ => false
                 };
             }
@@ -127,9 +142,10 @@ internal sealed class LocalTracker
                     };
                 }).ToArray();
             var next = rows.Length == 0 ? remaining.FirstOrDefault() : null;
+            var prerequisite = next == null ? null : CompletionGate(next);
             return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
                 minimumLevel = knownLevel, rows,
-                waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock },
+                waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock, count = prerequisite?.Count, goal = prerequisite?.Goal },
                 complete = remaining.Length == 0 };
         }
     }

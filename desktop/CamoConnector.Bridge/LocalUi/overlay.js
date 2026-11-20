@@ -16,8 +16,6 @@ function render(data) {
   const available = data.rows ?? [];
   const visible = available.length || !data.waiting ? available : [{
     ...data.waiting, objective: data.waiting.unlock
-      ? 'Waiting to unlock: ' + data.waiting.unlock
-      : 'Waiting to unlock'
   }];
   const rows = visible.map(row => {
     const section = document.createElement('section');
@@ -45,7 +43,7 @@ function render(data) {
       progress.value = row.count;
       progress.setAttribute('aria-label', row.name);
       const count = document.createElement('span');
-      count.textContent = row.count + ' / ' + row.goal;
+      count.textContent = row.count + '/' + row.goal;
       meter.append(progress, count);
       copy.append(meter);
     }

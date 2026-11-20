@@ -172,6 +172,7 @@ internal sealed partial class ConnectorWindow
         content.Controls.Add(captureBanner);
         Controls.Add(content);
         Controls.Add(rail);
+        AddCaption();
 
         var help = PageBody(helpPage, "How it works", "Camo Connector reads your game capture and saves progress on this PC.");
         AddSetupRow(help, SetupSection("PC capture", new Label { AutoSize = true, Text = "Select the monitor showing Call of Duty in Auto tracking." }));
@@ -200,7 +201,7 @@ internal sealed partial class ConnectorWindow
 
     private void ShapeButtons(Control parent)
     {
-        if (parent is Button button && button != versionBadge && button != navigationToggle && !railButtons.ContainsValue(button))
+        if (parent is Button button && button is not CaptionControl && button != versionBadge && button != navigationToggle && !railButtons.ContainsValue(button))
         {
             if (button.AutoSize && button != versionBadge)
             {

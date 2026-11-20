@@ -182,8 +182,17 @@ try {
     }
     $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
     if ($tracker.overview.waiting.id -ne 'platinum' -or $overlay.waiting.id -ne 'platinum' -or
-        $overlay.waiting.name -ne 'Platinum' -or !$overlay.waiting.unlock -or $overlay.rows.Count -ne 0) {
+        $overlay.waiting.name -ne 'Platinum' -or !$overlay.waiting.unlock -or $overlay.rows.Count -ne 0 -or
+        $overlay.waiting.count -ne 1 -or $overlay.waiting.goal -ne 4) {
         throw 'Tracker and overlay must report the same locked Platinum objective.'
+    }
+    foreach ($weapon in 'csg-35', 'cronen-osprey', 'mojave-357') {
+        $body = @{ weapon = $weapon; camo = 'platinum'; count = 0; done = $true } | ConvertTo-Json
+        $tracker = Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $body
+    }
+    $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+    if ($overlay.waiting.id -ne 'harmonic-break' -or $overlay.waiting.count -ne 1 -or $overlay.waiting.goal -ne 33) {
+        throw 'Harmonic Break must count launch-weapon Platinum challenges only.'
     }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {

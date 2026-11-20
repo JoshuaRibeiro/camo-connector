@@ -81,7 +81,17 @@ function renderOverview() {
     const copy = element('div');
     copy.append(element('div', waiting.name, 'camo-name'));
     copy.append(element('p', waiting.unlock ?? 'Complete the prerequisite camos to unlock this challenge.', 'prerequisite'));
-    next.append(copy, element('span', 'Waiting to unlock', 'subtitle'));
+    if (waiting.count != null && waiting.goal != null)
+      copy.append(element('p', waiting.count + '/' + waiting.goal, 'subtitle'));
+    const description = element('div', null, 'camo-description');
+    if (waiting.artwork) {
+      const image = element('img', null, 'camo-artwork');
+      image.src = waiting.artwork;
+      image.alt = '';
+      description.append(image);
+    }
+    description.append(copy);
+    next.append(description);
     entries.push(next);
   } else if (!overview.rows.length) entries.push(element('p', overview.complete
     ? 'All weapon camos complete' : 'No camo challenges available', 'overview-empty'));

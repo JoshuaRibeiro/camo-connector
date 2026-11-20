@@ -1,7 +1,6 @@
 using CamoConnector.Capture;
 using System.Diagnostics;
 using System.Text.Json;
-using System.Threading.Channels;
 using CamoConnector.Detector;
 
 Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
@@ -128,48 +127,28 @@ try
     var window = args[0] == "--window" ? GameWindows.Parse(args[1]) : null;
     var screen = external == null && window == null ? FindMonitor(args[1]) : null;
     using var previewStop = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
-    var acceptedFrames = publishPreview && external == null
-        ? Channel.CreateBounded<Bitmap>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest },
-            dropped => dropped.Dispose())
-        : null;
     var previewTask = publishPreview ? Task.Run(async () =>
     {
         try
         {
             await CapturePreview.RunAsync(token => window != null ? CaptureWindowAsync(window, token) : external == null
                 ? Task.FromResult(HudCapture.Desktop(screen!)) : external.NextAsync(token, forPreview: true),
-                previewStop.Token, filterIsolatedFrames: external == null,
-                onAccepted: acceptedFrames == null ? null : frame =>
-                {
-                    var copy = (Bitmap)frame.Clone();
-                    if (!acceptedFrames.Writer.TryWrite(copy)) copy.Dispose();
-                });
+                previewStop.Token, filterIsolatedFrames: false);
         }
-        catch (Exception error)
+        catch (IOException error) when (!previewStop.IsCancellationRequested)
         {
-            acceptedFrames?.Writer.TryComplete(error);
-            throw;
+            Console.Error.WriteLine("Preview stopped: " + error.Message);
         }
-        finally { acceptedFrames?.Writer.TryComplete(); }
     }) : null;
     try
     {
-        await DetectLiveAsync(args[2], capture, external, screen, window, acceptedFrames?.Reader, stop.Token);
+        await DetectLiveAsync(args[2], capture, external, screen, window, stop.Token);
     }
     finally
     {
         previewStop.Cancel();
-        try
-        {
-            if (previewTask != null) await previewTask;
-        }
+        try { if (previewTask != null) await previewTask; }
         catch (OperationCanceledException) when (previewStop.IsCancellationRequested) { }
-        catch (IOException error) { Console.Error.WriteLine("Preview stopped: " + error.Message); }
-        finally
-        {
-            if (acceptedFrames != null)
-                while (acceptedFrames.Reader.TryRead(out var frame)) frame.Dispose();
-        }
     }
     return 0;
 }
@@ -182,7 +161,7 @@ catch (Exception error)
 }
 
 static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, ExternalCapture? external, Screen? screen, GameWindows.Window? window,
-    ChannelReader<Bitmap>? acceptedFrames, CancellationToken cancel)
+    CancellationToken cancel)
 {
     Console.Error.WriteLine("OCR engine: " + capture.OcrMode + ".");
     var data = Directory.CreateDirectory(Path.GetFullPath(dataDirectory)).FullName;
@@ -220,8 +199,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     var firstFrame = true;
     while (!cancel.IsCancellationRequested)
     {
-        using var captured = acceptedFrames != null ? await acceptedFrames.ReadAsync(cancel) :
-            window != null ? await CaptureWindowAsync(window, cancel) :
+        using var captured = window != null ? await CaptureWindowAsync(window, cancel) :
             external == null ? HudCapture.Desktop(screen!) : await external.NextAsync(cancel);
         if (window != null && GameWindows.VisibleClient(window) == null) continue;
         using var viewport = HudCapture.CropPaddedViewport(captured);

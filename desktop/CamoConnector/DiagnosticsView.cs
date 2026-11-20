@@ -157,7 +157,15 @@ internal sealed partial class ConnectorWindow
         control.ForeColor = ink;
         if (control is TextBoxBase or ComboBox)
             control.BackColor = dark ? Color.FromArgb(22, 24, 27) : SystemColors.Window;
-        if (control is Button button)
+        if (control is CaptionControl caption)
+        {
+            caption.FlatStyle = FlatStyle.Flat;
+            caption.FlatAppearance.BorderSize = 0;
+            caption.BackColor = surface;
+            caption.ForeColor = dark ? ShellAccent : ink;
+            caption.FlatAppearance.MouseOverBackColor = dark ? ShellButton : SystemColors.ControlLight;
+        }
+        else if (control is Button button)
         {
             button.FlatStyle = dark ? FlatStyle.Flat : FlatStyle.Standard;
             button.UseVisualStyleBackColor = !dark;
