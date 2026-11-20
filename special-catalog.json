@@ -343,7 +343,8 @@
     {
       "slot": 1,
       "artworkRGB12": "TkEtLyoiIB8cHx4cHx4cY1A0U0YvqIlSiXBFiG5EfmVAVEQvHR0aHBsZHBsaHh0aHx4bLykgNzAjSj4rnoBMgmlBa1Q3V0YvHhwZGxsZMCshLikgJCEbHBsYGRkYOzMlfmU+bFY3e2M9YEwyHBsYGRgWa1c2gmlASDwoHhwZKiYeTD8qdl45XEkvZVAzb1g2GRgWFxYUTT8plHhHW0gtQTUkTD8pOTAhblg2LicdSTonVkMsMiseU0UrgWg9eGA5UkApUD8oKyQaFhUTLiccJSAYTDwmUD8ohmw/hGs/U0UrQzUiVUMqRzgkVEMqPDIhPDEhQDMhPDAgSDklFhQSExIQW0stRzkjeGA4RTYiX0stoYFKSDolQzUhQzQhRjYiGhgTEA8PExIQQjcjhWs+RjciaVMxc1w3TT0mSjokPC8eMykbWUktIBwWGxgUbFc0im5AYE0vSDolFxUSQTYjZlIxV0UrGRYTHxwWlnpGj3JCYE0vhmw/ZFAwHRoWFhUTNi4fVEMpSTolJyEZGBcVfmc+ZFIzIBwYHhsXKyUcGRcVPTMjlXlHYk4wGxoWGRgW",
-      "name": "Struck Oil"
+      "name": "Struck Oil",
+      "goal": 20
     },
     {
       "slot": 2,

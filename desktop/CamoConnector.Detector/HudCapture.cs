@@ -471,11 +471,11 @@ internal sealed class HudCapture : IDisposable
         var (titleText, _) = await ReadTextAsync(frame, (.344, .628, .310, .041), cancel, pageMode: 7,
             trace: trace, regionName: "camoTitle");
         var title = CamoMenuRecognition.ReadKnownCamoTitle(titleText, names);
-        if (title == null && weapon == "Mojave .357")
+        if (title == null && names.Length > 0)
         {
-            // Keep Garland's heading clear of the lock icon and the description.
-            var (specialTitle, _) = await ReadTextAsync(frame, (.344, .615, .152, .056), cancel, pageMode: 7,
-                adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "mojaveCamoTitle");
+            // Leave room for the top of the lettering while excluding the lock icon.
+            var (specialTitle, _) = await ReadTextAsync(frame, (.343, .613, .255, .060), cancel, pageMode: 7,
+                adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "tightCamoTitleContrast");
             title = CamoMenuRecognition.ReadKnownCamoTitle(specialTitle, names);
         }
         // Some layouts place the selected camo details above the lower menu region.

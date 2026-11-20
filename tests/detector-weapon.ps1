@@ -381,3 +381,10 @@ $catalog = Get-Content "$PSScriptRoot/../special-catalog.json" -Raw | ConvertFro
 if (($catalog.'Mojave .357' | Where-Object name -eq 'Garland').goal -ne 30) {
     throw 'Garland should have a 30-kill catalog goal.'
 }
+
+$struckOil = $menuReader::ReadProgress('Rezi 12', 'STRUCK OIL', @(
+    'Earn 21 more weapon unlocks', 'Get 20 Point Blank Kills against Players', '16/20'
+), @('Struck Oil', 'Brushstroke'))
+if ($struckOil.Camo -ne 'Struck Oil' -or $struckOil.Count -ne 16 -or $struckOil.Goal -ne 20) {
+    throw 'Struck Oil should use the 16/20 objective counter.'
+}
