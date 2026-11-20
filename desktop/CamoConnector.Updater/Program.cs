@@ -14,38 +14,19 @@ internal static class Program
         if (!Version.TryParse(args[2], out var expected) && !recovery) return;
         var root = Path.GetFullPath(args[0]);
         ApplicationConfiguration.Initialize();
-        using var window = new Form
-        {
-            Text = recovery ? "Recovering Camo Connector" : $"Updating Camo Connector to v{expected}",
-            ClientSize = new Size(440, 115),
-            StartPosition = FormStartPosition.CenterScreen,
-            FormBorderStyle = FormBorderStyle.FixedDialog,
-            MaximizeBox = false,
-            ControlBox = false
-        };
-        var status = new Label { Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft,
-            Padding = new Padding(16), Text = "Waiting for Camo Connector to close…" };
-        var progressArea = new Panel { Dock = DockStyle.Bottom, Height = 40, Padding = new Padding(16, 0, 16, 16) };
-        var bar = new ProgressBar { Dock = DockStyle.Fill, Style = ProgressBarStyle.Marquee, AccessibleName = "Update progress" };
-        progressArea.Controls.Add(bar);
-        window.Controls.Add(status);
-        window.Controls.Add(progressArea);
+        using var window = new UpdateWindow(expected, recovery);
         var finished = false;
         window.FormClosing += (_, e) => e.Cancel = !finished && e.CloseReason == CloseReason.UserClosing;
         window.Shown += async (_, _) =>
         {
-            var progress = new Progress<(string Message, int? Percent)>(step =>
-            {
-                status.Text = step.Message;
-                bar.Style = step.Percent.HasValue ? ProgressBarStyle.Continuous : ProgressBarStyle.Marquee;
-                if (step.Percent is int percent) bar.Value = percent;
-            });
+            IProgress<(string Message, int? Percent)> progress =
+                new Progress<(string Message, int? Percent)>(step => window.Report(step.Message, step.Percent));
             try
             {
-                await Task.Run(() => Run(root, parentId, expected, recovery, ((IProgress<(string, int?)>)progress).Report,
+                await Task.Run(() => Run(root, parentId, expected, recovery, progress.Report,
                     (message, title) => window.Invoke(() =>
                     {
-                        status.Text = title;
+                        window.Report(title, null);
                         MessageBox.Show(window, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
                     })));
             }
