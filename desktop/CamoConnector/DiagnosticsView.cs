@@ -145,6 +145,11 @@ internal sealed partial class ConnectorWindow
             DwmSetWindowAttribute(Handle, 20, ref enabled, sizeof(int));
             var rounded = 2;
             DwmSetWindowAttribute(Handle, 33, ref rounded, sizeof(int));
+            const int dwmBorderColor = 34;
+            const int noBorder = unchecked((int)0xFFFFFFFE);
+            const int systemBorder = unchecked((int)0xFFFFFFFF);
+            var border = useDark ? noBorder : systemBorder;
+            DwmSetWindowAttribute(Handle, dwmBorderColor, ref border, sizeof(int));
         }
         Invalidate(true);
     }
