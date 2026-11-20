@@ -407,7 +407,9 @@ internal sealed class HudCapture : IDisposable
         if (!goldTile && !completed) return (null, false, null);
         var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)
-            ? "gold-15" : SpecialUnlocks.ReadBanner(heading, text);
+            ? "gold-15"
+            : completed && !goldTile && CombatRecognition.IsPronePlatinumBanner(text) ? "platinum-prone-75"
+            : SpecialUnlocks.ReadBanner(heading, text);
         if (Match(detail) is { } match) return (match, true, null);
         var details = new List<string> { detail };
         foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast, PixelAdjustment.Invert })

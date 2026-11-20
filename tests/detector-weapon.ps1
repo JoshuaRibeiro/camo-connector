@@ -271,6 +271,13 @@ $devices = [CamoConnector.Detector.CaptureDevices]::Parse($listing)
 if ($devices.Length -ne 2 -or $devices[0].Input -ne '@device_pnp_elgato' -or
     $devices[1].Input -ne 'OBS Virtual Camera') { throw 'DirectShow capture device enumeration failed.' }
 'Passed DirectShow device listing, stable identifiers and audio filtering.'
+$combat = [CamoConnector.Detector.CombatRecognition]
+if (!$combat::IsPronePlatinumBanner('GET 75 PLAYER KILLS WHILE PRONE') -or
+    !$combat::IsPronePlatinumBanner('GEL-75 PLAYER*KIELS WHILE PRONE') -or
+    $combat::IsPronePlatinumBanner('GET 25 PLAYER KILLS WHILE PRONE') -or
+    $combat::IsPronePlatinumBanner('GET 75 PLAYER KILLS WHILE CROUCHED')) {
+    throw 'Platinum prone objective did not require the recorded wording and goal'
+}
 $specials = [CamoConnector.Detector.SpecialUnlocks]
 $camos = [CamoConnector.Detector.CamoReference[]]@(
     [CamoConnector.Detector.CamoReference]::new('A', $null, 1, 25)

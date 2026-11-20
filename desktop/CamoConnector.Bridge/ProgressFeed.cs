@@ -112,6 +112,10 @@ public sealed class ProgressFeed
                         name = trackerFocus;
                     if (IsWeapon(name)) goldUnlocks.Add(name!);
                     break;
+                case "completionist-unlock" when name == "KG-7 Vulcan" &&
+                    Text(item, "challenge") == "Platinum" && Number(item, "goal") == 75:
+                    SaveRow(name, "Platinum", "camo", 75, 75, null, null, true);
+                    break;
                 case "military-unlock" when IsWeapon(name) && Number(item, "tier") is >= 1 and <= 8:
                     var tiers = military;
                     if (name != "Sang 9mm" && !catalogMilitary.TryGetValue(name!, out tiers!))

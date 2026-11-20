@@ -38,6 +38,13 @@ public static class CombatRecognition
     public static bool HasCompletionistGold(string text) =>
         Regex.IsMatch(text, @"\bCOMPLETIONIST\s*\[?\s*[1-4]\s*/\s*4\b", IgnoreCase);
 
+    public static bool IsPronePlatinumBanner(string detail)
+    {
+        var objective = Regex.Replace(detail.ToUpperInvariant(), "[^A-Z0-9]", "");
+        // The banner font can turn GET into GEL and KILLS into KIELS.
+        return Regex.IsMatch(objective, @"\A(?:GE[TL])?75PLAYERKI[LE][LE]SWHILEPRONE\z");
+    }
+
     public static bool IsGoldBanner(string heading, string detail, bool goldTile)
     {
         string Compact(string text) => Regex.Replace(text.ToUpperInvariant(), "[^A-Z0-9]", "");
