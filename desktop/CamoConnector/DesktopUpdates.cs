@@ -91,6 +91,11 @@ internal sealed partial class ConnectorWindow
         {
             checkingUpdate = false;
             if (!cancel.IsCancellationRequested) update.Enabled = true;
+            if (releaseNoticePending)
+            {
+                releaseNoticePending = false;
+                if (!cancel.IsCancellationRequested) await CheckForUpdateAsync(manual: false);
+            }
         }
     }
 }

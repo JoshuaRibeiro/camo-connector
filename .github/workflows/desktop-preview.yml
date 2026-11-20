@@ -92,6 +92,7 @@ jobs:
         if: github.ref_type == 'tag'
         env:
           CAMO_UPDATE_PUBLIC_KEY: ${{ vars.CAMO_UPDATE_PUBLIC_KEY }}
+          CAMO_UPDATE_NOTIFY_URL: ${{ vars.CAMO_UPDATE_NOTIFY_URL }}
           CAMO_PORTABLE_SIGNING_KEY: ${{ secrets.CAMO_PORTABLE_SIGNING_KEY }}
         run: |
           $version = (Get-Content desktop/version.txt -Raw).Trim()
@@ -180,3 +181,16 @@ jobs:
           "@ | Set-Content release-notes.md
           gh release create $env:GITHUB_REF_NAME @assets --verify-tag --latest --generate-notes --notes-file release-notes.md --title "Camo Connector $env:GITHUB_REF_NAME"
           if ($LASTEXITCODE) { throw 'GitHub Release publishing failed.' }
+      - name: Notify running clients
+        env:
+          CAMO_UPDATE_NOTIFY_URL: ${{ vars.CAMO_UPDATE_NOTIFY_URL }}
+          CAMO_UPDATE_NOTIFY_TOKEN: ${{ secrets.CAMO_UPDATE_NOTIFY_TOKEN }}
+        run: |
+          if (!$env:CAMO_UPDATE_NOTIFY_URL) { return }
+          if (!$env:CAMO_UPDATE_NOTIFY_TOKEN) { throw 'Configure CAMO_UPDATE_NOTIFY_TOKEN before publishing notifications.' }
+          $uri = $env:CAMO_UPDATE_NOTIFY_URL.TrimEnd('/') + '/release'
+          $headers = @{
+            Authorization = "Bearer $env:CAMO_UPDATE_NOTIFY_TOKEN"
+            'X-Camo-Version' = $env:GITHUB_REF_NAME.Substring(1)
+          }
+          Invoke-RestMethod -Uri $uri -Method Post -Headers $headers -TimeoutSec 15 -MaximumRetryCount 2

@@ -80,6 +80,7 @@ internal sealed partial class ConnectorWindow : Form
         Shown += async (_, _) =>
         {
             updateTimer.Start();
+            _ = ListenForReleaseNoticesAsync(closing.Token);
             await CheckForUpdateAsync(manual: false);
         };
         updateTimer.Tick += async (_, _) => await CheckForUpdateAsync(manual: false);

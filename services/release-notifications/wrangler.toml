@@ -1,0 +1,11 @@
+name = "camo-connector-updates"
+main = "worker.mjs"
+compatibility_date = "2026-01-15"
+
+[[durable_objects.bindings]]
+name = "RELEASES"
+class_name = "ReleaseNotifications"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ReleaseNotifications"]

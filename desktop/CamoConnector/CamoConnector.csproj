@@ -23,5 +23,8 @@
       <Reference Remove="@(Reference)" Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
     </ItemGroup>
   </Target>
+  <ItemGroup Condition="'$(CAMO_UPDATE_NOTIFY_URL)' != ''">
+    <AssemblyMetadata Include="CamoUpdateNotifyUrl" Value="$(CAMO_UPDATE_NOTIFY_URL)" />
+  </ItemGroup>
   <Import Project="../UpdateSources.props" />
 </Project>
