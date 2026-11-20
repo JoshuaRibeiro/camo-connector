@@ -284,7 +284,7 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   const tracker = fs.readFileSync(path.join(root, 'tracker.js'), 'utf8').replace(
     /  poll\(\);\s*setInterval\(poll, 500\);/,
     '  multiplayerSelected = () => true; focusedWeapon = () => true; grindingCard = () => globalThis.card;\n' +
-    '  grindingMilitaryControl = (_, tier) => globalThis.military(tier); grindingCompletion = () => null;\n' +
+    '  grindingMilitaryControl = (_, tier) => globalThis.military(tier); grindingCompletion = (weapon, name) => globalThis.special?.(weapon, name) ?? null;\n' +
     '  Object.assign(globalThis, { syncMilitary, syncTrackedRows, syncGold, pastCompletionStage });');
   const data = {};
   let count = 0;
@@ -324,9 +324,19 @@ test('Military clicks only the highest tier and later visible stages acknowledge
   stage = 'Gold';
   await page.syncTrackedRows('session', rows);
   assert.equal(data.trackedProgress, undefined);
+  let specialDone = false;
+  const specialButton = {
+    isConnected: true, getAttribute: () => null,
+    click() { specialDone = true; }
+  };
+  page.special = (weapon, name) => weapon === '50gs' && name === 'Red Tiger'
+    ? { button: specialButton, done: specialDone } : null;
+  await page.syncTrackedRows('session', [{ id: 2, type: 'camo', camo: 'Red Tiger', weapon: '.50 GS', confirmed: true }]);
+  assert.equal(count, 7);
+  assert.equal(specialDone, true);
   await page.syncMilitary('session', [2, 7, 6, 8], '.50 GS');
   await page.syncTrackedRows('session', rows);
-  assert.deepEqual([...data.trackedProgress.handled], [1]);
+  assert.deepEqual([...data.trackedProgress.handled], [2, 1]);
   data['goldProgress-han86'] = { session: 'session', handled: [], pending: true };
   await page.syncGold('session', ['.50 GS']);
   assert.equal(data['goldProgress-50gs'], undefined);

@@ -264,8 +264,6 @@
       completionFocusAttempts.set(weapon, now);
       return focusWeapon(weapon);
     }
-    const canComplete = () => Number.isInteger(goal) && goal > 0 || !militaryIncomplete(weapon);
-    if (!canComplete()) return false;
     const readControl = () => {
       const control = grindingCompletion(weapon, name);
       if (control || !Number.isInteger(goal) || goal < 1) return control;
@@ -289,7 +287,7 @@
       : { ...state, pending: true };
     await extension.storage.local.set({ [key]: interrupted });
     const current = readControl();
-    if (!multiplayerSelected() || !focusedWeapon(weapon) || !canComplete() ||
+    if (!multiplayerSelected() || !focusedWeapon(weapon) ||
         current?.button !== control.button || !control.button.isConnected || control.button.disabled ||
         control.button.getAttribute?.('aria-disabled') === 'true') {
       await extension.storage.local.set({ [key]: state });
