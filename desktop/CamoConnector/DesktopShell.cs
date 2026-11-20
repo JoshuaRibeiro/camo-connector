@@ -92,8 +92,10 @@ internal sealed partial class ConnectorWindow
         var hints = new ToolTip();
         Disposed += (_, _) => { hints.Dispose(); logsPage.Dispose(); };
         hints.SetToolTip(version, "Camo Connector version");
-        using var appBitmap = Icon!.ToBitmap();
-        var trackerIcon = new Bitmap(appBitmap, new Size(LogicalToDeviceUnits(20), LogicalToDeviceUnits(20)));
+        var iconSize = LogicalToDeviceUnits(20);
+        using var navigationIcon = new Icon(Icon!, iconSize, iconSize);
+        using var appBitmap = navigationIcon.ToBitmap();
+        var trackerIcon = new Bitmap(appBitmap, iconSize, iconSize);
         Disposed += (_, _) => trackerIcon.Dispose();
         foreach (var (page, glyph) in entries)
         {
