@@ -485,9 +485,9 @@ internal sealed class HudCapture : IDisposable
         if (!names.Contains(title)) return progress;
 
         // Check the isolated counter even when the wider objective OCR returns a plausible value.
-        async Task<CamoProgress?> ReadCounter(PixelAdjustment adjustment, string region)
+        async Task<CamoProgress?> ReadCounter((double X, double Y, double W, double H) area, PixelAdjustment adjustment, string region)
         {
-            var (counter, _) = await ReadTextAsync(frame, (.512, .795, .060, .045), cancel, pageMode: 7,
+            var (counter, _) = await ReadTextAsync(frame, area, cancel, pageMode: 7,
                 countersOnly: true, adjustment: adjustment, trace: trace, regionName: region);
             return System.Text.RegularExpressions.Regex.IsMatch(counter.Trim(), @"\A[0-9]+\s*/\s*[0-9]+\z")
                 ? CamoMenuRecognition.ReadProgress(weapon, title, [counter], names) : null;
@@ -500,12 +500,18 @@ internal sealed class HudCapture : IDisposable
             if (candidate != null && candidate.Count == candidate.Goal) return null;
             return CamoMenuRecognition.CheckObjectiveGoal(candidate, catalogGoal, objectives);
         }
-        var isolated = await ReadCounter(PixelAdjustment.Normal, "camoCounter");
-        if (progress != null || isolated == null)
-            return Validate(CamoMenuRecognition.ConfirmCounter(progress, isolated, null));
-        // If the wider read contains a rejected fraction, avoid substituting a different row's count.
+        var isolated = await ReadCounter((.512, .795, .060, .045), PixelAdjustment.Normal, "camoCounter");
+        if (CamoMenuRecognition.ConfirmCounter(progress, isolated, null) is { } confirmed)
+            return Validate(confirmed);
+        // A wider counter crop retains digits when the menu is shifted or the counter is longer.
+        var alternate = await ReadCounter((.499, .780, .102, .066), PixelAdjustment.Contrast, "camoCounterContrast");
+        if (progress != null)
+        {
+            if (isolated != null && isolated != progress) return null;
+            return Validate(CamoMenuRecognition.ConfirmCounter(progress, alternate, null));
+        }
+        // If the objective crop contains a rejected fraction, avoid substituting another row's count.
         if (System.Text.RegularExpressions.Regex.IsMatch(objectives, @"\d\s*/\s*\d")) return null;
-        var alternate = await ReadCounter(PixelAdjustment.Contrast, "camoCounterContrast");
         return Validate(CamoMenuRecognition.ConfirmCounter(null, isolated, alternate));
     }
 

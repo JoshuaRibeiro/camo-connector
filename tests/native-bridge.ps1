@@ -137,6 +137,22 @@ try {
             throw "The overlay listed the wrong challenges at weapon level $($expected.Level)."
         }
     }
+    $mojave = @(
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":"Mojave .357"}'
+        '{"kind":"military-unlock","source":"live","mode":"mp","weapon":"Mojave .357","tier":8}'
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"Mojave .357","type":"camo","camo":"Garland","count":3,"goal":30}'
+    )
+    [IO.File]::AppendAllLines($eventLog, [string[]]$mojave)
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+        $garland = $overlay.rows | Where-Object name -eq 'Garland'
+        if ($garland.count -eq 3) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($garland.count -ne 3 -or $garland.goal -ne 30) {
+        throw 'Garland progress must appear even when the Military tiers only confirm 39 unlocks.'
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

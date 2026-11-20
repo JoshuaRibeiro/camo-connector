@@ -89,6 +89,8 @@ internal sealed class LocalTracker
             var unlocks = ConfirmedMilitaryTotal(false);
             bool Available(Rule camo)
             {
+                // Progress on the objective confirms that the game already opened the challenge.
+                if (state.Progress.GetValueOrDefault(weapon.Id + ":" + camo.Id)?.Count > 0) return true;
                 if (camo.Type == "Special")
                     return (camo.UnlockTotal ?? 0) <= (IsLevelRule(camo) ? knownLevel : unlocks);
                 if (camo.Type != "Completionist") return false;
