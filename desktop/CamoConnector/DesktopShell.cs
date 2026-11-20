@@ -152,6 +152,7 @@ internal sealed partial class ConnectorWindow
         };
         toggle.Click += (_, _) => { railExpanded = !railExpanded; UpdateRail(); };
         rail.Controls.Add(menu);
+        rail.Controls.Add(usageLabel);
         rail.Controls.Add(footer);
 
         var captureShortcut = PageButton("Open Auto tracking", capturePage);
@@ -182,6 +183,8 @@ internal sealed partial class ConnectorWindow
         update.AutoSize = true;
         updateStatus.Text = $"Camo Connector v{build}";
         AddSetupRow(settings, SetupSection("App updates", updateStatus, update));
+        BindUsage();
+        AddSetupRow(settings, SetupSection("Performance", showUsage));
         var tray = new Button { Text = "Hide to tray", AutoSize = true };
         tray.Click += (_, _) => HideTrackerToTray();
         AddSetupRow(settings, SetupSection("Desktop",

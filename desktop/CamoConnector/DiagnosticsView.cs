@@ -44,6 +44,7 @@ internal sealed partial class ConnectorWindow
         diagnosticsTimer.Tick += (_, _) =>
         {
             RefreshTheme();
+            RefreshUsage();
             CheckBridge();
             CheckAutomaticTracking();
             RefreshLogs();

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Threading.Channels;
 using CamoConnector.Capture;
 using System.Diagnostics;
 using System.Text.Json;
@@ -166,346 +168,416 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     Console.Error.WriteLine("OCR engine: " + capture.OcrMode + ".");
     var data = Directory.CreateDirectory(Path.GetFullPath(dataDirectory)).FullName;
     var log = Path.Combine(data, "sunburn-events.jsonl");
-    var confirmation = new WeaponConfirmation();
-    var menuConfirmation = new WeaponConfirmation();
-    var seenWeaponLevels = new Dictionary<string, int>();
-    var seenUnlocks = new HashSet<MilitaryUnlock>();
-    MilitaryUnlock? previousMenuMilitary = null;
-    var progressConfirmation = new CamoProgressConfirmation();
-    var combat = new CombatConfirmation();
-    var specialConfirmation = new SpecialUnlockConfirmation();
-    var goldUnlocked = new HashSet<string>();
-    var seenChallenges = new HashSet<string>();
-    var seenSpecialBanners = new HashSet<SpecialUnlock>();
-    string? goldCandidate = null, platinumCandidate = null, matchPhase = null;
-    string? confirmedWeapon = null;
-    var lastConfirmedWeapon = DateTimeOffset.MinValue;
-    var lastChallengeScan = DateTimeOffset.MinValue;
-    var unassignedGoldVisible = false;
-    var match = 0;
-    var lastLobbyScan = DateTimeOffset.MinValue;
-    var lastAkimbo = DateTimeOffset.MinValue;
-    var lastLongshot = DateTimeOffset.MinValue;
-    var longshotCounted = false;
-    var lastProgressScan = DateTimeOffset.MinValue;
-    var lastTiming = Stopwatch.GetTimestamp();
-    var totalScanMs = 0d;
-    var scans = 0;
-    var weaponReads = 0;
-    var menuReads = 0;
-    string? lastMenuWeapon = null;
-    var camoReads = 0;
-    var replayReads = 0;
-    var firstFrame = true;
-    while (!cancel.IsCancellationRequested)
+    using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+    cancel = lifetime.Token;
+    using var logGate = new SemaphoreSlim(1);
+    var gameplayFrames = LatestFrames();
+    var progressFrames = LatestFrames();
+    var unlockFrames = LatestFrames();
+    var seenUnlocks = new ConcurrentDictionary<MilitaryUnlock, byte>();
+    var workers = new[] { CaptureFramesAsync(), ScanGameplayAsync(), ScanPinnedAsync(), ScanUnlocksAsync() };
+    try { await Task.WhenAny(workers); }
+    finally
     {
-        using var captured = window != null ? await CaptureWindowAsync(window, cancel) :
-            external == null ? HudCapture.Desktop(screen!) : await external.NextAsync(cancel);
-        if (window != null && GameWindows.VisibleClient(window) == null) continue;
-        using var viewport = HudCapture.CropPaddedViewport(captured);
-        var paddedMenu = viewport == null ? null :
-            await capture.ReadCamoMenuWeaponAsync(viewport, cancel, requireHeading: true);
-        var frame = paddedMenu != null ? viewport! : captured;
-        if (firstFrame)
+        lifetime.Cancel();
+        try { await Task.WhenAll(workers); }
+        finally
         {
-            Console.Error.WriteLine($"First frame from {screen?.DeviceName ?? "capture device"}: {frame.Width} × {frame.Height}.");
-            firstFrame = false;
+            foreach (var channel in new[] { gameplayFrames, progressFrames, unlockFrames })
+                while (channel.Reader.TryRead(out var frame)) frame.Dispose();
         }
-        var now = DateTimeOffset.UtcNow;
-        var scanStarted = Stopwatch.GetTimestamp();
-        var pollProgress = lastMenuWeapon != null || now - lastProgressScan >= TimeSpan.FromMilliseconds(400) ||
-            (previousMenuMilitary != null && !seenUnlocks.Contains(previousMenuMilitary));
-        var menuWeapon = paddedMenu ?? (pollProgress ? await capture.ReadCamoMenuWeaponAsync(frame, cancel, requireHeading: true) : null);
-        var scanGameplay = menuWeapon == null;
-        var trackedProgress = scanGameplay && pollProgress
-            ? ReadSnapshotAsync(frame, copy => capture.DetectTrackedCamosAsync(copy, cancel))
-            : null;
-        var scanLobby = scanGameplay && now - lastLobbyScan >= TimeSpan.FromSeconds(1);
-        var scanChallenge = scanGameplay && now - lastChallengeScan >= TimeSpan.FromMilliseconds(200);
-        var unlockRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectMilitaryUnlockAsync(copy, cancel)) :
-            Task.FromResult<MilitaryUnlock?>(null);
-        var lobbyRead = scanLobby ? ReadSnapshotAsync(frame, copy => capture.DetectMatchNoticeAsync(copy, cancel)) : null;
-        var challengeRead = scanChallenge ? ReadSnapshotAsync(frame, copy => capture.DetectChallengeBannerAsync(copy, cancel)) : null;
-        var combatRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectCombatAsync(copy, cancel)) :
-            Task.FromResult(new CombatRead(false, false, null));
-        var weaponRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectAsync(copy, cancel)) :
-            Task.FromResult<(WeaponRead? Weapon, bool Replay)>((null, false));
-        await Task.WhenAll(unlockRead, (Task?)lobbyRead ?? Task.CompletedTask,
-            (Task?)challengeRead ?? Task.CompletedTask, combatRead, weaponRead);
-        var result = scanGameplay ? await weaponRead : (Weapon: (WeaponRead?)null, Replay: false);
-        if (result.Weapon != null) weaponReads++;
-        if (result.Replay) replayReads++;
-        if (!result.Replay && lobbyRead != null)
+    }
+
+    static Channel<Bitmap> LatestFrames() => Channel.CreateBounded<Bitmap>(
+        new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest },
+        frame => frame.Dispose());
+
+    async Task CaptureFramesAsync()
+    {
+        var lastPinnedFrame = Stopwatch.GetTimestamp() - Stopwatch.Frequency;
+        while (!cancel.IsCancellationRequested)
         {
-            lastLobbyScan = now;
-            var notice = await lobbyRead;
-            if (notice != null && notice != matchPhase)
+            var frame = window != null ? await CaptureWindowAsync(window, cancel) :
+                external == null ? HudCapture.Desktop(screen!) : await external.NextAsync(cancel);
+            if (window != null && GameWindows.VisibleClient(window) == null)
             {
-                if (notice == "match-voting" || notice == "match-confirmed" && matchPhase != "match-voting")
-                    match++;
-                var previous = new { kills = combat.Kills, deaths = combat.Deaths, bestStreak = combat.Best };
-                if (notice != "match-confirmed" || matchPhase != "match-voting") combat.Reset();
-                confirmation.Reset();
-                confirmedWeapon = null;
-                matchPhase = notice;
-                lastAkimbo = lastLongshot = DateTimeOffset.MinValue;
-                longshotCounted = false;
-                await AppendAsync(log, new
-                {
-                    kind = notice, source = "live", match, at = now,
-                    kills = notice == "match-ended" ? previous.kills : combat.Kills,
-                    deaths = notice == "match-ended" ? previous.deaths : combat.Deaths,
-                    bestStreak = notice == "match-ended" ? previous.bestStreak : combat.Best
-                }, cancel);
-            }
-        }
-        if (confirmation.Observe(result.Weapon, result.Replay, now) is { } weapon)
-        {
-            // Two matching, replay-checked HUD reads also prove gameplay resumed if the lobby transition was missed.
-            if (matchPhase is "match-ended" or "match-voting")
-            {
-                if (matchPhase == "match-ended") match++;
-                matchPhase = "match-started";
-                await AppendAsync(log, new { kind = matchPhase, source = "live", match, at = now }, cancel);
-            }
-            menuConfirmation.Reset();
-            confirmedWeapon = weapon.Name;
-            var record = JsonSerializer.Serialize(new
-            {
-                kind = "weapon", source = "live", mode = "mp", weapon = weapon.Name,
-                akimbo = weapon.Akimbo, at = DateTimeOffset.UtcNow
-            });
-            await File.AppendAllTextAsync(log, record + "\n", cancel);
-        }
-        if (!result.Replay && result.Weapon?.Name == confirmedWeapon && confirmedWeapon != null)
-            lastConfirmedWeapon = now;
-        if (result.Weapon is { Akimbo: true }) lastAkimbo = now;
-        else if (result.Weapon != null) lastAkimbo = DateTimeOffset.MinValue;
-        var combatFrame = await combatRead;
-        // A lobby notice can be missed between scans. A first-kill card outside a replay can start the next match.
-        var resumedAfterLobby = matchPhase is "match-ended" or "match-voting" &&
-            combatFrame.Ordinal == 1 && !result.Replay &&
-            !await capture.IsReplayAsync(frame, cancel);
-        if (!result.Replay && (matchPhase is not ("match-ended" or "match-voting") || resumedAfterLobby))
-        {
-            var read = combatFrame;
-            if (!(read.Kill || read.Death) || result.Weapon != null || !await capture.IsReplayAsync(frame, cancel))
-            {
-                foreach (var entry in combat.Observe(read, now))
-                {
-                    if (matchPhase != "match-started")
-                    {
-                        if (matchPhase is null or "match-ended") match++;
-                        matchPhase = "match-started";
-                        await AppendAsync(log, new { kind = matchPhase, source = "live", match, at = now }, cancel);
-                    }
-                    await AppendAsync(log, new
-                    {
-                        kind = entry.Kind, source = "live", match, at = now, opponent = "unknown",
-                        kills = entry.Kills, deaths = entry.Deaths, killStreak = entry.KillStreak,
-                        bestStreak = entry.BestStreak, endedStreak = entry.EndedStreak
-                    }, cancel);
-                    if (entry.Kind == "death") lastAkimbo = DateTimeOffset.MinValue;
-                    if (entry.Kind == "kill" && !read.Death && (result.Weapon is { Name: "Sang 9mm", Akimbo: true } ||
-                        result.Weapon == null && now - lastAkimbo <= TimeSpan.FromMilliseconds(1500)))
-                        await AppendAsync(log, new
-                        {
-                            kind = "akimbo-kill", source = "live", mode = "mp", weapon = "Sang 9mm",
-                            at = now, detectedAt = DateTimeOffset.UtcNow, writtenAt = DateTimeOffset.UtcNow
-                        }, cancel);
-                }
-            }
-            if (result.Weapon?.Name == "Signal 50" && await capture.DetectLongshotAsync(frame, cancel))
-            {
-                lastLongshot = now;
-                if (!longshotCounted)
-                {
-                    longshotCounted = true;
-                    await AppendAsync(log, new
-                    {
-                        key = "signal-50:sp-3", delta = 1, weapon = "Signal 50", source = "live", mode = "mp", at = now
-                    }, cancel);
-                }
-            }
-            else if (result.Weapon?.Name == "Signal 50" && now - lastLongshot >= TimeSpan.FromMilliseconds(650))
-                longshotCounted = false;
-            var candidate = result.Weapon?.Name ?? (now - lastConfirmedWeapon <= TimeSpan.FromSeconds(5) ? confirmedWeapon : null);
-            if (challengeRead != null)
-            {
-                lastChallengeScan = now;
-                var banner = await challengeRead;
-                if (banner.LevelUp is { } levelUp && levelUp.Level > seenWeaponLevels.GetValueOrDefault(levelUp.Weapon) &&
-                    (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
-                {
-                    seenWeaponLevels[levelUp.Weapon] = levelUp.Level;
-                    await AppendAsync(log, new
-                    {
-                        kind = "weapon-level-up", source = "live", mode = "mp", weapon = levelUp.Weapon,
-                        level = levelUp.Level, at = now
-                    }, cancel);
-                }
-                var challenge = banner.Challenge;
-                if (challenge != "gold-15") unassignedGoldVisible = false;
-                if (banner.Completed && (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
-                {
-                    if (challenge == "gold-15" && (result.Weapon?.Name is { } goldWeapon
-                        ? goldUnlocked.Add(goldWeapon) : !unassignedGoldVisible))
-                        await AppendAsync(log, new
-                        {
-                            kind = "completionist-unlock", source = "live", mode = "mp", weapon = result.Weapon?.Name, challenge = "Gold", at = now
-                        }, cancel);
-                    else if (challenge == "platinum")
-                    {
-                        var platinumWeapon = result.Weapon?.Name ??
-                            (now - lastConfirmedWeapon <= TimeSpan.FromSeconds(1.25) ? confirmedWeapon : null);
-                        if (platinumWeapon != null && seenChallenges.Add(platinumWeapon + "|" + challenge))
-                            await AppendAsync(log, new
-                            {
-                                kind = "completionist-unlock", source = "live", mode = "mp",
-                                weapon = platinumWeapon, challenge = "Platinum", at = now
-                            }, cancel);
-                    }
-                    else if (challenge != null && challenge != "gold-15" && (candidate == "Sang 9mm" || candidate == null && challenge != "menu-space-time") &&
-                        seenChallenges.Add((candidate ?? "") + "|" + challenge))
-                        await AppendAsync(log, new
-                        {
-                            kind = "challenge-completed", source = "live", mode = "mp", weapon = candidate, challenge, at = now
-                        }, cancel);
-                    else if (challenge == null && capture.IdentifySpecialBanner(frame, candidate, banner.Details) is { } special &&
-                        seenSpecialBanners.Add(special))
-                        await AppendAsync(log, new
-                        {
-                            kind = special.Kind, source = "live", mode = "mp", weapon = special.Weapon, challenge = special.Challenge, at = now
-                        }, cancel);
-                    if (challenge == "gold-15" && result.Weapon == null) unassignedGoldVisible = true;
-                }
-            }
-        }
-        if (!result.Replay && await unlockRead is { } unlock &&
-            (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)) &&
-            seenUnlocks.Add(unlock))
-        {
-            var record = JsonSerializer.Serialize(new
-            {
-                kind = "military-unlock", source = "live", mode = "mp", weapon = unlock.Weapon,
-                tier = unlock.Tier, at = DateTimeOffset.UtcNow
-            });
-            await File.AppendAllTextAsync(log, record + "\n", cancel);
-        }
-        if (pollProgress || paddedMenu != null)
-        {
-            lastProgressScan = now;
-            if (menuWeapon == null && result is { Weapon: null, Replay: false })
-                menuWeapon = await capture.ReadCamoMenuWeaponAsync(frame, cancel);
-            if (menuWeapon != null)
-            {
-                menuReads++;
-                if (menuWeapon != lastMenuWeapon)
-                    Console.Error.WriteLine($"Recognized camo menu for {menuWeapon}.");
-            }
-            lastMenuWeapon = menuWeapon;
-            if (menuConfirmation.Observe(menuWeapon == null ? null : new WeaponRead(menuWeapon, false), result.Replay) is { } selected)
-            {
-                confirmation.Reset();
-                await AppendAsync(log, new
-                {
-                    kind = "weapon", source = "live", mode = "mp", weapon = selected.Name,
-                    context = "camo-menu", at = now
-                }, cancel);
-            }
-            var reads = await ReadProgressAsync(frame, capture, menuWeapon, result.Replay, trackedProgress, cancel);
-            camoReads += reads.Length;
-            foreach (var progress in progressConfirmation.ObserveRows(reads))
-            {
-                var record = JsonSerializer.Serialize(new
-                {
-                    kind = "progress-snapshot", source = "live", mode = "mp", weapon = progress.Weapon,
-                    camo = progress.WeaponLevelObjective == null ? progress.Camo : null,
-                    count = progress.Count, goal = progress.Goal, identity = progress.Identity,
-                    type = progress.WeaponLevelObjective == null ? "camo" : "weapon-level",
-                    objective = progress.WeaponLevelObjective,
-                    key = progress.Weapon == "Signal 50" && progress.Camo.Equals("Sunburn", StringComparison.OrdinalIgnoreCase) &&
-                        progress.Goal == 40 ? "signal-50:sp-3" : null, at = DateTimeOffset.UtcNow
-                });
-                await File.AppendAllTextAsync(log, record + "\n", cancel);
-            }
-            var militaryTier = menuWeapon == null ? null : await capture.ReadMilitaryMenuCountAsync(frame, cancel);
-            var menuMilitary = menuWeapon != null && militaryTier is int tier && tier > 0
-                ? new MilitaryUnlock(menuWeapon, tier) : null;
-            if (menuMilitary != null && menuMilitary == previousMenuMilitary && seenUnlocks.Add(menuMilitary))
-            {
-                await AppendAsync(log, new
-                {
-                    kind = "military-unlock", source = "live", mode = "mp", weapon = menuMilitary.Weapon,
-                    tier = menuMilitary.Tier, context = "camo-menu", verified = true, at = now
-                }, cancel);
-            }
-            var confirmingMilitary = menuMilitary != null && menuMilitary != previousMenuMilitary &&
-                !seenUnlocks.Contains(menuMilitary);
-            previousMenuMilitary = menuMilitary;
-            if (confirmingMilitary)
-            {
-                await Task.Delay(75, cancel);
+                frame.Dispose();
                 continue;
             }
-            var completionistCount = await capture.DetectCompletionistCountAsync(frame, menuWeapon, cancel);
-            var gold = completionistCount >= 1 ? menuWeapon : null;
-            var platinum = completionistCount >= 2 ? menuWeapon : null;
-            var specials = await capture.DetectSpecialUnlocksAsync(frame, menuWeapon, cancel);
-            if (gold != null && gold == goldCandidate && goldUnlocked.Add(gold))
-                await AppendAsync(log, new
-                {
-                    kind = "completionist-unlock", source = "live", mode = "mp", weapon = gold, challenge = "Gold", at = now
-                }, cancel);
-            goldCandidate = gold;
-            if (platinum != null && platinum == platinumCandidate && seenChallenges.Add(platinum + "|platinum"))
-                await AppendAsync(log, new
-                {
-                    kind = "completionist-unlock", source = "live", mode = "mp", weapon = platinum,
-                    challenge = "Platinum", context = "camo-menu", at = now
-                }, cancel);
-            platinumCandidate = platinum;
-            foreach (var special in specialConfirmation.Observe(specials))
-                await AppendAsync(log, new
-                {
-                    kind = special.Kind, source = "live", mode = "mp",
-                    weapon = special.Weapon, challenge = special.Challenge, at = now
-                }, cancel);
+            if (Stopwatch.GetElapsedTime(lastPinnedFrame) >= TimeSpan.FromMilliseconds(350))
+            {
+                lastPinnedFrame = Stopwatch.GetTimestamp();
+                progressFrames.Writer.TryWrite(CopyFrame(frame));
+            }
+            unlockFrames.Writer.TryWrite(CopyFrame(frame));
+            gameplayFrames.Writer.TryWrite(frame);
+            await Task.Delay(75, cancel);
+        }
+    }
 
-        }
-        totalScanMs += Stopwatch.GetElapsedTime(scanStarted).TotalMilliseconds;
-        scans++;
-        if (Stopwatch.GetElapsedTime(lastTiming) >= TimeSpan.FromSeconds(10))
+    async Task ScanPinnedAsync()
+    {
+        var confirmed = new CamoProgressConfirmation();
+        await foreach (var frame in progressFrames.Reader.ReadAllAsync(cancel))
         {
-            Console.Error.WriteLine($"Scanned {scans} frames ({totalScanMs / scans:F0} ms average). " +
-                $"HUD weapons {weaponReads}, camo menus {menuReads}, counters {camoReads}, replays {replayReads}.");
-            lastTiming = Stopwatch.GetTimestamp();
-            totalScanMs = 0;
-            scans = 0;
-            weaponReads = menuReads = camoReads = replayReads = 0;
+            using (frame)
+            {
+                var reads = await capture.DetectTrackedCamosAsync(frame, cancel);
+                if (reads.Length > 0 && await capture.IsReplayAsync(frame, cancel)) reads = [];
+                foreach (var progress in confirmed.ObserveRows(reads)) await PublishProgressAsync(progress);
+            }
         }
-        await Task.Delay(75, cancel);
+    }
+
+    async Task ScanUnlocksAsync()
+    {
+        await foreach (var frame in unlockFrames.Reader.ReadAllAsync(cancel))
+        {
+            using (frame)
+            {
+                var unlock = await capture.DetectMilitaryUnlockAsync(frame, cancel);
+                if (unlock == null || seenUnlocks.ContainsKey(unlock) ||
+                    await capture.IsReplayAsync(frame, cancel) || !seenUnlocks.TryAdd(unlock, 0)) continue;
+                await AppendAsync(new
+                {
+                    kind = "military-unlock", source = "live", mode = "mp", weapon = unlock.Weapon,
+                    tier = unlock.Tier, at = DateTimeOffset.UtcNow
+                });
+            }
+        }
+    }
+
+    async Task WriteLineAsync(string line)
+    {
+        await logGate.WaitAsync(cancel);
+        try { await File.AppendAllTextAsync(log, line + "\n", cancel); }
+        finally { logGate.Release(); }
+    }
+
+    Task AppendAsync(object record) =>
+        WriteLineAsync(JsonSerializer.Serialize(record));
+
+    Task PublishProgressAsync(CamoProgress progress) => AppendAsync(new
+    {
+        kind = "progress-snapshot", source = "live", mode = "mp", weapon = progress.Weapon,
+        camo = progress.WeaponLevelObjective == null ? progress.Camo : null,
+        count = progress.Count, goal = progress.Goal, identity = progress.Identity,
+        type = progress.WeaponLevelObjective == null ? "camo" : "weapon-level",
+        objective = progress.WeaponLevelObjective,
+        key = progress.Weapon == "Signal 50" && progress.Camo.Equals("Sunburn", StringComparison.OrdinalIgnoreCase) &&
+            progress.Goal == 40 ? "signal-50:sp-3" : null, at = DateTimeOffset.UtcNow
+    });
+
+    async Task ScanGameplayAsync()
+    {
+        var confirmation = new WeaponConfirmation();
+        var menuConfirmation = new WeaponConfirmation();
+        var seenWeaponLevels = new Dictionary<string, int>();
+        MilitaryUnlock? previousMenuMilitary = null;
+        var progressConfirmation = new CamoProgressConfirmation();
+        var combat = new CombatConfirmation();
+        var specialConfirmation = new SpecialUnlockConfirmation();
+        var goldUnlocked = new HashSet<string>();
+        var seenChallenges = new HashSet<string>();
+        var seenSpecialBanners = new HashSet<SpecialUnlock>();
+        string? goldCandidate = null, platinumCandidate = null, matchPhase = null;
+        string? confirmedWeapon = null;
+        var lastConfirmedWeapon = DateTimeOffset.MinValue;
+        var lastChallengeScan = DateTimeOffset.MinValue;
+        var unassignedGoldVisible = false;
+        var match = 0;
+        var lastLobbyScan = DateTimeOffset.MinValue;
+        var lastAkimbo = DateTimeOffset.MinValue;
+        var lastLongshot = DateTimeOffset.MinValue;
+        var longshotCounted = false;
+        var lastProgressScan = DateTimeOffset.MinValue;
+        var lastTiming = Stopwatch.GetTimestamp();
+        var totalScanMs = 0d;
+        var scans = 0;
+        var weaponReads = 0;
+        var menuReads = 0;
+        string? lastMenuWeapon = null;
+        var camoReads = 0;
+        var replayReads = 0;
+        var firstFrame = true;
+        await foreach (var snapshot in gameplayFrames.Reader.ReadAllAsync(cancel))
+        {
+            using var captured = snapshot;
+            using var viewport = HudCapture.CropPaddedViewport(captured);
+            var paddedMenu = viewport == null ? null :
+                await capture.ReadCamoMenuWeaponAsync(viewport, cancel, requireHeading: true);
+            var frame = paddedMenu != null ? viewport! : captured;
+            if (firstFrame)
+            {
+                Console.Error.WriteLine($"First frame from {screen?.DeviceName ?? "capture device"}: {frame.Width} × {frame.Height}.");
+                firstFrame = false;
+            }
+            var now = DateTimeOffset.UtcNow;
+            var scanStarted = Stopwatch.GetTimestamp();
+            var pollProgress = lastMenuWeapon != null || now - lastProgressScan >= TimeSpan.FromMilliseconds(400) ||
+                (previousMenuMilitary != null && !seenUnlocks.ContainsKey(previousMenuMilitary));
+            var menuWeapon = paddedMenu ?? (pollProgress ? await capture.ReadCamoMenuWeaponAsync(frame, cancel, requireHeading: true) : null);
+            var scanGameplay = menuWeapon == null;
+            var scanLobby = scanGameplay && now - lastLobbyScan >= TimeSpan.FromSeconds(1);
+            var scanChallenge = scanGameplay && now - lastChallengeScan >= TimeSpan.FromMilliseconds(200);
+            var lobbyRead = scanLobby ? ReadSnapshotAsync(frame, copy => capture.DetectMatchNoticeAsync(copy, cancel)) : null;
+            var challengeRead = scanChallenge ? ReadSnapshotAsync(frame, copy => capture.DetectChallengeBannerAsync(copy, cancel)) : null;
+            var combatRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectCombatAsync(copy, cancel)) :
+                Task.FromResult(new CombatRead(false, false, null));
+            var weaponRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectAsync(copy, cancel)) :
+                Task.FromResult<(WeaponRead? Weapon, bool Replay)>((null, false));
+            var result = scanGameplay ? await weaponRead : (Weapon: (WeaponRead?)null, Replay: false);
+            if (result.Weapon != null) weaponReads++;
+            if (result.Replay) replayReads++;
+            if (!result.Replay && lobbyRead != null)
+            {
+                lastLobbyScan = now;
+                var notice = await lobbyRead;
+                if (notice != null && notice != matchPhase)
+                {
+                    if (notice == "match-voting" || notice == "match-confirmed" && matchPhase != "match-voting")
+                        match++;
+                    var previous = new { kills = combat.Kills, deaths = combat.Deaths, bestStreak = combat.Best };
+                    if (notice != "match-confirmed" || matchPhase != "match-voting") combat.Reset();
+                    confirmation.Reset();
+                    confirmedWeapon = null;
+                    matchPhase = notice;
+                    lastAkimbo = lastLongshot = DateTimeOffset.MinValue;
+                    longshotCounted = false;
+                    await AppendAsync(new
+                    {
+                        kind = notice, source = "live", match, at = now,
+                        kills = notice == "match-ended" ? previous.kills : combat.Kills,
+                        deaths = notice == "match-ended" ? previous.deaths : combat.Deaths,
+                        bestStreak = notice == "match-ended" ? previous.bestStreak : combat.Best
+                    });
+                }
+            }
+            if (confirmation.Observe(result.Weapon, result.Replay, now) is { } weapon)
+            {
+                // Two matching, replay-checked HUD reads also prove gameplay resumed if the lobby transition was missed.
+                if (matchPhase is "match-ended" or "match-voting")
+                {
+                    if (matchPhase == "match-ended") match++;
+                    matchPhase = "match-started";
+                    await AppendAsync(new { kind = matchPhase, source = "live", match, at = now });
+                }
+                menuConfirmation.Reset();
+                confirmedWeapon = weapon.Name;
+                var record = JsonSerializer.Serialize(new
+                {
+                    kind = "weapon", source = "live", mode = "mp", weapon = weapon.Name,
+                    akimbo = weapon.Akimbo, at = DateTimeOffset.UtcNow
+                });
+                await WriteLineAsync(record);
+            }
+            if (!result.Replay && result.Weapon?.Name == confirmedWeapon && confirmedWeapon != null)
+                lastConfirmedWeapon = now;
+            if (result.Weapon is { Akimbo: true }) lastAkimbo = now;
+            else if (result.Weapon != null) lastAkimbo = DateTimeOffset.MinValue;
+            await Task.WhenAll((Task?)lobbyRead ?? Task.CompletedTask,
+                (Task?)challengeRead ?? Task.CompletedTask, combatRead, weaponRead);
+            var combatFrame = await combatRead;
+            // A lobby notice can be missed between scans. A first-kill card outside a replay can start the next match.
+            var resumedAfterLobby = matchPhase is "match-ended" or "match-voting" &&
+                combatFrame.Ordinal == 1 && !result.Replay &&
+                !await capture.IsReplayAsync(frame, cancel);
+            if (!result.Replay && (matchPhase is not ("match-ended" or "match-voting") || resumedAfterLobby))
+            {
+                var read = combatFrame;
+                if (!(read.Kill || read.Death) || result.Weapon != null || !await capture.IsReplayAsync(frame, cancel))
+                {
+                    foreach (var entry in combat.Observe(read, now))
+                    {
+                        if (matchPhase != "match-started")
+                        {
+                            if (matchPhase is null or "match-ended") match++;
+                            matchPhase = "match-started";
+                            await AppendAsync(new { kind = matchPhase, source = "live", match, at = now });
+                        }
+                        await AppendAsync(new
+                        {
+                            kind = entry.Kind, source = "live", match, at = now, opponent = "unknown",
+                            kills = entry.Kills, deaths = entry.Deaths, killStreak = entry.KillStreak,
+                            bestStreak = entry.BestStreak, endedStreak = entry.EndedStreak
+                        });
+                        if (entry.Kind == "death") lastAkimbo = DateTimeOffset.MinValue;
+                        if (entry.Kind == "kill" && !read.Death && (result.Weapon is { Name: "Sang 9mm", Akimbo: true } ||
+                            result.Weapon == null && now - lastAkimbo <= TimeSpan.FromMilliseconds(1500)))
+                            await AppendAsync(new
+                            {
+                                kind = "akimbo-kill", source = "live", mode = "mp", weapon = "Sang 9mm",
+                                at = now, detectedAt = DateTimeOffset.UtcNow, writtenAt = DateTimeOffset.UtcNow
+                            });
+                    }
+                }
+                if (result.Weapon?.Name == "Signal 50" && await capture.DetectLongshotAsync(frame, cancel))
+                {
+                    lastLongshot = now;
+                    if (!longshotCounted)
+                    {
+                        longshotCounted = true;
+                        await AppendAsync(new
+                        {
+                            key = "signal-50:sp-3", delta = 1, weapon = "Signal 50", source = "live", mode = "mp", at = now
+                        });
+                    }
+                }
+                else if (result.Weapon?.Name == "Signal 50" && now - lastLongshot >= TimeSpan.FromMilliseconds(650))
+                    longshotCounted = false;
+                var candidate = result.Weapon?.Name ?? (now - lastConfirmedWeapon <= TimeSpan.FromSeconds(5) ? confirmedWeapon : null);
+                if (challengeRead != null)
+                {
+                    lastChallengeScan = now;
+                    var banner = await challengeRead;
+                    if (banner.LevelUp is { } levelUp && levelUp.Level > seenWeaponLevels.GetValueOrDefault(levelUp.Weapon) &&
+                        (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
+                    {
+                        seenWeaponLevels[levelUp.Weapon] = levelUp.Level;
+                        await AppendAsync(new
+                        {
+                            kind = "weapon-level-up", source = "live", mode = "mp", weapon = levelUp.Weapon,
+                            level = levelUp.Level, at = now
+                        });
+                    }
+                    var challenge = banner.Challenge;
+                    if (challenge != "gold-15") unassignedGoldVisible = false;
+                    if (banner.Completed && (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
+                    {
+                        if (challenge == "gold-15" && (result.Weapon?.Name is { } goldWeapon
+                            ? goldUnlocked.Add(goldWeapon) : !unassignedGoldVisible))
+                            await AppendAsync(new
+                            {
+                                kind = "completionist-unlock", source = "live", mode = "mp", weapon = result.Weapon?.Name, challenge = "Gold", at = now
+                            });
+                        else if (challenge == "platinum")
+                        {
+                            var platinumWeapon = result.Weapon?.Name ??
+                                (now - lastConfirmedWeapon <= TimeSpan.FromSeconds(1.25) ? confirmedWeapon : null);
+                            if (platinumWeapon != null && seenChallenges.Add(platinumWeapon + "|" + challenge))
+                                await AppendAsync(new
+                                {
+                                    kind = "completionist-unlock", source = "live", mode = "mp",
+                                    weapon = platinumWeapon, challenge = "Platinum", at = now
+                                });
+                        }
+                        else if (challenge != null && challenge != "gold-15" && (candidate == "Sang 9mm" || candidate == null && challenge != "menu-space-time") &&
+                            seenChallenges.Add((candidate ?? "") + "|" + challenge))
+                            await AppendAsync(new
+                            {
+                                kind = "challenge-completed", source = "live", mode = "mp", weapon = candidate, challenge, at = now
+                            });
+                        else if (challenge == null && capture.IdentifySpecialBanner(frame, candidate, banner.Details) is { } special &&
+                            seenSpecialBanners.Add(special))
+                            await AppendAsync(new
+                            {
+                                kind = special.Kind, source = "live", mode = "mp", weapon = special.Weapon, challenge = special.Challenge, at = now
+                            });
+                        if (challenge == "gold-15" && result.Weapon == null) unassignedGoldVisible = true;
+                    }
+                }
+            }
+            if (pollProgress || paddedMenu != null)
+            {
+                lastProgressScan = now;
+                if (menuWeapon == null && result is { Weapon: null, Replay: false })
+                    menuWeapon = await capture.ReadCamoMenuWeaponAsync(frame, cancel);
+                if (menuWeapon != null)
+                {
+                    menuReads++;
+                    if (menuWeapon != lastMenuWeapon)
+                        Console.Error.WriteLine($"Recognized camo menu for {menuWeapon}.");
+                }
+                lastMenuWeapon = menuWeapon;
+                if (menuConfirmation.Observe(menuWeapon == null ? null : new WeaponRead(menuWeapon, false), result.Replay) is { } selected)
+                {
+                    confirmation.Reset();
+                    await AppendAsync(new
+                    {
+                        kind = "weapon", source = "live", mode = "mp", weapon = selected.Name,
+                        context = "camo-menu", at = now
+                    });
+                }
+                var hovered = result.Replay ? null : await capture.DetectCamoProgressAsync(frame, menuWeapon, cancel);
+                CamoProgress[] reads = hovered == null ? [] : [hovered];
+                camoReads += reads.Length;
+                foreach (var progress in progressConfirmation.ObserveRows(reads)) await PublishProgressAsync(progress);
+                var militaryTier = menuWeapon == null ? null : await capture.ReadMilitaryMenuCountAsync(frame, cancel);
+                var menuMilitary = menuWeapon != null && militaryTier is int tier && tier > 0
+                    ? new MilitaryUnlock(menuWeapon, tier) : null;
+                if (menuMilitary != null && menuMilitary == previousMenuMilitary && seenUnlocks.TryAdd(menuMilitary, 0))
+                {
+                    await AppendAsync(new
+                    {
+                        kind = "military-unlock", source = "live", mode = "mp", weapon = menuMilitary.Weapon,
+                        tier = menuMilitary.Tier, context = "camo-menu", verified = true, at = now
+                    });
+                }
+                var confirmingMilitary = menuMilitary != null && menuMilitary != previousMenuMilitary &&
+                    !seenUnlocks.ContainsKey(menuMilitary);
+                previousMenuMilitary = menuMilitary;
+                if (confirmingMilitary)
+                {
+                    await Task.Delay(75, cancel);
+                    continue;
+                }
+                var completionistCount = await capture.DetectCompletionistCountAsync(frame, menuWeapon, cancel);
+                var gold = completionistCount >= 1 ? menuWeapon : null;
+                var platinum = completionistCount >= 2 ? menuWeapon : null;
+                var specials = await capture.DetectSpecialUnlocksAsync(frame, menuWeapon, cancel);
+                if (gold != null && gold == goldCandidate && goldUnlocked.Add(gold))
+                    await AppendAsync(new
+                    {
+                        kind = "completionist-unlock", source = "live", mode = "mp", weapon = gold, challenge = "Gold", at = now
+                    });
+                goldCandidate = gold;
+                if (platinum != null && platinum == platinumCandidate && seenChallenges.Add(platinum + "|platinum"))
+                    await AppendAsync(new
+                    {
+                        kind = "completionist-unlock", source = "live", mode = "mp", weapon = platinum,
+                        challenge = "Platinum", context = "camo-menu", at = now
+                    });
+                platinumCandidate = platinum;
+                foreach (var special in specialConfirmation.Observe(specials))
+                    await AppendAsync(new
+                    {
+                        kind = special.Kind, source = "live", mode = "mp",
+                        weapon = special.Weapon, challenge = special.Challenge, at = now
+                    });
+
+            }
+            totalScanMs += Stopwatch.GetElapsedTime(scanStarted).TotalMilliseconds;
+            scans++;
+            if (Stopwatch.GetElapsedTime(lastTiming) >= TimeSpan.FromSeconds(10))
+            {
+                Console.Error.WriteLine($"Scanned {scans} frames ({totalScanMs / scans:F0} ms average). " +
+                    $"HUD weapons {weaponReads}, camo menus {menuReads}, counters {camoReads}, replays {replayReads}.");
+                lastTiming = Stopwatch.GetTimestamp();
+                totalScanMs = 0;
+                scans = 0;
+                weaponReads = menuReads = camoReads = replayReads = 0;
+            }
+        }
     }
 }
 
 static async Task<T> ReadSnapshotAsync<T>(Bitmap frame, Func<Bitmap, Task<T>> read)
 {
-    using var copy = new Bitmap(frame.Width, frame.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
-    using (var graphics = Graphics.FromImage(copy))
-        graphics.DrawImageUnscaled(frame, 0, 0);
+    using var copy = CopyFrame(frame);
     return await read(copy);
 }
 
-static async Task<CamoProgress[]> ReadProgressAsync(Bitmap frame, HudCapture capture, string? menuWeapon, bool replay, Task<CamoProgress[]>? trackedProgress, CancellationToken cancel)
+static Bitmap CopyFrame(Bitmap frame)
 {
-    var tracked = trackedProgress == null ? null : await trackedProgress;
-    if (replay) return [];
-    var hovered = await capture.DetectCamoProgressAsync(frame, menuWeapon, cancel);
-    return hovered != null ? [hovered] : tracked ?? await capture.DetectTrackedCamosAsync(frame, cancel);
+    var copy = new Bitmap(frame.Width, frame.Height, System.Drawing.Imaging.PixelFormat.Format24bppRgb);
+    try
+    {
+        using var graphics = Graphics.FromImage(copy);
+        graphics.DrawImageUnscaled(frame, 0, 0);
+        return copy;
+    }
+    catch { copy.Dispose(); throw; }
 }
-
-static Task AppendAsync(string log, object record, CancellationToken stop) =>
-    File.AppendAllTextAsync(log, JsonSerializer.Serialize(record) + "\n", stop);
 
 static async Task<Bitmap> CaptureWindowAsync(GameWindows.Window window, CancellationToken cancel)
 {

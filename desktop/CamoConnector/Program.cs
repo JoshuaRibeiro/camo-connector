@@ -180,6 +180,7 @@ internal sealed partial class ConnectorWindow : Form
         setupHeadingFont?.Dispose();
         DisposeTrackerTray();
         diagnosticsTimer.Dispose();
+        ReleaseUsage();
         logFont.Dispose();
         foreach (var font in shellFonts) font.Dispose();
         previewTimer.Dispose();
