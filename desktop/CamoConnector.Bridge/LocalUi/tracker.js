@@ -72,7 +72,10 @@ function render() {
   }
   const title = element('h2', weapon?.name ?? 'Prestige & mastery');
   const entries = [title];
-  if (weapon) entries.push(element('p', weapon.category, 'subtitle'));
+  if (weapon) {
+    const level = state.progress[weapon.id + ':weapon-level']?.count;
+    entries.push(element('p', weapon.category + (level == null ? '' : ' · Weapon level ' + level), 'subtitle'));
+  }
   for (const group of new Set(rules.map(rule => rule.type))) {
     const section = element('section', null, 'group');
     section.append(element('h3', group === 'Multiplayer' ? 'Multiplayer mastery' : group));
@@ -111,7 +114,15 @@ function camoRow(rule, weapon) {
     weapon, camo: rule.id, count: current.done ? 0 : rule.goal ?? 0, done: !current.done
   }));
   controls.append(done);
-  row.append(copy, controls);
+  const description = element('div', null, 'camo-description');
+  if (rule.artwork) {
+    const image = element('img', null, 'camo-artwork');
+    image.src = rule.artwork;
+    image.alt = '';
+    description.append(image);
+  }
+  description.append(copy);
+  row.append(description, controls);
   return row;
 }
 

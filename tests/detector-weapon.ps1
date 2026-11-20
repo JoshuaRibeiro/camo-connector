@@ -4,6 +4,20 @@ Add-Type -Path @((Join-Path $detector 'WeaponRecognition.cs'), (Join-Path $detec
     (Join-Path $detector 'TrackedCamoRecognition.cs'), (Join-Path $detector 'CombatRecognition.cs'),
     (Join-Path $detector 'CaptureDevices.cs'), (Join-Path $detector 'SpecialUnlocks.cs'))
 $reader = [CamoConnector.Detector.WeaponRecognition]
+$levelUp = $reader::ReadLevelUp('WEAPON LEVELED UP', 'PM-40 ANVIL', '10')
+if ($levelUp.Weapon -ne 'PM-40 Anvil' -or $levelUp.Level -ne 10 -or
+    $reader::ReadLevelUp('NEW UNLOCK', 'SIGNAL 50', '31').Level -ne 31 -or
+    $reader::ReadLevelUp('NEW UNLOCK', 'SIGNAL 50', 'MILITARY CAMO 2') -or
+    $reader::ReadLevelUp('WEAPON LEVEL UP', '', '10')) {
+    throw 'Weapon level banner did not require both an identified weapon and an explicit level.'
+}
+$menuReader = [CamoConnector.Detector.CamoMenuRecognition]
+$militaryLevel = $menuReader::ReadMilitaryLevel('PM-40 Anvil', 'MILITARY CAMO 2', "Reach Weapon Level 11`n9 / 11")
+if ($militaryLevel.Count -ne 9 -or $militaryLevel.Goal -ne 11 -or
+    $menuReader::ReadMilitaryLevel('PM-40 Anvil', 'MILITARY CAMO 2', "Reach Weapon Level 11`n9 / 18") -or
+    $menuReader::ReadMilitaryLevel('PM-40 Anvil', 'MILITARY CAMO 2', "Earn 11 weapon unlocks`n9 / 11")) {
+    throw 'The Military camo menu did not distinguish weapon levels from unlock totals.'
+}
 $stability = [CamoConnector.Detector.WeaponConfirmation]::new()
 $weapon = $reader::Read(@('SANG 9mm AKIMB0'), $true)
 if ($reader::ReadHud(@('.58 GS'), $false).Name -ne '.50 GS' -or

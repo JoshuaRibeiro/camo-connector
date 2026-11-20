@@ -16,6 +16,7 @@
   <ItemGroup>
     <Content Remove="multiplayer-catalog.json" />
     <EmbeddedResource Include="multiplayer-catalog.json" LogicalName="CamoConnector.MultiplayerCatalog" />
+    <EmbeddedResource Include="CamoArtwork/*.png" LogicalName="CamoConnector.CamoArtwork.%(Filename)%(Extension)" />
     <EmbeddedResource Include="LocalUi/*" LogicalName="CamoConnector.LocalUi.%(Filename)%(Extension)" />
     <Content Include="../../special-catalog.json" Link="special-catalog.json" CopyToPublishDirectory="PreserveNewest" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

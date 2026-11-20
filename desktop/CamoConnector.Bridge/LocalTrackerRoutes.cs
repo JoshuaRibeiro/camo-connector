@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace CamoConnector.Bridge;
 
@@ -22,12 +23,29 @@ internal sealed class LocalTrackerRoutes(LocalTracker tracker, ProgressFeed feed
         // OBS applies Browser Source Custom CSS as an inline stylesheet.
         var styles = request.Path == "/local/overlay" ? "'self' 'unsafe-inline'" : "'self'";
         response.Headers.ContentSecurityPolicy =
-            $"default-src 'none'; script-src 'self'; style-src {styles}; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
+            $"default-src 'none'; script-src 'self'; img-src 'self'; style-src {styles}; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
         response.Headers.XContentTypeOptions = "nosniff";
         response.Headers["Referrer-Policy"] = "no-referrer";
         var path = request.Path.Value;
         var read = HttpMethods.IsGet(request.Method);
         var write = HttpMethods.IsPost(request.Method);
+        const string artworkPrefix = "/local/artwork/";
+        if (read && path?.StartsWith(artworkPrefix, StringComparison.Ordinal) == true)
+        {
+            var filename = path[artworkPrefix.Length..];
+            using var stream = Regex.IsMatch(filename, @"\A[a-z0-9-]+\.png\z")
+                ? typeof(LocalTrackerRoutes).Assembly.GetManifestResourceStream(LocalTracker.ArtworkResourcePrefix + filename)
+                : null;
+            if (stream == null)
+            {
+                response.StatusCode = 404;
+                return;
+            }
+            response.ContentType = "image/png";
+            response.Headers.CacheControl = "public, max-age=3600";
+            await stream.CopyToAsync(response.Body, context.RequestAborted);
+            return;
+        }
         var asset = path switch
         {
             "/local/tracker" => ("tracker.html", "text/html"),

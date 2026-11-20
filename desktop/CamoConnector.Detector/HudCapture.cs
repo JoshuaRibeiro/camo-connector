@@ -383,7 +383,7 @@ internal sealed class HudCapture : IDisposable
         return best;
     }
 
-    public async Task<(string? Challenge, bool Completed, string[]? Details)> DetectChallengeBannerAsync(Bitmap frame, CancellationToken cancel,
+    public async Task<(string? Challenge, bool Completed, string[]? Details, WeaponLevelRead? LevelUp)> DetectChallengeBannerAsync(Bitmap frame, CancellationToken cancel,
         Action<string, string, Bitmap>? trace = null)
     {
         var warmPixels = 0;
@@ -402,6 +402,17 @@ internal sealed class HudCapture : IDisposable
         var heading = await ReadBannerText((.365, .257, .274, .041), "unlockHeading", PixelAdjustment.CyanText);
         if (!LooksCompleted(heading))
             heading = await ReadBannerText((.350, .250, .300, .047), "unlockHeadingOriginal", pageMode: 6);
+        var levelHeading = heading;
+        if (!LooksCompleted(heading) && !WeaponRecognition.IsLevelUpHeading(heading))
+            levelHeading = await ReadBannerText((.425, .268, .150, .037), "weaponLevelHeading", PixelAdjustment.YellowText);
+        if (WeaponRecognition.IsLevelUpHeading(levelHeading))
+        {
+            var name = await ReadBannerText((.447, .308, .106, .030), "weaponLevelName");
+            var (number, _) = await ReadTextAsync(frame, (.479, .334, .042, .048), cancel, pageMode: 7,
+                countersOnly: true, adjustment: PixelAdjustment.YellowText, trace: trace, regionName: "weaponLevelNumber");
+            if (WeaponRecognition.ReadLevelUp(levelHeading, name, number) is { } levelUp)
+                return (null, false, null, levelUp);
+        }
         var completed = LooksCompleted(heading);
         // HUD notices can cover the middle of the completion text. Require the camo artwork as corroboration.
         if (!completed && (heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
@@ -410,20 +421,20 @@ internal sealed class HudCapture : IDisposable
         if (!goldTile && (completed || heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
             System.Text.RegularExpressions.Regex.IsMatch(heading, @"[CG]OMPLE", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) &&
             CombatRecognition.IsPlatinumArtwork(Sample(frame, .148, (.471, .058, .102, 0))))
-            return ("platinum", true, null);
-        if (!goldTile && !completed) return (null, false, null);
+            return ("platinum", true, null, null);
+        if (!goldTile && !completed) return (null, false, null, null);
         var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)
             ? "gold-15" : SpecialUnlocks.ReadBanner(heading, text);
-        if (Match(detail) is { } match) return (match, true, null);
+        if (Match(detail) is { } match) return (match, true, null, null);
         var details = new List<string> { detail };
         foreach (var adjustment in new[] { PixelAdjustment.Normal, PixelAdjustment.Contrast, PixelAdjustment.Invert })
         {
             detail = await ReadBannerText((.382, .301, .237, .022), $"unlockObjective{adjustment}", adjustment);
-            if (Match(detail) is { } fallback) return (fallback, true, null);
+            if (Match(detail) is { } fallback) return (fallback, true, null, null);
             details.Add(detail);
         }
-        return (null, completed && !goldTile, details.ToArray());
+        return (null, completed && !goldTile, details.ToArray(), null);
 
         static bool LooksCompleted(string text) => System.Text.RegularExpressions.Regex.IsMatch(text,
             @"\bCOMPLETED\b|\bCHALLENGE\w{0,2}\s+LETED\b",
@@ -468,6 +479,8 @@ internal sealed class HudCapture : IDisposable
         if (title.Length == 0) return null;
         var (objectives, _) = await ReadTextAsync(frame, (.313, .679, .342, .181), cancel,
             trace: trace, regionName: "camoObjectives");
+        if (CamoMenuRecognition.ReadMilitaryLevel(weapon, title, objectives) is { } weaponLevel)
+            return weaponLevel;
         var progress = CamoMenuRecognition.ReadProgress(weapon, title, Lines(objectives), names);
         if (!names.Contains(title)) return progress;
 

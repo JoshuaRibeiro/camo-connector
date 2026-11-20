@@ -99,6 +99,44 @@ try {
     if ($resumed.count -ne 0 -or $resumed.session -eq $embedded.session) {
         throw 'Browser sync failed to resume without replaying desktop deltas.'
     }
+    $catalog = Check-Events 200 $native 'local/catalog'
+    $anvil = $catalog.catalog.weapons | Where-Object id -eq 'pm-40-anvil'
+    $nightSnow = $anvil.camos | Where-Object id -eq 'sp-1'
+    if ($nightSnow.artwork -ne '/local/artwork/night-snow.png') { throw 'Night Snow is missing its catalog artwork.' }
+    $artwork = $client.GetByteArrayAsync("http://127.0.0.1:47150$($nightSnow.artwork)").GetAwaiter().GetResult()
+    if ($artwork.Length -lt 8 -or [Convert]::ToHexString($artwork[0..7]) -ne '89504E470D0A1A0A') {
+        throw 'Embedded Night Snow artwork did not return a PNG.'
+    }
+    $overlayHeaders = @{ Authorization = 'Bearer ' + ([uri]$catalog.overlayUrl).Fragment.TrimStart('#') }
+    $military = '{"kind":"military-unlock","source":"live","mode":"mp","weapon":"PM-40 Anvil","tier":1}'
+    $focus = '{"kind":"weapon","source":"live","mode":"mp","weapon":"PM-40 Anvil"}'
+    $snapshot = '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"PM-40 Anvil","type":"weapon-level","count":9,"goal":11,"objective":"Reach Weapon Level 11"}'
+    [IO.File]::AppendAllLines($eventLog, [string[]]@($military, $focus, $snapshot))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+        if ($overlay.level -eq 9) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($overlay.rows.Count -ne 1 -or $overlay.rows[0].name -ne 'Military Camo 2' -or
+        $overlay.rows[0].count -ne 9 -or $overlay.rows[0].goal -ne 11) {
+        throw 'The overlay missed the PM-40 weapon-level snapshot.'
+    }
+    $levelUp = '{"kind":"weapon-level-up","source":"live","mode":"mp","weapon":"PM-40 Anvil","level":'
+    foreach ($expected in @(@{ Level = 10; Rows = 1 }, @{ Level = 16; Rows = 2 }, @{ Level = 31; Rows = 3 })) {
+        [IO.File]::AppendAllLines($eventLog, [string[]]@(($levelUp + $expected.Level + '}'), $snapshot))
+        $deadline = [DateTime]::UtcNow.AddSeconds(5)
+        do {
+            $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+            if ($overlay.level -eq $expected.Level) { break }
+            Start-Sleep -Milliseconds 100
+        } while ([DateTime]::UtcNow -lt $deadline)
+        if ($overlay.rows.Count -ne $expected.Rows -or $overlay.rows[0].name -ne 'Military Camo 2' -or
+            ($expected.Level -ge 16 -and $overlay.rows[1].artwork -ne $nightSnow.artwork) -or
+            ($expected.Level -ge 31 -and $overlay.rows[2].name -ne 'Recursive')) {
+            throw "The overlay listed the wrong challenges at weapon level $($expected.Level)."
+        }
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

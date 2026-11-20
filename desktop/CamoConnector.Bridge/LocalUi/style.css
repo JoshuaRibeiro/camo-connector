@@ -46,8 +46,14 @@ dialog form { display: grid; gap: .7rem; }
 .overlay h1 { font-size: 1.45em; }
 .overlay h2 { font-size: 1.05em; color: var(--accent); margin-top: .15em; }
 .overlay p { margin: .25em 0 .45em; color: #d8e4e6; }
-#meter { display: flex; align-items: center; gap: .8rem; font-variant-numeric: tabular-nums; }
-#meter[hidden] { display: none; }
+.overlay-meter { display: flex; align-items: center; gap: .8rem; font-variant-numeric: tabular-nums; }
+.camo-description, .overlay-unlock { display: flex; align-items: flex-start; gap: .65em; }
+.camo-artwork { width: 2.6em; height: 2.6em; flex: 0 0 auto; object-fit: cover; border-radius: .3em; }
+.overlay-unlock > div { flex: 1; min-width: 0; }
+.overlay-unlock { padding: .55em 0; border-top: 1px solid #344344; }
+.overlay-unlock:last-child { padding-bottom: 0; }
+#unlock-rows { margin-top: .5em; }
+#weapon-level { font-size: .85em; }
 progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 @media (max-width: 640px) {
   main { grid-template-columns: minmax(7rem, 32%) 1fr; }

@@ -80,7 +80,7 @@ try
             var special = banner.Completed && banner.Challenge == null && !replay
                 ? capture.IdentifySpecialBanner(frame, weapon?.Name, banner.Details) : null;
             var militaryUnlock = replay ? null : await capture.DetectMilitaryUnlockAsync(frame, stop.Token);
-            result = new { source, weapon, replay, banner.Challenge, banner.Completed, special, militaryUnlock, cropDirectory, reads };
+            result = new { source, weapon, replay, banner.Challenge, banner.Completed, banner.LevelUp, special, militaryUnlock, cropDirectory, reads };
         }
         else
         {
@@ -118,7 +118,7 @@ try
             matchNotice = replay ? null : await capture.DetectMatchNoticeAsync(image, stop.Token),
             longshot = !replay && await capture.DetectLongshotAsync(image, stop.Token),
             completionistCount = await capture.DetectCompletionistCountAsync(image, menuWeapon, stop.Token),
-            goldBanner = challenge == "gold-15", challenge,
+            goldBanner = challenge == "gold-15", challenge, banner.LevelUp,
             specialBanner = banner.Completed && challenge == null ? capture.IdentifySpecialBanner(image, result.Weapon?.Name, banner.Details) : null,
             specialUnlocks = await capture.DetectSpecialUnlocksAsync(image, menuWeapon, stop.Token)
         }));
@@ -187,6 +187,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     var log = Path.Combine(data, "sunburn-events.jsonl");
     var confirmation = new WeaponConfirmation();
     var menuConfirmation = new WeaponConfirmation();
+    var seenWeaponLevels = new Dictionary<string, int>();
     var seenUnlocks = new HashSet<MilitaryUnlock>();
     MilitaryUnlock? previousMenuMilitary = null;
     var progressConfirmation = new CamoProgressConfirmation();
@@ -348,6 +349,16 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             {
                 lastChallengeScan = now;
                 var banner = await challengeRead;
+                if (banner.LevelUp is { } levelUp && levelUp.Level > seenWeaponLevels.GetValueOrDefault(levelUp.Weapon) &&
+                    (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
+                {
+                    seenWeaponLevels[levelUp.Weapon] = levelUp.Level;
+                    await AppendAsync(log, new
+                    {
+                        kind = "weapon-level-up", source = "live", mode = "mp", weapon = levelUp.Weapon,
+                        level = levelUp.Level, at = now
+                    }, cancel);
+                }
                 var challenge = banner.Challenge;
                 if (challenge != "gold-15") unassignedGoldVisible = false;
                 if (banner.Completed && (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))

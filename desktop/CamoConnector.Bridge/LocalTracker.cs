@@ -14,8 +14,13 @@ internal sealed class LocalTracker
     private readonly Catalog catalog;
     private State state;
 
+    internal const string ArtworkResourcePrefix = "CamoConnector.CamoArtwork.";
+
     internal sealed record Rule(string Id, string Type, string Name, string? Unlock, int? UnlockTotal,
-        string? Objective, int? Goal, string? Category);
+        string? Objective, int? Goal, string? Category)
+    {
+        public string? Artwork { get; init; }
+    }
     internal sealed record Weapon(string Id, string Name, string Category, Rule[] Camos);
     internal sealed record Catalog(Weapon[] Weapons, Rule[] Shared);
     internal sealed record Entry(int Count, bool Done);
@@ -28,11 +33,18 @@ internal sealed class LocalTracker
         backup = Path.Combine(data, "mw4-camos.latest.json");
         using var stream = typeof(LocalTracker).Assembly.GetManifestResourceStream("CamoConnector.MultiplayerCatalog")!;
         var source = JsonSerializer.Deserialize<Catalog>(stream, Json)!;
-        var completion = source.Shared.Where(rule => rule.Type == "Completionist").ToLookup(rule => rule.Category);
+        var embedded = typeof(LocalTracker).Assembly.GetManifestResourceNames().ToHashSet(StringComparer.Ordinal);
+        Rule WithArtwork(Rule rule)
+        {
+            var filename = Key(rule.Name) + ".png";
+            return embedded.Contains(ArtworkResourcePrefix + filename)
+                ? rule with { Artwork = "/local/artwork/" + filename } : rule;
+        }
+        var completion = source.Shared.Select(WithArtwork).Where(rule => rule.Type == "Completionist").ToLookup(rule => rule.Category);
         catalog = new(source.Weapons.Select(weapon => weapon with
         {
-            Camos = [.. weapon.Camos, .. completion[weapon.Category == "Melee" ? "Melee" : weapon.Category + "s"]]
-        }).ToArray(), source.Shared.Where(rule => rule.Type is "Prestige" or "Multiplayer").ToArray());
+            Camos = [.. weapon.Camos.Select(WithArtwork), .. completion[weapon.Category == "Melee" ? "Melee" : weapon.Category + "s"]]
+        }).ToArray(), source.Shared.Where(rule => rule.Type is "Prestige" or "Multiplayer").Select(WithArtwork).ToArray());
         weapons = catalog.Weapons.ToDictionary(weapon => weapon.Id);
         foreach (var weapon in catalog.Weapons)
         foreach (var rule in weapon.Camos)
@@ -66,15 +78,54 @@ internal sealed class LocalTracker
         {
             if (state.Focus == null || !weapons.TryGetValue(state.Focus, out var weapon))
                 return new { weapon = (string?)null };
-            var remaining = weapon.Camos.Where(camo => state.Progress.GetValueOrDefault(weapon.Id + ":" + camo.Id)?.Done != true).ToArray();
-            var rule = remaining.FirstOrDefault(camo => camo.Type == "Special" &&
-                (camo.UnlockTotal ?? 0) <= weapon.Camos.Where(item => item.Type == "Military" &&
-                    state.Progress.GetValueOrDefault(weapon.Id + ":" + item.Id)?.Done == true)
-                    .Select(item => item.UnlockTotal ?? 0).DefaultIfEmpty().Max())
-                ?? remaining.FirstOrDefault();
-            var progress = rule == null ? null : state.Progress.GetValueOrDefault(weapon.Id + ":" + rule.Id);
-            return new { weapon = weapon.Name, camo = rule?.Name, objective = rule?.Objective ?? rule?.Unlock,
-                count = progress?.Count ?? 0, goal = rule?.Goal };
+            bool Done(Weapon item, Rule camo) => state.Progress.GetValueOrDefault(item.Id + ":" + camo.Id)?.Done == true;
+            bool HasCamo(Weapon item, string id) => item.Camos.Any(camo => camo.Id == id && Done(item, camo));
+            int ConfirmedMilitaryTotal(bool levelBased) => weapon.Camos
+                .Where(camo => camo.Type == "Military" && IsLevelRule(camo) == levelBased && Done(weapon, camo))
+                .Select(camo => camo.UnlockTotal ?? 0).DefaultIfEmpty().Max();
+
+            var level = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-level")?.Count;
+            var knownLevel = Math.Max(level ?? 0, ConfirmedMilitaryTotal(true));
+            var unlocks = ConfirmedMilitaryTotal(false);
+            bool Available(Rule camo)
+            {
+                if (camo.Type == "Special")
+                    return (camo.UnlockTotal ?? 0) <= (IsLevelRule(camo) ? knownLevel : unlocks);
+                if (camo.Type != "Completionist") return false;
+                if (camo.Id == "gold")
+                    return weapon.Camos.Where(item => item.Type is "Military" or "Special").All(item => Done(weapon, item));
+
+                var required = Regex.Match(camo.Unlock ?? "", @"^Complete (\d+) ");
+                var goal = required.Success ? int.Parse(required.Groups[1].Value) : 1;
+                return camo.Id switch
+                {
+                    "platinum" => HasCamo(weapon, "gold") && catalog.Weapons.Count(item =>
+                        item.Category == weapon.Category && HasCamo(item, "gold")) >= goal,
+                    "harmonic-break" => HasCamo(weapon, "platinum") &&
+                        catalog.Weapons.Count(item => HasCamo(item, "platinum")) >= goal,
+                    "divergence" => HasCamo(weapon, "harmonic-break") &&
+                        catalog.Weapons.Count(item => HasCamo(item, "harmonic-break")) >= goal,
+                    _ => false
+                };
+            }
+
+            var remaining = weapon.Camos.Where(camo => !Done(weapon, camo)).ToArray();
+            var nextMilitary = remaining.FirstOrDefault(camo => camo.Type == "Military");
+            var rows = remaining.Where(camo => camo == nextMilitary || Available(camo))
+                .Select(camo =>
+                {
+                    var military = camo.Type == "Military";
+                    var levelBased = IsLevelRule(camo);
+                    return new
+                    {
+                        name = camo.Name, camo.Artwork, objective = camo.Objective ?? camo.Unlock,
+                        count = military ? (levelBased ? level : (int?)null) :
+                            state.Progress.GetValueOrDefault(weapon.Id + ":" + camo.Id)?.Count ?? 0,
+                        goal = military && levelBased ? camo.UnlockTotal : camo.Goal
+                    };
+                }).ToArray();
+            return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
+                minimumLevel = knownLevel, rows, complete = remaining.Length == 0 };
         }
     }
 
@@ -134,6 +185,25 @@ internal sealed class LocalTracker
         if (kind == "weapon")
         {
             Change((_, _) => weapon.Id);
+            return;
+        }
+
+        if (kind == "weapon-level-up" ||
+            kind == "progress-snapshot" && ProgressFeed.Text(item, "type") == "weapon-level")
+        {
+            var level = ProgressFeed.Number(item, kind == "weapon-level-up" ? "level" : "count");
+            if (level is not (>= 1 and <= 200)) return;
+            if (kind == "progress-snapshot" &&
+                (ProgressFeed.Number(item, "goal") is not int goal || level > goal ||
+                    !string.Equals(ProgressFeed.Text(item, "objective"), $"Reach Weapon Level {goal}",
+                        StringComparison.OrdinalIgnoreCase))) return;
+            var key = weapon.Id + ":weapon-level";
+            Change((next, focus) =>
+            {
+                if (level.Value > (next.GetValueOrDefault(key)?.Count ?? 0))
+                    next[key] = new(level.Value, false);
+                return focus;
+            });
             return;
         }
 
@@ -210,6 +280,9 @@ internal sealed class LocalTracker
             finally { File.Delete(temporary); }
         }
     }
+
+    private static bool IsLevelRule(Rule camo) =>
+        camo.Unlock?.StartsWith("Reach Weapon Level ", StringComparison.OrdinalIgnoreCase) == true;
 
     private static string Key(string text) => Regex.Replace(text.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
 }
