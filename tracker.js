@@ -560,6 +560,9 @@
         snapshot.weapon + ' · synced ' + snapshot.value + '/' + snapshot.goal);
       return true;
     }
+    if (militaryIncomplete(weapon) &&
+        (target.identity !== 2 || !target.button?.isConnected || target.button.disabled ||
+          target.button.getAttribute('aria-disabled') === 'true')) return false;
     if (target.maximum !== null && snapshot.value > target.maximum) {
       show(snapshot.camo + ' · game count exceeds the tracker field limit');
       return true;
@@ -579,6 +582,8 @@
     const current = currentDetails && detailCounter(currentDetails, snapshot);
     if (!multiplayerSelected() || !current || current.completed ||
         current.count !== target.count || current.maximum !== target.maximum || current.input !== target.input ||
+        (militaryIncomplete(weapon) && (current.identity !== 2 || !current.button?.isConnected ||
+          current.button.disabled || current.button.getAttribute('aria-disabled') === 'true')) ||
         !current.input.isConnected || current.input.disabled || current.input.readOnly) {
       await extension.storage.local.set({ [storage]: state });
       return true;
@@ -701,8 +706,6 @@
       show(snapshot.camo + ' · could not verify the automatic +1');
       return true;
     }
-    // A visible, enabled +1 can belong to a Special unlocked before Military 8.
-    if (militaryIncomplete(name)) return false;
     return reconcileDetails(snapshot, key, state, done);
   }
   async function syncAkimbo(session, count, timing, receivedTimes) {
