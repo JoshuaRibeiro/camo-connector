@@ -1,7 +1,12 @@
 * { box-sizing: border-box; }
 :root { color-scheme: dark; font-family: Bahnschrift, "Segoe UI", sans-serif; color: #d7e2e8; --accent: #a8df87; }
 body { margin: 0; }
-.tracker { background: #111419; --accent: #8dd7ce; }
+.tracker {
+  --tracker-background: #111419;
+  --accent: #8dd7ce;
+  background: var(--tracker-background);
+  scrollbar-color: #527b80 var(--tracker-background);
+}
 .toolbar {
   display: flex; gap: 1rem; justify-content: space-between; align-items: center;
   padding: 1.2rem clamp(.85rem, 3vw, 2rem); border-bottom: 1px solid #304044; background: #172226;

@@ -6,7 +6,7 @@ namespace CamoConnector;
 internal sealed partial class ConnectorWindow
 {
     private readonly TabPage localTrackerPage = new("Tracker");
-    private readonly Button reloadTracker = new() { Text = "Refresh tracker", AutoSize = true };
+    private readonly BannerButton reloadTracker = new() { Text = "Refresh tracker", AutoSize = true };
     private readonly Label trackerMessage = new() { AutoSize = true, Dock = DockStyle.Top };
     private WebView2? localTrackerView;
     private bool localTrackerLoading;

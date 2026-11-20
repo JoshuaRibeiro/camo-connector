@@ -260,9 +260,15 @@ internal sealed partial class ConnectorWindow
         return body;
     }
 
+    private sealed class BannerButton : Button
+    {
+        // The shell paints a rounded focus outline in its normal theme.
+        protected override bool ShowFocusCues => SystemInformation.HighContrast && base.ShowFocusCues;
+    }
+
     private Button PageButton(string label, TabPage page)
     {
-        var button = new Button { Text = label, AutoSize = true, Padding = new Padding(8, 2, 8, 2) };
+        var button = new BannerButton { Text = label, AutoSize = true, Padding = new Padding(8, 2, 8, 2) };
         button.Click += (_, _) => pages.SelectedTab = page;
         return button;
     }
