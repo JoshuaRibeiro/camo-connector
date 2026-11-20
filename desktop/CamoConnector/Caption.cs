@@ -49,11 +49,12 @@ internal sealed partial class ConnectorWindow
         title.MouseDown += Drag;
         icon.MouseDown += Drag;
 
+        var captionFont = ShellFont("Segoe MDL2 Assets", 10);
         Button CaptionButton(string symbol, string name, Action action)
         {
             var button = new CaptionControl
             {
-                Dock = DockStyle.Right, Width = LogicalToDeviceUnits(46), Text = symbol, AccessibleName = name
+                Dock = DockStyle.Right, Width = LogicalToDeviceUnits(46), Text = symbol, Font = captionFont, AccessibleName = name
             };
             button.Click += (_, _) => action();
             return button;
