@@ -20,6 +20,8 @@ internal sealed partial class ConnectorWindow
     private readonly Label previewStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly System.Windows.Forms.Timer previewTimer = new() { Interval = 33 };
     private byte[]? pendingPreview;
+    private long previewLastFrame;
+    private bool previewRestarted;
     private CancellationTokenSource? previewRead;
     private Process? previewWorker;
     private Task<string>? previewErrors;
@@ -35,6 +37,7 @@ internal sealed partial class ConnectorWindow
     {
         sources.SelectedIndexChanged += (_, _) =>
         {
+            previewRestarted = false;
             nextAutomaticCheck = DateTimeOffset.MinValue;
             if (!scanning && sources.SelectedItem is Source source)
             {
@@ -248,6 +251,8 @@ internal sealed partial class ConnectorWindow
             StopPreview();
             if (scanning || detector != null || closing.IsCancellationRequested || pages.SelectedTab != capturePage ||
                 sources.SelectedItem is not Source source || !File.Exists(DetectorPath)) return;
+            // Tracking supplies its own preview. Avoid opening the capture device a second time at startup.
+            if (automaticTracking.Checked && bridgeReady && DateTimeOffset.UtcNow >= nextAutomaticCheck) return;
             var mode = source.Mode == "--device" ? "--preview-device" : "--preview-monitor";
             previewWorker = LaunchDetector(mode, source.MonitorId ?? source.Input);
             _ = StartReadingPreview(previewWorker);
@@ -299,6 +304,7 @@ internal sealed partial class ConnectorWindow
 
     private Task StartReadingPreview(Process process)
     {
+        previewLastFrame = Stopwatch.GetTimestamp();
         previewRead = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
         return ReadPreviewAsync(process.StandardOutput.BaseStream, previewRead.Token);
     }
@@ -336,7 +342,21 @@ internal sealed partial class ConnectorWindow
             previewErrors = null;
         }
         var frame = Interlocked.Exchange(ref pendingPreview, null);
-        if (frame == null) return;
+        if (frame == null)
+        {
+            if (!previewRestarted && pages.SelectedTab == capturePage && detector is { HasExited: false } &&
+                Stopwatch.GetElapsedTime(previewLastFrame) >= TimeSpan.FromSeconds(12))
+            {
+                previewRestarted = true;
+                previewStatus.Text = "Reconnecting capture preview…";
+                LogLine(captureMessages, previewStatus.Text);
+                nextAutomaticCheck = DateTimeOffset.MinValue;
+                try { StopDetector(); }
+                catch (Exception error) { previewStatus.Text = error.Message; }
+            }
+            return;
+        }
+        previewLastFrame = Stopwatch.GetTimestamp();
         try
         {
             using var stream = new MemoryStream(frame, writable: false);

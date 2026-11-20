@@ -2,7 +2,7 @@ namespace CamoConnector;
 
 internal sealed partial class ConnectorWindow
 {
-    private readonly CheckBox automaticTracking = new() { Text = "Enable auto tracking", AutoSize = true, Checked = true };
+    private readonly TrackingSwitch automaticTracking = new() { Text = "Enable auto tracking", Checked = true };
     private readonly Label captureBannerText = new() { AutoSize = true, Anchor = AnchorStyles.Left, UseMnemonic = false };
     private Source? activeCapture;
     private DateTimeOffset nextAutomaticCheck;
@@ -19,6 +19,7 @@ internal sealed partial class ConnectorWindow
         catch (UnauthorizedAccessException error) { LogLine(captureMessages, error.Message); }
         automaticTracking.CheckedChanged += (_, _) =>
         {
+            previewRestarted = false;
             try
             {
                 Directory.CreateDirectory(DataDirectory);
@@ -32,6 +33,7 @@ internal sealed partial class ConnectorWindow
                 try { StopDetector(); }
                 catch (Exception error) { detectorStatus.Text = error.Message; }
             }
+            if (detector == null) StartPreview();
             RefreshCaptureBanner();
         };
     }

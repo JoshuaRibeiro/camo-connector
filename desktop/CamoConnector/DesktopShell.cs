@@ -4,12 +4,13 @@ namespace CamoConnector;
 
 internal sealed partial class ConnectorWindow
 {
-    private static readonly Color ShellBackground = Color.FromArgb(17, 24, 33);
-    private static readonly Color ShellPanel = Color.FromArgb(24, 42, 51);
-    private static readonly Color ShellBorder = Color.FromArgb(57, 111, 117);
-    private static readonly Color ShellButton = Color.FromArgb(32, 61, 70);
-    private static readonly Color ShellAccent = Color.FromArgb(123, 224, 205);
-    private static readonly Color ShellMuted = Color.FromArgb(176, 198, 216);
+    private static readonly Color ShellBackground = Color.FromArgb(17, 20, 25);
+    private static readonly Color ShellPanel = Color.FromArgb(26, 32, 39);
+    private static readonly Color ShellBorder = Color.FromArgb(64, 88, 101);
+    private static readonly Color ShellButton = Color.FromArgb(33, 45, 56);
+    private static readonly Color ShellAccent = Color.FromArgb(141, 215, 206);
+    private static readonly Color ShellText = Color.FromArgb(215, 226, 232);
+    private static readonly Color ShellMuted = Color.FromArgb(158, 179, 193);
     private readonly TabPage capturePage = new("Auto tracking"),
         helpPage = new("How it works"), settingsPage = new("Settings");
     private readonly List<Font> shellFonts = [];
@@ -77,11 +78,11 @@ internal sealed partial class ConnectorWindow
     {
         var menu = new FlowLayoutPanel
         {
-            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(6, 10, 6, 0),
+            Dock = DockStyle.Fill, FlowDirection = FlowDirection.TopDown, WrapContents = false, Padding = new Padding(LogicalToDeviceUnits(6), 10, LogicalToDeviceUnits(6), 0),
             AutoScroll = true
         };
-        var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 46, WrapContents = false, Padding = new Padding(6, 4, 0, 0) };
-        var version = versionBadge = new Button { Text = "v" + build, Height = 30, AutoSize = true, Margin = Padding.Empty, AccessibleName = "Version " + build };
+        var footer = new Panel { Dock = DockStyle.Bottom, Height = LogicalToDeviceUnits(23) };
+        var version = versionBadge = new Button { Text = "v" + build, Dock = DockStyle.Fill, Padding = Padding.Empty, Margin = Padding.Empty, Font = ShellFont("Bahnschrift", 8), AccessibleName = "Version " + build };
         footer.Controls.Add(version);
         var toggle = navigationToggle = new Button { Height = 38, AccessibleName = "Expand navigation", Margin = new Padding(0, 0, 0, 8) };
         menu.Controls.Add(toggle);
@@ -114,7 +115,7 @@ internal sealed partial class ConnectorWindow
         }
         void UpdateRail()
         {
-            rail.Width = LogicalToDeviceUnits(railExpanded ? 174 : 72);
+            rail.Width = LogicalToDeviceUnits(railExpanded ? 162 : 52);
             var buttonWidth = LogicalToDeviceUnits(railExpanded ? 150 : 40);
             toggle.Height = LogicalToDeviceUnits(40);
             toggle.Width = buttonWidth;
@@ -171,7 +172,6 @@ internal sealed partial class ConnectorWindow
         content.Controls.Add(captureBanner);
         Controls.Add(content);
         Controls.Add(rail);
-        AddCaption();
 
         var help = PageBody(helpPage, "How it works", "Camo Connector reads your game capture and saves progress on this PC.");
         AddSetupRow(help, SetupSection("PC capture", new Label { AutoSize = true, Text = "Select the monitor showing Call of Duty in Auto tracking." }));
@@ -200,7 +200,7 @@ internal sealed partial class ConnectorWindow
 
     private void ShapeButtons(Control parent)
     {
-        if (parent is Button button && button != navigationToggle && !railButtons.ContainsValue(button))
+        if (parent is Button button && button != versionBadge && button != navigationToggle && !railButtons.ContainsValue(button))
         {
             if (button.AutoSize && button != versionBadge)
             {
@@ -269,6 +269,9 @@ internal sealed partial class ConnectorWindow
         {
             version.FlatStyle = FlatStyle.Flat;
             version.FlatAppearance.BorderSize = 0;
+            version.BackColor = dark == true ? ShellPanel : SystemColors.Control;
+            version.FlatAppearance.MouseOverBackColor = version.BackColor;
+            version.FlatAppearance.MouseDownBackColor = version.BackColor;
             version.ForeColor = dark == true ? ShellMuted : SystemColors.GrayText;
         }
         if (dark != true) return;

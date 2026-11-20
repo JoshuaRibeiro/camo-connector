@@ -152,7 +152,7 @@ internal sealed partial class ConnectorWindow
     {
         if (control is PictureBox) return;
         var surface = dark ? (insideCard ? ShellPanel : ShellBackground) : SystemColors.Control;
-        var ink = dark ? Color.FromArgb(234, 236, 240) : SystemColors.ControlText;
+        var ink = dark ? ShellText : SystemColors.ControlText;
         control.BackColor = surface;
         control.ForeColor = ink;
         if (control is TextBoxBase or ComboBox)
@@ -169,6 +169,8 @@ internal sealed partial class ConnectorWindow
                 button.FlatAppearance.MouseDownBackColor = Color.FromArgb(34, 103, 106);
             }
         }
+        if (dark && control is Label label)
+            label.ForeColor = label.Font.Bold ? ShellText : ShellMuted;
         if (control is TabPage page) page.UseVisualStyleBackColor = !dark;
         foreach (Control child in control.Controls) ApplyTheme(child, dark, insideCard || control is RoundedCard);
     }

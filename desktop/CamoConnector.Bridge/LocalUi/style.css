@@ -1,15 +1,15 @@
 * { box-sizing: border-box; }
-:root { color-scheme: dark; font-family: "Segoe UI", sans-serif; color: #eaf0f4; --accent: #a8df87; }
+:root { color-scheme: dark; font-family: Bahnschrift, "Segoe UI", sans-serif; color: #d7e2e8; --accent: #a8df87; }
 body { margin: 0; }
-.tracker { background: #111821; --accent: #7be0cd; }
+.tracker { background: #111419; --accent: #8dd7ce; }
 .toolbar {
   display: flex; gap: 1rem; justify-content: space-between; align-items: center;
   padding: 1.2rem clamp(.85rem, 3vw, 2rem); border-bottom: 1px solid #304044; background: #172226;
 }
 h1, h2, h3, p { margin: 0; }
-.tracker .toolbar { background: #1b2835; border-color: #324654; }
+.tracker .toolbar { background: #1a2027; border-color: #324654; }
 .toolbar h1 { font-size: clamp(1.55rem, 3vw, 2rem); font-weight: 800; }
-.toolbar p, aside label, .subtitle { color: #a2b2b8; }
+.toolbar p, aside label, .subtitle { color: #9eb3c1; }
 .actions { display: flex; flex-wrap: wrap; gap: .45rem; justify-content: end; }
 button, input {
   font: inherit; color: inherit; border-radius: .42rem; border: 1px solid #405156;
@@ -22,16 +22,16 @@ button:disabled { opacity: .5; cursor: default; }
 #status { padding: 0 clamp(.85rem, 3vw, 2rem); color: var(--accent); }
 #status:not(:empty) { padding-top: .65rem; }
 .overview { padding: 1rem clamp(.85rem, 3vw, 2rem); border-bottom: 1px solid #304044; }
-.tracker .overview { background: #151f2a; border-color: #324654; }
+.tracker .overview { background: #171e26; border-color: #324654; }
 .overview h2 { font-size: 1.15rem; margin-bottom: .25rem; color: var(--accent); }
-.tracker .camo-row { background: #1b2835; border-color: #324654; }
+.tracker .camo-row { background: #1a2027; border-color: #324654; }
 .tracker nav button[aria-current="true"] { background: #24444b; border-color: #456b73; }
 .overview .subtitle { margin-bottom: .55rem; }
 .overview-empty { margin: .5rem 0; }
 .overview-meter { display: flex; align-items: center; gap: .5rem; margin-top: .3rem; font-size: .82rem; }
 .overview-meter progress { width: 6rem; }
 .overview-completed { margin-top: .65rem; }
-.overview-completed summary { cursor: pointer; color: #a2b2b8; }
+.overview-completed summary { cursor: pointer; color: #9eb3c1; }
 main { display: grid; grid-template-columns: minmax(10rem, 15rem) 1fr; min-height: 65vh; }
 aside { padding: 1rem; border-right: 1px solid #304044; }
 aside input { width: 100%; margin: .35rem 0 .6rem; }
