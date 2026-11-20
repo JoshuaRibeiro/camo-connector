@@ -83,6 +83,11 @@ internal sealed partial class ConnectorWindow : Form
 
     private async Task UpdateAsync()
     {
+        if (installingRuntime)
+        {
+            updateStatus.Text = "Wait for tracking support to finish downloading.";
+            return;
+        }
         update.Enabled = false;
         try
         {

@@ -15,6 +15,53 @@ if ([bool]$CertificateThumbprint -ne [bool]$TimestampServer) { throw 'Supply bot
 $output = [IO.Directory]::CreateDirectory($OutputDirectory).FullName
 if (Get-ChildItem -LiteralPath $output -Force) { throw 'Release output must be empty.' }
 $assembly = Join-Path $output 'app'
+$slim = Join-Path $output 'slim'
+$programs = @('CamoConnector.exe','CamoConnector.Updater.exe','Runtime/Bridge/CamoConnector.Bridge.exe','Runtime/Detector/CamoConnector.Detector.exe')
+$coreFiles = $programs + 'Runtime/Bridge/special-catalog.json'
+
+function Get-ReleaseFiles($directory) {
+    Get-ChildItem -LiteralPath $directory -Recurse -File | ForEach-Object {
+        $relative = [IO.Path]::GetRelativePath($directory, $_.FullName).Replace('\','/')
+        if ([CamoConnector.Update.PortableReplacement]::IsAppFile($relative)) {
+            [pscustomobject]@{ FullName = $_.FullName; Relative = $relative }
+        } elseif ($_.Extension -ne '.pdb') { throw "Unexpected release file: $relative" }
+    }
+}
+
+function Write-Package($files, $required, $flavor, $manifestName) {
+    foreach ($file in $required) {
+        if ($file -cnotin $files.Relative) { throw "Missing release file: $file" }
+    }
+    $asset = "CamoConnector-v$version-$flavor.zip"
+    $archive = Join-Path $output $asset
+    $zip = [IO.Compression.ZipFile]::Open($archive, 'Create')
+    try {
+        foreach ($file in ($files | Sort-Object Relative)) {
+            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file.FullName, $file.Relative)
+        }
+    } finally { $zip.Dispose() }
+
+    $manifest = @{
+        version = $version
+        asset = $asset
+        size = (Get-Item -LiteralPath $archive).Length
+        sha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+    } | ConvertTo-Json -Compress
+    $body = [Text.Encoding]::UTF8.GetBytes($manifest)
+    $signature = $key.SignData($body, [Security.Cryptography.HashAlgorithmName]::SHA256,
+        [Security.Cryptography.RSASignaturePadding]::Pss)
+    $signed = [CamoConnector.Update.ReleaseVerification]::VerifyManifest($body, $signature, $public,
+        "v$version", [version]'0.0.0', $flavor)
+    $inputStream = [IO.File]::OpenRead($archive)
+    try { [CamoConnector.Update.ReleaseVerification]::VerifyArchive($inputStream, $signed) }
+    finally { $inputStream.Dispose() }
+    $json = Join-Path $output "$manifestName.json"
+    $sig = Join-Path $output "$manifestName.sig"
+    [IO.File]::WriteAllBytes($json, $body)
+    [IO.File]::WriteAllBytes($sig, $signature)
+    Get-Item -LiteralPath $archive,$json,$sig
+}
+
 Add-Type -Path @(
     (Join-Path $root 'desktop/CamoConnector.Update/ReleaseVerification.cs'),
     (Join-Path $root 'desktop/CamoConnector.Update/PortableReplacement.cs')
@@ -31,53 +78,28 @@ try {
         }
     } finally { $verification.Dispose() }
     & (Join-Path $PSScriptRoot 'build-desktop-preview.ps1') -OutputDirectory $assembly -OcrDirectory $OcrDirectory -CaptureDirectory $CaptureDirectory -UpdatePublicKeyFile $UpdatePublicKeyFile
-    $programs = @('CamoConnector.exe','CamoConnector.Updater.exe','Runtime/Bridge/CamoConnector.Bridge.exe','Runtime/Detector/CamoConnector.Detector.exe')
+    & (Join-Path $PSScriptRoot 'build-desktop-preview.ps1') -OutputDirectory $slim -SlimPortable -UpdatePublicKeyFile $UpdatePublicKeyFile
     if ($CertificateThumbprint) {
         $certificate = Get-Item -LiteralPath "Cert:\CurrentUser\My\$CertificateThumbprint"
-        foreach ($program in $programs) {
-            $signature = Set-AuthenticodeSignature -LiteralPath (Join-Path $assembly $program) -Certificate $certificate -HashAlgorithm SHA256 -TimestampServer $TimestampServer
-            if ($signature.Status -ne 'Valid' -or !$signature.TimeStamperCertificate) {
-                throw "Authenticode signing or timestamp validation failed for $program."
+        foreach ($directory in @($assembly, $slim)) {
+            foreach ($program in $programs) {
+                $signature = Set-AuthenticodeSignature -LiteralPath (Join-Path $directory $program) -Certificate $certificate -HashAlgorithm SHA256 -TimestampServer $TimestampServer
+                if ($signature.Status -ne 'Valid' -or !$signature.TimeStamperCertificate) {
+                    throw "Authenticode signing or timestamp validation failed for $program."
+                }
             }
         }
-    } else { Write-Warning 'Windows executables are unsigned. Only the update manifest is signed.' }
-    $unexpectedFiles = [Collections.Generic.List[string]]::new()
-    $files = @(Get-ChildItem -LiteralPath $assembly -Recurse -File | ForEach-Object {
-        $relative = [IO.Path]::GetRelativePath($assembly, $_.FullName).Replace('\','/')
-        if ([CamoConnector.Update.PortableReplacement]::IsAppFile($relative)) {
-            [pscustomobject]@{ FullName = $_.FullName; Relative = $relative }
-        } elseif ($_.Extension -ne '.pdb') { $unexpectedFiles.Add($relative) }
-    })
-    if ($unexpectedFiles.Count) { throw ("Unexpected release files: " + ($unexpectedFiles -join ", ")) }
-    $required = $programs + @('Runtime/Bridge/special-catalog.json','Runtime/Ocr/tesseract.exe',
-        'Runtime/Ocr/tessdata/eng.traineddata','Runtime/Capture/ffmpeg.exe')
-    foreach ($file in $required) {
-        if ($file -cnotin $files.Relative) { throw "Missing release file: $file" }
-    }
-    $asset = "CamoConnector-v$version-win-x64.zip"
-    $archive = Join-Path $output $asset
-    $zip = [IO.Compression.ZipFile]::Open($archive, 'Create')
-    try {
-        foreach ($file in ($files | Sort-Object Relative)) {
-            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file.FullName, $file.Relative)
-        }
-    } finally { $zip.Dispose() }
-    $manifest = @{
-        version = $version
-        asset = $asset
-        size = (Get-Item -LiteralPath $archive).Length
-        sha256 = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
-    } | ConvertTo-Json -Compress
-    $body = [Text.Encoding]::UTF8.GetBytes($manifest)
-    $signature = $key.SignData($body, [Security.Cryptography.HashAlgorithmName]::SHA256,
-        [Security.Cryptography.RSASignaturePadding]::Pss)
-    $signed = [CamoConnector.Update.ReleaseVerification]::VerifyManifest($body, $signature, $public, "v$version", [version]'0.0.0')
-    $inputStream = [IO.File]::OpenRead($archive)
-    try { [CamoConnector.Update.ReleaseVerification]::VerifyArchive($inputStream, $signed) }
-    finally { $inputStream.Dispose() }
-    [IO.File]::WriteAllBytes((Join-Path $output 'portable-update.json'), $body)
-    [IO.File]::WriteAllBytes((Join-Path $output 'portable-update.sig'), $signature)
-    Get-Item -LiteralPath $archive,(Join-Path $output 'portable-update.json'),(Join-Path $output 'portable-update.sig')
+    } else { Write-Warning 'Windows executables are unsigned. Only the update manifests are signed.' }
+    $offline = @(Get-ReleaseFiles $assembly)
+    $ocrRequired = @('Runtime/Ocr/tesseract.exe', 'Runtime/Ocr/tessdata/eng.traineddata')
+    $captureRequired = @('Runtime/Capture/ffmpeg.exe')
+    $standard = @(Get-ReleaseFiles $slim)
+    if ($standard.Count -ne $coreFiles.Count) { throw 'The standard ZIP must contain only core application files.' }
+
+    Write-Package $standard $coreFiles 'win-x64-slim' 'portable-slim-update'
+    Write-Package $offline ($coreFiles + $ocrRequired + $captureRequired) 'win-x64' 'portable-update'
+    Write-Package @($offline | Where-Object Relative -CLike 'Runtime/Ocr/*') $ocrRequired 'win-x64-ocr' 'runtime-ocr'
+    Write-Package @($offline | Where-Object Relative -CLike 'Runtime/Capture/*') $captureRequired 'win-x64-capture' 'runtime-capture'
 } finally {
     $key.Dispose()
 }

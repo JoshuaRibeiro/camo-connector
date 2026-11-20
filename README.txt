@@ -2,6 +2,23 @@ MW4 Sunburn Connector
 
 Windows app
 
+For the current portable CamoConnector.exe release, choose one download on
+GitHub Releases:
+
+- Standard (win-x64-slim.zip): install the x64 .NET 10 Desktop Runtime and
+  ASP.NET Core Runtime first from https://dotnet.microsoft.com/download/dotnet/10.0.
+  The app downloads OCR when tracking starts.
+  For a capture card or OBS Virtual Camera, open Auto tracking and choose
+  Download capture support. PC game-window and monitor capture need only OCR.
+- Offline (win-x64.zip): includes .NET, OCR and capture support. Use this for
+  an offline setup or if you prefer to skip installing the .NET prerequisites.
+
+Extract the ZIP before launching CamoConnector.exe. Both downloads use the
+same local tracker, capture controls and OBS overlay. The Tracker view uses
+Microsoft Edge WebView2. In-app updates stay on the edition you installed.
+
+Legacy browser-extension setup
+
 The repository also builds Chrome, Firefox, Edge and Opera extension packages.
 See docs/extension-release.md for build, test and publication instructions.
 For these builds, start the matching desktop app, click Copy browser

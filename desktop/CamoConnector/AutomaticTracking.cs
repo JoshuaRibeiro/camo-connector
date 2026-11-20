@@ -42,8 +42,8 @@ internal sealed partial class ConnectorWindow
     private void CheckAutomaticTracking()
     {
         RefreshCaptureBanner();
-        if (!bridgeReady || detector != null || !automaticTracking.Checked ||
-            MissingDetectionComponent != null || DateTimeOffset.UtcNow < nextAutomaticCheck) return;
+        if (!bridgeReady || detector != null || installingRuntime || !automaticTracking.Checked ||
+            !File.Exists(DetectorPath) || DateTimeOffset.UtcNow < nextAutomaticCheck) return;
         nextAutomaticCheck = DateTimeOffset.UtcNow.AddSeconds(3);
         var candidates = GameWindows.List().Where(window => window.IsCallOfDuty).ToArray();
         var game = candidates.FirstOrDefault(window => GameWindows.VisibleClient(window) != null) ??
@@ -55,7 +55,8 @@ internal sealed partial class ConnectorWindow
     {
         string message;
         if (!bridgeReady) message = status.Text;
-        else if (MissingDetectionComponent is { } missing) message = missing + " is missing";
+        else if (installingRuntime) message = "Downloading tracking support · See Auto tracking";
+        else if (!File.Exists(DetectorPath)) message = "The bundled detector is missing";
         else if (detector is { HasExited: false } && activeCapture is { } source)
         {
             message = source.Mode == "--window" && GameWindows.VisibleClient(GameWindows.Parse(source.Input)) == null

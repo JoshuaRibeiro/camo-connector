@@ -111,6 +111,9 @@ jobs:
           $devices = & "$runtime/Capture/ffmpeg.exe" -hide_banner -devices
           if ($LASTEXITCODE -or !($devices -match '\bdshow\b')) { throw 'Bundled FFmpeg lacks DirectShow support.' }
       - run: ./tests/native-bridge.ps1 -Executable (Join-Path $env:CAMO_CHECK_ROOT 'Runtime/Bridge/CamoConnector.Bridge.exe')
+      - name: Check the standard bridge without bundled runtimes
+        if: github.ref_type == 'tag'
+        run: ./tests/native-bridge.ps1 -Executable dist/portable-release/slim/Runtime/Bridge/CamoConnector.Bridge.exe
       - uses: actions/upload-artifact@v4
         if: github.ref_type != 'tag'
         with:
@@ -128,9 +131,11 @@ jobs:
         with:
           name: CamoConnector-desktop-release
           path: |
-            dist/portable-release/CamoConnector-v*-win-x64.zip
-            dist/portable-release/portable-update.json
-            dist/portable-release/portable-update.sig
+            dist/portable-release/CamoConnector-v*-win-x64*.zip
+            dist/portable-release/portable-*.json
+            dist/portable-release/portable-*.sig
+            dist/portable-release/runtime-*.json
+            dist/portable-release/runtime-*.sig
           if-no-files-found: error
 
   publish:
@@ -149,7 +154,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          $assets = @("release/CamoConnector-$env:GITHUB_REF_NAME-win-x64.zip", 'release/portable-update.json', 'release/portable-update.sig')
+          $prefix = "CamoConnector-$env:GITHUB_REF_NAME-win-x64"
+          $assets = @(
+            "release/$prefix-slim.zip", "release/$prefix.zip", "release/$prefix-ocr.zip", "release/$prefix-capture.zip",
+            'release/portable-update.json', 'release/portable-update.sig',
+            'release/portable-slim-update.json', 'release/portable-slim-update.sig',
+            'release/runtime-ocr.json', 'release/runtime-ocr.sig', 'release/runtime-capture.json', 'release/runtime-capture.sig'
+          )
           foreach ($asset in $assets) { if (!(Test-Path -LiteralPath $asset)) { throw "Missing $asset" } }
-          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --latest --generate-notes --title "Camo Connector $env:GITHUB_REF_NAME"
+          @"
+          **Standard download:** [$prefix-slim.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix-slim.zip). Requires the x64 .NET 10 Desktop Runtime and ASP.NET Core Runtime. OCR is downloaded when first needed. Use **Download capture support** in Auto tracking for capture cards and OBS Virtual Camera.
+
+          **Offline download:** [$prefix.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix.zip). Includes the .NET runtimes, OCR and capture support. Use this ZIP when you want everything included.
+          "@ | Set-Content release-notes.md
+          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --latest --generate-notes --notes-file release-notes.md --title "Camo Connector $env:GITHUB_REF_NAME"
           if ($LASTEXITCODE) { throw 'GitHub Release publishing failed.' }

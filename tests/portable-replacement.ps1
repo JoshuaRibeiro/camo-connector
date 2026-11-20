@@ -6,13 +6,13 @@ $sources = 'ReleaseVerification.cs','PortableReplacement.cs' | ForEach-Object {
 }
 Add-Type -Path $sources
 
-function Apply-TestUpdate([string]$directory, [switch]$Interrupt, [switch]$Unmanaged) {
+function Apply-TestUpdate([string]$directory, [switch]$Interrupt, [switch]$Unmanaged, [switch]$Slim) {
     $archive = [IO.MemoryStream]::new()
     $zip = [IO.Compression.ZipArchive]::new($archive, 'Create', $true)
     try {
         $paths = @('CamoConnector.exe','Runtime/Bridge/CamoConnector.Bridge.exe',
-            'Runtime/Bridge/special-catalog.json','Runtime/Detector/CamoConnector.Detector.exe','CamoConnector.Updater.exe',
-            'Runtime/Ocr/tesseract.exe','Runtime/Ocr/libstdc++-6.dll','Runtime/Ocr/tessdata/eng.traineddata','Runtime/Capture/ffmpeg.exe')
+            'Runtime/Bridge/special-catalog.json','Runtime/Detector/CamoConnector.Detector.exe','CamoConnector.Updater.exe')
+        if (!$Slim) { $paths += 'Runtime/Ocr/tesseract.exe','Runtime/Ocr/libstdc++-6.dll','Runtime/Ocr/tessdata/eng.traineddata','Runtime/Capture/ffmpeg.exe' }
         if ($Unmanaged) { $paths += 'Data/settings.json' }
         foreach ($path in $paths) {
             $entry = $zip.CreateEntry($path)
@@ -61,7 +61,40 @@ try {
         [IO.File]::ReadAllText((Join-Path $root 'Runtime/Ocr/libstdc++-6.dll')) -ne 'new' -or
         [IO.File]::ReadAllText((Join-Path $root 'Runtime/Ocr/tessdata/eng.traineddata')) -ne 'new' -or
         (Test-Path -LiteralPath (Join-Path $root '.camo-update'))) { throw 'Successful update did not preserve data or clean up.' }
-    'Passed interrupted replacement, recovery, unmanaged ZIP rejection and data preservation.'
+    [IO.File]::WriteAllText((Join-Path $root 'Runtime/Capture/ffmpeg.exe'), 'installed capture support')
+    Apply-TestUpdate $root -Slim
+    if ([IO.File]::ReadAllText((Join-Path $root 'Runtime/Capture/ffmpeg.exe')) -ne 'installed capture support' -or
+        [IO.File]::ReadAllText((Join-Path $root 'Runtime/Ocr/tessdata/eng.traineddata')) -ne 'new') {
+        throw 'The standard update removed an installed runtime.'
+    }
+
+    foreach ($includeUnmanaged in $true, $false) {
+        $archive = [IO.MemoryStream]::new()
+        try {
+            $zip = [IO.Compression.ZipArchive]::new($archive, 'Create', $true)
+            try {
+                $paths = @('Runtime/Capture/ffmpeg.exe')
+                if ($includeUnmanaged) { $paths += 'CamoConnector.exe' }
+                foreach ($path in $paths) {
+                    $writer = [IO.StreamWriter]::new($zip.CreateEntry($path).Open())
+                    try { $writer.Write('downloaded runtime') } finally { $writer.Dispose() }
+                }
+            } finally { $zip.Dispose() }
+            $sha = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($archive.ToArray()))
+            $manifest = [CamoConnector.Update.ReleaseVerification+Manifest]::new('2.0.0','test.zip',$archive.Length,$sha)
+            try {
+                [CamoConnector.Update.PortableReplacement]::InstallRuntime($archive, $manifest, $root, 'Capture')
+                if ($includeUnmanaged) { throw 'A runtime pack could replace a program file.' }
+            } catch {
+                if (!$includeUnmanaged -or $_.Exception.ToString() -notmatch 'duplicate or unmanaged path') { throw }
+            }
+            $expected = if ($includeUnmanaged) { 'installed capture support' } else { 'downloaded runtime' }
+            if ([IO.File]::ReadAllText((Join-Path $root 'Runtime/Capture/ffmpeg.exe')) -ne $expected) {
+                throw 'The runtime install did not leave the expected files in place.'
+            }
+        } finally { $archive.Dispose() }
+    }
+    'Passed portable recovery, standard update preservation and runtime pack isolation.'
 } finally {
     if (Test-Path -LiteralPath $root) { [IO.Directory]::Delete($root, $true) }
 }

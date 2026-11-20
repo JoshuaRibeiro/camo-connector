@@ -123,7 +123,39 @@ public sealed class PortableReplacement
         Directory.Delete(work, recursive: true);
     }
 
-    private static string[] Extract(Stream archive, string output)
+    public static void InstallRuntime(Stream archive, ReleaseVerification.Manifest manifest, string directory, string component)
+    {
+        var required = component switch
+        {
+            "Ocr" => new[] { "Runtime/Ocr/tesseract.exe", "Runtime/Ocr/tessdata/eng.traineddata" },
+            "Capture" => new[] { "Runtime/Capture/ffmpeg.exe" },
+            _ => throw new ArgumentOutOfRangeException(nameof(component))
+        };
+        var root = Path.GetFullPath(directory);
+        var runtime = Path.Combine(root, "Runtime");
+        var target = Path.Combine(runtime, component);
+        ValidateDirectory(root);
+        ValidateDirectory(runtime);
+        ValidateDirectory(target);
+        ReleaseVerification.VerifyArchive(archive, manifest);
+
+        var stage = Directory.CreateDirectory(Path.Combine(runtime, ".download-" + Guid.NewGuid().ToString("N"))).FullName;
+        try
+        {
+            Extract(archive, stage, required, "Runtime/" + component + "/");
+            var backup = Path.Combine(runtime, component + ".previous-" + Guid.NewGuid().ToString("N"));
+            if (Directory.Exists(target)) Directory.Move(target, backup);
+            try { Directory.Move(Path.Combine(stage, "Runtime", component), target); }
+            catch
+            {
+                if (Directory.Exists(backup)) Directory.Move(backup, target);
+                throw;
+            }
+        }
+        finally { Directory.Delete(stage, recursive: true); }
+    }
+
+    private static string[] Extract(Stream archive, string output, string[]? required = null, string? prefix = null)
     {
         using var zip = new ZipArchive(archive, ZipArchiveMode.Read, leaveOpen: true);
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -132,7 +164,7 @@ public sealed class PortableReplacement
         foreach (var entry in zip.Entries)
         {
             var path = entry.FullName;
-            if (!Allowed(path) || !seen.Add(path) || seen.Count > 512)
+            if (!Allowed(path) || (prefix != null && !path.StartsWith(prefix, StringComparison.Ordinal)) || !seen.Add(path) || seen.Count > 512)
                 throw new InvalidDataException("The update contains a duplicate or unmanaged path: " + path);
             paths.Add(path);
             if (entry.Length <= 0 || entry.Length > 1024L * 1024 * 1024 - total)
@@ -154,7 +186,7 @@ public sealed class PortableReplacement
             if (written != entry.Length) throw new InvalidDataException("ZIP entry was incomplete.");
             destination.Flush(true);
         }
-        if (!Managed.All(required => paths.Contains(required, StringComparer.Ordinal)))
+        if (!(required ?? Managed).All(file => paths.Contains(file, StringComparer.Ordinal)))
             throw new InvalidDataException("The update is missing application files.");
         return paths.ToArray();
     }

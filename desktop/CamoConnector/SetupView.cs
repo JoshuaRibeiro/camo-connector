@@ -31,7 +31,8 @@ internal sealed partial class ConnectorWindow
         picker.Controls.Add(refreshSources, 1, 0);
         AddSetupRow(capture, picker);
         var actions = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Dock = DockStyle.Fill, Margin = Padding.Empty };
-        actions.Controls.AddRange([startDetection, stopDetection]);
+        actions.WrapContents = true;
+        actions.Controls.AddRange([startDetection, stopDetection, enableCaptureDevices]);
         AddSetupRow(capture, actions);
         AddSetupRow(capture, detectorStatus);
         AddSetupRow(capture, new Label { Text = "Capture preview", AutoSize = true, Margin = new Padding(3, 12, 3, 4) });

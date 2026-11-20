@@ -27,9 +27,6 @@ internal sealed partial class ConnectorWindow
     private Task<string>? previewErrors;
     private string DetectorPath => Path.Combine(root, "Runtime", "Detector", "CamoConnector.Detector.exe");
     private string OcrDirectory => Path.Combine(root, "Runtime", "Ocr");
-    private string? MissingDetectionComponent => !File.Exists(DetectorPath) ? "Detector executable" :
-        !File.Exists(Path.Combine(OcrDirectory, "tesseract.exe")) ? "Tesseract OCR executable" :
-        !File.Exists(Path.Combine(OcrDirectory, "tessdata", "eng.traineddata")) ? "English OCR model" : null;
     private string DataDirectory => Path.Combine(root, "Data");
     private string SourceSettings => Path.Combine(DataDirectory, "capture-source.json");
     private Process? detector;
@@ -40,6 +37,20 @@ internal sealed partial class ConnectorWindow
     {
         sources.SelectedIndexChanged += (_, _) => { UpdateCaptureButtons(); StartPreview(); };
         refreshSources.Click += async (_, _) => await RefreshSourcesAsync();
+        enableCaptureDevices.Click += async (_, _) =>
+        {
+            try
+            {
+                await InstallRuntimeAsync("Capture");
+                await RefreshSourcesAsync();
+            }
+            catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
+            catch (Exception error)
+            {
+                if (!IsDisposed) detectorStatus.Text = error.Message;
+                LogLine(captureMessages, error.Message);
+            }
+        };
         startDetection.Click += async (_, _) => await RunDetectorAsync();
         stopDetection.Click += (_, _) =>
         {
@@ -57,10 +68,12 @@ internal sealed partial class ConnectorWindow
 
     private void UpdateCaptureButtons()
     {
-        sources.Enabled = detector == null && !scanning;
-        refreshSources.Enabled = detector == null && !scanning;
-        startDetection.Enabled = bridgeReady && detector == null && !scanning && sources.SelectedItem != null &&
-            MissingDetectionComponent == null;
+        sources.Enabled = detector == null && !scanning && !installingRuntime;
+        refreshSources.Enabled = detector == null && !scanning && !installingRuntime;
+        startDetection.Enabled = bridgeReady && detector == null && !scanning && !installingRuntime && sources.SelectedItem != null &&
+            File.Exists(DetectorPath);
+        enableCaptureDevices.Visible = !BundledCaptureReady;
+        enableCaptureDevices.Enabled = !scanning && !installingRuntime && detector == null;
         stopDetection.Enabled = detector != null;
         RefreshCaptureBanner();
         if (detectionSummary != null)
@@ -70,7 +83,7 @@ internal sealed partial class ConnectorWindow
 
     private async Task RefreshSourcesAsync()
     {
-        if (scanning || detector != null) return;
+        if (scanning || installingRuntime || detector != null) return;
         scanning = true;
         UpdateCaptureButtons();
         var selected = sources.SelectedItem as Source;
@@ -91,10 +104,8 @@ internal sealed partial class ConnectorWindow
                 }
                 catch (JsonException) { }
             }
-            detectorStatus.Text = MissingDetectionComponent is { } missing
-                ? missing + " missing. Extract the complete desktop preview ZIP."
-                : "";
-            if (File.Exists(DetectorPath))
+            detectorStatus.Text = File.Exists(DetectorPath) ? "" : "The bundled detector executable is missing.";
+            if (File.Exists(DetectorPath) && CaptureReady)
             {
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
                 deadline.CancelAfter(TimeSpan.FromSeconds(10));
@@ -114,7 +125,7 @@ internal sealed partial class ConnectorWindow
         catch (OperationCanceledException) when (closing.IsCancellationRequested) { return; }
         catch (Exception error)
         {
-            if (!IsDisposed && MissingDetectionComponent == null)
+            if (!IsDisposed && File.Exists(DetectorPath))
                 detectorStatus.Text = "Capture device scan failed: " + error.Message;
             LogLine(captureMessages, "Capture device scan failed: " + error.Message);
         }
@@ -147,13 +158,15 @@ internal sealed partial class ConnectorWindow
     private async Task RunDetectorAsync(Source? automaticSource = null)
     {
         var source = automaticSource ?? sources.SelectedItem as Source;
-        if (!bridgeReady || detector != null || source == null || MissingDetectionComponent != null) return;
+        if (!bridgeReady || detector != null || installingRuntime || source == null || !File.Exists(DetectorPath)) return;
         activeCapture = source;
         captureWasAutomatic = automaticSource != null;
         Process? child = null;
         try
         {
             StopPreview();
+            if (!OcrReady) await InstallRuntimeAsync("Ocr");
+            if (closing.IsCancellationRequested || automaticSource != null && !automaticTracking.Checked) return;
             Directory.CreateDirectory(DataDirectory);
             var staging = SourceSettings + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
@@ -209,7 +222,11 @@ internal sealed partial class ConnectorWindow
             }
         }
         catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
-        catch (Exception error) { if (!IsDisposed) detectorStatus.Text = error.Message; }
+        catch (Exception error)
+        {
+            if (!IsDisposed) detectorStatus.Text = error.Message;
+            if (automaticSource != null) nextAutomaticCheck = DateTimeOffset.UtcNow.AddMinutes(1);
+        }
         finally
         {
             if (child != null)

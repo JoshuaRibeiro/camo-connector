@@ -1,4 +1,4 @@
-param([string]$OcrDirectory, [string]$OutputDirectory, [string]$CaptureDirectory)
+param([string]$OcrDirectory, [string]$OutputDirectory, [string]$CaptureDirectory, [switch]$SlimPortable)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 if (!$OutputDirectory) { $OutputDirectory = Join-Path $root 'dist/detector-development' }
@@ -30,5 +30,6 @@ if ($CaptureDirectory) {
         Copy-Item -Destination $capture
 }
 $project = Join-Path $root 'desktop/CamoConnector.Detector/CamoConnector.Detector.csproj'
-dotnet publish $project -c Release --self-contained true -o (Join-Path $output 'Runtime/Detector')
+$selfContained = if ($SlimPortable) { 'false' } else { 'true' }
+dotnet publish $project -c Release --self-contained $selfContained -o (Join-Path $output 'Runtime/Detector')
 if ($LASTEXITCODE) { throw 'Detector build failed.' }

@@ -1,5 +1,5 @@
 param([string]$OutputDirectory, [string]$UpdatePublicKeyFile, [string]$OcrDirectory, [string]$CaptureDirectory,
-    [string]$PreviewNumber)
+    [string]$PreviewNumber, [switch]$SlimPortable)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 if (!$OutputDirectory) { $OutputDirectory = Join-Path $root 'dist/desktop-preview' }
@@ -11,11 +11,13 @@ if ($PreviewNumber -and $PreviewNumber -cnotmatch '^\d+$') { throw 'Use a numeri
 $information = if ($PreviewNumber) { "$version-preview.$PreviewNumber" } else { $version }
 $keyOption = @()
 if ($UpdatePublicKeyFile) { $keyOption += '-p:UpdatePublicKeyFile=' + (Resolve-Path -LiteralPath $UpdatePublicKeyFile).Path }
-& (Join-Path $PSScriptRoot 'build-detector-development.ps1') -OutputDirectory $output -OcrDirectory $OcrDirectory -CaptureDirectory $CaptureDirectory
-dotnet publish (Join-Path $root 'desktop/CamoConnector/CamoConnector.csproj') -c Release -r win-x64 --self-contained true -p:Version=$version -p:InformationalVersion=$information @keyOption -o $output
+& (Join-Path $PSScriptRoot 'build-detector-development.ps1') -OutputDirectory $output -OcrDirectory $OcrDirectory -CaptureDirectory $CaptureDirectory -SlimPortable:$SlimPortable
+$selfContained = if ($SlimPortable) { 'false' } else { 'true' }
+$flavor = "-p:SlimPortable=$($SlimPortable.IsPresent)"
+dotnet publish (Join-Path $root 'desktop/CamoConnector/CamoConnector.csproj') -c Release -r win-x64 --self-contained $selfContained $flavor "-p:Version=$version" "-p:InformationalVersion=$information" @keyOption -o $output
 if ($LASTEXITCODE) { throw 'Desktop host build failed.' }
-dotnet publish (Join-Path $root 'desktop/CamoConnector.Updater/CamoConnector.Updater.csproj') -c Release -r win-x64 --self-contained true -p:Version=$version @keyOption -o $output
+dotnet publish (Join-Path $root 'desktop/CamoConnector.Updater/CamoConnector.Updater.csproj') -c Release -r win-x64 --self-contained $selfContained $flavor "-p:Version=$version" @keyOption -o $output
 if ($LASTEXITCODE) { throw 'Desktop updater build failed.' }
 $bridge = Join-Path $output 'Runtime/Bridge'
-dotnet publish (Join-Path $root 'desktop/CamoConnector.Bridge/CamoConnector.Bridge.csproj') -c Release -r win-x64 --self-contained true -p:Version=$version -o $bridge
+dotnet publish (Join-Path $root 'desktop/CamoConnector.Bridge/CamoConnector.Bridge.csproj') -c Release -r win-x64 --self-contained $selfContained $flavor "-p:Version=$version" -o $bridge
 if ($LASTEXITCODE) { throw 'Desktop bridge build failed.' }

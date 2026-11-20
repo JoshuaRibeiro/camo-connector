@@ -14,6 +14,14 @@ public sealed class GitHubRelease(HttpClient http)
     private const string Api = "https://api.github.com/repos/JoshuaRibeiro/camo-connector/releases/latest";
     private const string AssetPrefix = "https://github.com/JoshuaRibeiro/camo-connector/releases/download/";
 
+#if SLIM_PORTABLE
+    private const string UpdatePackage = "win-x64-slim";
+    private const string UpdateManifest = "portable-slim-update";
+#else
+    private const string UpdatePackage = "win-x64";
+    private const string UpdateManifest = "portable-update";
+#endif
+
     public async Task<ReleaseVerification.Manifest?> CheckAsync(Version installed, string publicKey, CancellationToken cancel)
     {
         using var metadata = new MemoryStream();
@@ -37,11 +45,24 @@ public sealed class GitHubRelease(HttpClient http)
         }
         using var manifest = new MemoryStream();
         using var signature = new MemoryStream();
-        await DownloadAsync(Locate("portable-update.json"), manifest, 16384, cancel);
-        await DownloadAsync(Locate("portable-update.sig"), signature, 1024, cancel);
-        var verified = ReleaseVerification.VerifyManifest(manifest.ToArray(), signature.ToArray(), publicKey, tag, installed);
+        await DownloadAsync(Locate(UpdateManifest + ".json"), manifest, 16384, cancel);
+        await DownloadAsync(Locate(UpdateManifest + ".sig"), signature, 1024, cancel);
+        var verified = ReleaseVerification.VerifyManifest(manifest.ToArray(), signature.ToArray(), publicKey, tag, installed, UpdatePackage);
         Locate(verified.Asset);
         return verified;
+    }
+
+    public async Task<ReleaseVerification.Manifest> RuntimeAsync(Version version, string component, string publicKey, CancellationToken cancel)
+    {
+        if (component is not ("ocr" or "capture")) throw new ArgumentOutOfRangeException(nameof(component));
+        var tag = "v" + version.ToString(3);
+        var prefix = AssetPrefix + tag + "/runtime-" + component;
+        using var manifest = new MemoryStream();
+        using var signature = new MemoryStream();
+        await DownloadAsync(prefix + ".json", manifest, 16384, cancel);
+        await DownloadAsync(prefix + ".sig", signature, 1024, cancel);
+        return ReleaseVerification.VerifyManifest(manifest.ToArray(), signature.ToArray(), publicKey, tag,
+            new Version(0, 0, 0), "win-x64-" + component);
     }
 
     public sealed record ExtensionPackage(Version Version, string Name, long Size);

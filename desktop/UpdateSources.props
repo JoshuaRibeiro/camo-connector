@@ -1,4 +1,7 @@
 <Project>
+  <PropertyGroup Condition="'$(SlimPortable)' == 'true'">
+    <DefineConstants>$(DefineConstants);SLIM_PORTABLE</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <Compile Include="$(MSBuildThisFileDirectory)CamoConnector.Update/*.cs" Link="Update/%(Filename)%(Extension)" />
     <EmbeddedResource Include="$(UpdatePublicKeyFile)" LogicalName="CamoConnector.Update.PublicKey"
