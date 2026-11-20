@@ -1,7 +1,7 @@
 param([string]$InterruptedRoot)
 $ErrorActionPreference = 'Stop'
 $project = Split-Path $PSScriptRoot -Parent
-$sources = 'ReleaseVerification.cs','PortableReplacement.cs' | ForEach-Object {
+$sources = 'ReleaseVerification.cs','PortableReplacement.cs','GitHubRelease.cs','PendingUpdate.cs' | ForEach-Object {
     Join-Path $project "desktop/CamoConnector.Update/$_"
 }
 Add-Type -Path $sources
@@ -93,6 +93,33 @@ try {
                 throw 'The runtime install did not leave the expected files in place.'
             }
         } finally { $archive.Dispose() }
+    }
+    $pending = [IO.Directory]::CreateDirectory((Join-Path $root 'Data/PendingUpdate')).FullName
+    $archivePath = Join-Path $pending 'update.zip'
+    $content = [Text.Encoding]::UTF8.GetBytes('verified update bytes')
+    [IO.File]::WriteAllBytes($archivePath, $content)
+    $metadata = [Text.Encoding]::UTF8.GetBytes((@{
+        version = '2.1.0'; asset = 'CamoConnector-v2.1.0-win-x64.zip'; size = $content.Length
+        sha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($content))
+    } | ConvertTo-Json -Compress))
+    $signer = [Security.Cryptography.RSA]::Create(2048)
+    try {
+        $key = $signer.ExportSubjectPublicKeyInfoPem()
+        $signature = $signer.SignData($metadata, [Security.Cryptography.HashAlgorithmName]::SHA256,
+            [Security.Cryptography.RSASignaturePadding]::Pss)
+    } finally { $signer.Dispose() }
+    [IO.File]::WriteAllBytes((Join-Path $pending 'manifest.json'), $metadata)
+    [IO.File]::WriteAllBytes((Join-Path $pending 'manifest.sig'), $signature)
+    $cached = $null
+    $opened = [CamoConnector.Update.PendingUpdate]::Open($root, [version]'2.0.0', $key, [ref]$cached)
+    if ($null -eq $opened -or $cached.Version -ne '2.1.0' -or $opened.Position -ne 0) {
+        throw 'A verified pending update could not be opened offline.'
+    }
+    $opened.Dispose()
+    $content[0] = $content[0] -bxor 1
+    [IO.File]::WriteAllBytes($archivePath, $content)
+    if ([CamoConnector.Update.PendingUpdate]::Open($root, [version]'2.0.0', $key, [ref]$cached)) {
+        throw 'A modified staged archive was accepted.'
     }
     'Passed portable recovery, standard update preservation and runtime pack isolation.'
 } finally {

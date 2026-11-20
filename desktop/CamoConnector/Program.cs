@@ -59,7 +59,6 @@ internal sealed partial class ConnectorWindow : Form
     private readonly Label updateStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly string? updateKey = UpdateEnvironment.TrustedKey();
     private static readonly Version desktopVersion = typeof(Program).Assembly.GetName().Version!;
-    private ReleaseVerification.Manifest? available;
     private Process? bridge;
     private readonly CancellationTokenSource closing = new();
 
@@ -80,49 +79,16 @@ internal sealed partial class ConnectorWindow : Form
         Shown += async (_, _) => await RefreshSourcesAsync();
         Shown += async (_, _) =>
         {
+            updateTimer.Start();
+            await CheckForUpdateAsync(manual: false);
+        };
+        updateTimer.Tick += async (_, _) => await CheckForUpdateAsync(manual: false);
+        Shown += async (_, _) =>
+        {
             await StartBridgeAsync();
             if (!IsDisposed && !closing.IsCancellationRequested && pages.SelectedTab == localTrackerPage)
                 await OpenLocalTrackerAsync();
         };
-    }
-
-    private async Task UpdateAsync()
-    {
-        if (installingRuntime)
-        {
-            updateStatus.Text = "Wait for tracking support to finish downloading.";
-            return;
-        }
-        update.Enabled = false;
-        try
-        {
-            if (available != null)
-            {
-                UpdateEnvironment.HandOff(root, available.Version);
-                Close();
-                return;
-            }
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
-            timeout.CancelAfter(TimeSpan.FromSeconds(30));
-            using var http = new HttpClient();
-            var releases = new GitHubRelease(http);
-            updateStatus.Text = "Checking desktop version.";
-            try
-            {
-                available = updateKey == null ? null : await releases.CheckAsync(
-                    new Version(desktopVersion.Major, desktopVersion.Minor, desktopVersion.Build), updateKey, timeout.Token);
-                if (!IsDisposed) updateStatus.Text = updateKey == null ? "This build has no desktop update key." :
-                    available == null ? "Desktop is up to date." : $"Desktop v{available.Version} is available.";
-            }
-            catch (Exception error)
-            {
-                available = null;
-                if (!IsDisposed) updateStatus.Text = error.Message;
-            }
-            if (!IsDisposed && available != null) update.Text = "Update and restart";
-        }
-        catch (Exception error) { if (!IsDisposed) updateStatus.Text = error.Message; }
-        finally { if (!IsDisposed) update.Enabled = true; }
     }
 
     private async Task StartBridgeAsync()
@@ -177,6 +143,7 @@ internal sealed partial class ConnectorWindow : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         closing.Cancel();
+        updateTimer.Dispose();
         setupHeadingFont?.Dispose();
         DisposeTrackerTray();
         diagnosticsTimer.Dispose();

@@ -61,27 +61,39 @@ internal static class Program
                 var release = new GitHubRelease(http);
                 var key = UpdateEnvironment.TrustedKey() ?? throw new InvalidOperationException("This updater has no release verification key.");
                 var version = Assembly.GetExecutingAssembly().GetName().Version!;
-                report("Checking the release signature…");
-                var manifest = release.CheckAsync(new Version(version.Major, version.Minor, version.Build), key, deadline.Token)
-                    .GetAwaiter().GetResult();
-                if (manifest == null || new Version(manifest.Version) != expected)
-                    throw new IOException("The available release changed. Check again from the app.");
-                var staged = Path.Combine(Path.GetTempPath(), "CamoConnector-" + Guid.NewGuid().ToString("N") + ".zip");
-                using var archive = new FileStream(staged, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
-                    65536, FileOptions.DeleteOnClose);
-                var totalMiB = manifest.Size / 1048576d;
-                progress(($"Downloading 0.0 / {totalMiB:F1} MiB.", 0));
-                var lastReport = Stopwatch.GetTimestamp();
-                release.DownloadArchiveAsync(manifest, archive, CancellationToken.None, bytes =>
+                var installed = new Version(version.Major, version.Minor, version.Build);
+                report("Verifying the downloaded update.");
+                using var pending = PendingUpdate.Open(root, installed, key, out var cached);
+                if (pending != null && cached != null && new Version(cached.Version) == expected)
                 {
-                    if (bytes < manifest.Size && Stopwatch.GetElapsedTime(lastReport) < TimeSpan.FromMilliseconds(500))
-                        return;
-                    lastReport = Stopwatch.GetTimestamp();
-                    var percent = (int)Math.Clamp(bytes * 100d / manifest.Size, 0, 100);
-                    progress(($"Downloading {bytes / 1048576d:F1} / {totalMiB:F1} MiB ({percent}%).", percent));
-                }).GetAwaiter().GetResult();
-                report("Preparing the verified update.");
-                transaction.Apply(archive, manifest, report: report);
+                    transaction.Apply(pending, cached, report: report);
+                    pending.Dispose();
+                    PendingUpdate.Discard(root);
+                }
+                else
+                {
+                    report("Checking the release signature…");
+                    var manifest = release.CheckAsync(installed, key, deadline.Token)
+                        .GetAwaiter().GetResult();
+                    if (manifest == null || new Version(manifest.Version) != expected)
+                        throw new IOException("The available release changed. Check again from the app.");
+                    var staged = Path.Combine(Path.GetTempPath(), "CamoConnector-" + Guid.NewGuid().ToString("N") + ".zip");
+                    using var archive = new FileStream(staged, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
+                        65536, FileOptions.DeleteOnClose);
+                    var totalMiB = manifest.Size / 1048576d;
+                    progress(($"Downloading 0.0 / {totalMiB:F1} MiB.", 0));
+                    var lastReport = Stopwatch.GetTimestamp();
+                    release.DownloadArchiveAsync(manifest, archive, CancellationToken.None, bytes =>
+                    {
+                        if (bytes < manifest.Size && Stopwatch.GetElapsedTime(lastReport) < TimeSpan.FromMilliseconds(500))
+                            return;
+                        lastReport = Stopwatch.GetTimestamp();
+                        var percent = (int)Math.Clamp(bytes * 100d / manifest.Size, 0, 100);
+                        progress(($"Downloading {bytes / 1048576d:F1} / {totalMiB:F1} MiB ({percent}%).", percent));
+                    }).GetAwaiter().GetResult();
+                    report("Preparing the verified update.");
+                    transaction.Apply(archive, manifest, report: report);
+                }
             }
         }
         catch (Exception error)

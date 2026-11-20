@@ -15,7 +15,7 @@ internal sealed partial class ConnectorWindow
         }
     }
 
-    private enum CaptionAction { Minimize, Maximize, Restore, Close }
+    private enum CaptionAction { Minimize, Maximize, Restore, Close, Download }
 
     private sealed class CaptionControl : Button
     {
@@ -45,6 +45,14 @@ internal sealed partial class ConnectorWindow
                         new Point(x + size, y), new Point(x + size, y + size - offset),
                         new Point(x + size - offset, y + size - offset)
                     ]);
+                    break;
+                case CaptionAction.Download:
+                    var middle = x + size / 2;
+                    var tip = y + size * 3 / 4;
+                    e.Graphics.DrawLine(pen, middle, y, middle, tip);
+                    e.Graphics.DrawLines(pen, [new Point(x + 1, y + size / 3), new Point(middle, tip),
+                        new Point(x + size - 1, y + size / 3)]);
+                    e.Graphics.DrawLine(pen, x, y + size + 2, x + size, y + size + 2);
                     break;
                 case CaptionAction.Close:
                     e.Graphics.DrawLine(pen, x, y, x + size, y + size);
@@ -105,6 +113,12 @@ internal sealed partial class ConnectorWindow
         };
         caption.Controls.Add(title);
         caption.Controls.Add(icon);
+        installUpdate = CaptionButton(CaptionAction.Download, "Install downloaded update", () => _ = UpdateAsync());
+        installUpdate.Visible = false;
+        caption.Controls.Add(installUpdate);
+        var updateHint = new ToolTip();
+        updateHint.SetToolTip(installUpdate, "Install downloaded update and restart");
+        caption.Disposed += (_, _) => updateHint.Dispose();
         caption.Controls.Add(CaptionButton(CaptionAction.Minimize, "Minimize", () => WindowState = FormWindowState.Minimized));
         caption.Controls.Add(maximize);
         caption.Controls.Add(CaptionButton(CaptionAction.Close, "Close", Close));

@@ -22,7 +22,12 @@ public sealed class GitHubRelease(HttpClient http)
     private const string UpdateManifest = "portable-update";
 #endif
 
-    public async Task<ReleaseVerification.Manifest?> CheckAsync(Version installed, string publicKey, CancellationToken cancel)
+    public sealed record SignedRelease(ReleaseVerification.Manifest Manifest, byte[] Metadata, byte[] Signature);
+
+    public async Task<ReleaseVerification.Manifest?> CheckAsync(Version installed, string publicKey, CancellationToken cancel) =>
+        (await CheckSignedAsync(installed, publicKey, cancel))?.Manifest;
+
+    public async Task<SignedRelease?> CheckSignedAsync(Version installed, string publicKey, CancellationToken cancel)
     {
         using var metadata = new MemoryStream();
         await DownloadAsync(Api, metadata, 1024 * 1024, cancel);
@@ -49,7 +54,7 @@ public sealed class GitHubRelease(HttpClient http)
         await DownloadAsync(Locate(UpdateManifest + ".sig"), signature, 1024, cancel);
         var verified = ReleaseVerification.VerifyManifest(manifest.ToArray(), signature.ToArray(), publicKey, tag, installed, UpdatePackage);
         Locate(verified.Asset);
-        return verified;
+        return new(verified, manifest.ToArray(), signature.ToArray());
     }
 
     public async Task<ReleaseVerification.Manifest> RuntimeAsync(Version version, string component, string publicKey, CancellationToken cancel)
