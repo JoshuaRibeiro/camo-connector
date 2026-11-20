@@ -72,6 +72,7 @@ internal sealed partial class ConnectorWindow : Form
         using var icon = new Icon(iconStream);
         Icon = (Icon)icon.Clone();
         StartPosition = FormStartPosition.CenterScreen;
+        ConfigureWindowFrame();
         ClientSize = new Size(1040, 720);
         MinimumSize = new Size(570, 420);
         update.Click += async (_, _) => await UpdateAsync();

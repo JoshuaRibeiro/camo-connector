@@ -139,21 +139,6 @@ internal sealed partial class ConnectorWindow
         dark = useDark;
         ApplyTheme(this, useDark);
         StyleShell();
-        var enabled = useDark ? 1 : 0;
-        if (IsHandleCreated)
-        {
-            DwmSetWindowAttribute(Handle, 20, ref enabled, sizeof(int));
-            var rounded = 2;
-            DwmSetWindowAttribute(Handle, 33, ref rounded, sizeof(int));
-            const int nonClientRenderingPolicy = 2;
-            var rendering = useDark ? 1 : 0; // Disabled, or use the window style in high contrast.
-            DwmSetWindowAttribute(Handle, nonClientRenderingPolicy, ref rendering, sizeof(int));
-            const int dwmBorderColor = 34;
-            const int noBorder = unchecked((int)0xFFFFFFFE);
-            const int systemBorder = unchecked((int)0xFFFFFFFF);
-            var border = useDark ? noBorder : systemBorder;
-            DwmSetWindowAttribute(Handle, dwmBorderColor, ref border, sizeof(int));
-        }
         Invalidate(true);
     }
 
@@ -191,9 +176,6 @@ internal sealed partial class ConnectorWindow
         if (control is TabPage page) page.UseVisualStyleBackColor = !dark;
         foreach (Control child in control.Controls) ApplyTheme(child, dark, insideCard || control is RoundedCard);
     }
-
-    [DllImport("dwmapi.dll")]
-    private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
 
     [DllImport("user32.dll", EntryPoint = "SendMessageW")]
     private static extern nint SendMessage(IntPtr window, int message, nint wParam, nint lParam);

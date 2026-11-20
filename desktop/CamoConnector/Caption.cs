@@ -4,47 +4,72 @@ namespace CamoConnector;
 
 internal sealed partial class ConnectorWindow
 {
-    protected override CreateParams CreateParams
+    private Point resizeStart;
+    private Rectangle resizeBounds;
+    private Point resizeDirection;
+
+    private void ConfigureWindowFrame()
     {
-        get
-        {
-            const int caption = 0x00C00000;
-            var parameters = base.CreateParams;
-            parameters.Style &= ~caption;
-            return parameters;
-        }
+        FormBorderStyle = FormBorderStyle.None;
+        UpdateResizePadding();
+        Resize += (_, _) => UpdateResizePadding();
     }
 
-    protected override void WndProc(ref Message message)
+    private void UpdateResizePadding() => Padding =
+        WindowState == FormWindowState.Normal ? new Padding(LogicalToDeviceUnits(4)) : Padding.Empty;
+
+    private Point ResizeDirection(Point cursor) => new(
+        cursor.X < Padding.Left ? -1 : cursor.X >= ClientSize.Width - Padding.Right ? 1 : 0,
+        cursor.Y < Padding.Top ? -1 : cursor.Y >= ClientSize.Height - Padding.Bottom ? 1 : 0);
+
+    protected override void OnMouseDown(MouseEventArgs e)
     {
-        const int calculateClient = 0x0083;
-        const int hitTest = 0x0084;
-        const int client = 1, topEdge = 12;
-        if (message.Msg == calculateClient && message.LParam != 0 && !IsZoomed(message.HWnd))
-        {
-            // Preserve the proposed window rectangle as the client rectangle.
-            message.Result = 0;
-            return;
-        }
+        base.OnMouseDown(e);
+        if (e.Button != MouseButtons.Left || WindowState != FormWindowState.Normal) return;
+        resizeDirection = ResizeDirection(e.Location);
+        if (resizeDirection.IsEmpty) return;
+        resizeStart = Cursor.Position;
+        resizeBounds = Bounds;
+        Capture = true;
+    }
 
-        base.WndProc(ref message);
-        if (message.Msg != hitTest || message.Result != client || IsZoomed(message.HWnd)) return;
-
-        var packed = message.LParam.ToInt64();
-        var point = PointToClient(new Point(unchecked((short)packed), unchecked((short)(packed >> 16))));
-        var edge = LogicalToDeviceUnits(5);
-        var horizontal = point.X < edge ? -1 : point.X >= ClientSize.Width - edge ? 1 : 0;
-        var vertical = point.Y < edge ? -1 : point.Y >= ClientSize.Height - edge ? 1 : 0;
-        message.Result = (horizontal, vertical) switch
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        var direction = resizeDirection.IsEmpty ? ResizeDirection(e.Location) : resizeDirection;
+        Cursor = (direction.X, direction.Y) switch
         {
-            (-1, -1) => 13, (1, -1) => 14, (-1, 1) => 16, (1, 1) => 17,
-            (-1, 0) => 10, (1, 0) => 11, (0, -1) => topEdge, (0, 1) => 15,
-            _ => client
+            (-1, -1) or (1, 1) => Cursors.SizeNWSE,
+            (-1, 1) or (1, -1) => Cursors.SizeNESW,
+            (_, 0) when direction.X != 0 => Cursors.SizeWE,
+            (0, _) when direction.Y != 0 => Cursors.SizeNS,
+            _ => Cursors.Default
         };
+        if (resizeDirection.IsEmpty || !Capture) return;
+
+        var cursor = Cursor.Position;
+        var dx = cursor.X - resizeStart.X;
+        var dy = cursor.Y - resizeStart.Y;
+        int left = resizeBounds.Left, top = resizeBounds.Top;
+        int right = resizeBounds.Right, bottom = resizeBounds.Bottom;
+        if (direction.X < 0) left = Math.Min(left + dx, right - MinimumSize.Width);
+        if (direction.X > 0) right = Math.Max(right + dx, left + MinimumSize.Width);
+        if (direction.Y < 0) top = Math.Min(top + dy, bottom - MinimumSize.Height);
+        if (direction.Y > 0) bottom = Math.Max(bottom + dy, top + MinimumSize.Height);
+        Bounds = Rectangle.FromLTRB(left, top, right, bottom);
     }
 
-    [DllImport("user32.dll")]
-    private static extern bool IsZoomed(nint window);
+    protected override void OnMouseUp(MouseEventArgs e)
+    {
+        base.OnMouseUp(e);
+        if (e.Button == MouseButtons.Left && !resizeDirection.IsEmpty) Capture = false;
+    }
+
+    protected override void OnMouseCaptureChanged(EventArgs e)
+    {
+        base.OnMouseCaptureChanged(e);
+        if (!Capture) resizeDirection = Point.Empty;
+    }
 
     private enum CaptionAction { Minimize, Maximize, Restore, Close, Download }
 
@@ -156,8 +181,16 @@ internal sealed partial class ConnectorWindow
         Controls.Add(caption);
     }
 
-    private void ToggleMaximized() => WindowState = WindowState == FormWindowState.Maximized
-        ? FormWindowState.Normal : FormWindowState.Maximized;
+    private void ToggleMaximized()
+    {
+        if (WindowState == FormWindowState.Maximized)
+            WindowState = FormWindowState.Normal;
+        else
+        {
+            MaximizedBounds = Screen.FromControl(this).WorkingArea;
+            WindowState = FormWindowState.Maximized;
+        }
+    }
 
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
