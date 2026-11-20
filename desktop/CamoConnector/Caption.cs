@@ -4,6 +4,17 @@ namespace CamoConnector;
 
 internal sealed partial class ConnectorWindow
 {
+    protected override CreateParams CreateParams
+    {
+        get
+        {
+            const int thickFrame = 0x00040000, maximizeBox = 0x00010000, systemMenu = 0x00080000;
+            var parameters = base.CreateParams;
+            parameters.Style |= thickFrame | maximizeBox | systemMenu;
+            return parameters;
+        }
+    }
+
     private Point resizeStart;
     private Rectangle resizeBounds;
     private Point resizeDirection;
@@ -13,6 +24,12 @@ internal sealed partial class ConnectorWindow
         FormBorderStyle = FormBorderStyle.None;
         UpdateResizePadding();
         Resize += (_, _) => UpdateResizePadding();
+        HandleCreated += (_, _) =>
+        {
+            const int borderColor = 34;
+            var noBorder = unchecked((int)0xFFFFFFFE);
+            DwmSetWindowAttribute(Handle, borderColor, ref noBorder, sizeof(int));
+        };
     }
 
     private void UpdateResizePadding() => Padding =
@@ -35,7 +52,14 @@ internal sealed partial class ConnectorWindow
 
     protected override void WndProc(ref Message message)
     {
-        const int setCursor = 0x0020;
+        const int calculateClient = 0x0083, setCursor = 0x0020;
+        if (message.Msg == calculateClient && message.WParam != 0 &&
+            WindowState != FormWindowState.Maximized)
+        {
+            // The resize style makes the window eligible for Snap. Keep the custom header in the client area.
+            message.Result = 0;
+            return;
+        }
         if (message.Msg != setCursor || message.WParam != message.HWnd || WindowState != FormWindowState.Normal)
         {
             base.WndProc(ref message);
@@ -204,6 +228,9 @@ internal sealed partial class ConnectorWindow
             WindowState = FormWindowState.Maximized;
         }
     }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(nint window, int attribute, ref int value, int size);
 
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();

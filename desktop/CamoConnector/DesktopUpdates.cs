@@ -21,8 +21,6 @@ internal sealed partial class ConnectorWindow
             updateStatus.Text = "Wait for tracking support to finish downloading.";
             return;
         }
-        if (MessageBox.Show(this, $"Install v{available.Version} and restart Camo Connector?",
-                "Update ready", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
         try
         {
             UpdateEnvironment.HandOff(root, available.Version);
