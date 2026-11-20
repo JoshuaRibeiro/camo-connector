@@ -603,15 +603,16 @@ internal sealed class HudCapture : IDisposable
             ? new[] { (Heading: (.02, .01, .36, .09), Area: (.25, .14, .52, .69), Thumbnail: (.075, .155, .168, .007)) }
             : new[]
             {
-                (Heading: (.654, .383, .095, .035), Area: (.714, .432, .135, .278), Thumbnail: (.670, .039, .069, .004)),
+                (Heading: (.067, .114, .110, .038), Area: (.121, .156, .141, .335), Thumbnail: (.084, .039, .069, .004)),
                 (Heading: (.740, .117, .110, .037), Area: (.792, .159, .146, .335), Thumbnail: (.760, .039, .069, .004)),
-                (Heading: (.067, .114, .110, .038), Area: (.121, .156, .141, .335), Thumbnail: (.084, .039, .069, .004))
+                (Heading: (.654, .383, .095, .035), Area: (.714, .432, .135, .278), Thumbnail: (.670, .039, .069, .004))
             };
         for (var i = 0; i < layouts.Length; i++)
         {
             var layout = layouts[i];
+            var lobby = layouts.Length == 3 && i < 2;
             var (heading, _) = await ReadTextAsync(frame, layout.Heading, cancel, trace: trace, regionName: $"trackedHeading{i + 1}");
-            if (!TrackedCamoRecognition.IsPanel(heading) && layouts.Length == 3 && i >= 1)
+            if (!TrackedCamoRecognition.IsPanel(heading) && lobby)
             {
                 var (headingX, headingY, _, _) = layout.Heading;
                 (heading, _) = await ReadTextAsync(frame, (headingX + .006, headingY + .006, .051, .026),
@@ -619,7 +620,7 @@ internal sealed class HudCapture : IDisposable
                     regionName: $"trackedHeadingTight{i + 1}");
             }
             if (!TrackedCamoRecognition.IsPanel(heading) &&
-                !(layouts.Length == 3 && i >= 1 && heading.Trim().Equals("CAMUS", StringComparison.OrdinalIgnoreCase))) continue;
+                !(lobby && heading.Trim().Equals("CAMUS", StringComparison.OrdinalIgnoreCase))) continue;
             var (text, height) = await ReadTextAsync(frame, layout.Area, cancel, positioned: true, pageMode: 11,
                 trace: trace, regionName: "trackedRows");
             var lines = TrackedCamoRecognition.ReadTsv(text, height);
@@ -634,7 +635,7 @@ internal sealed class HudCapture : IDisposable
                 .ToArray();
             var fallback = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail, counters);
             var merged = TrackedCamoRecognition.MergeRows(rows, fallback);
-            if (layouts.Length == 3 && i >= 1)
+            if (lobby)
             {
                 var firstWeapon = lines.Where(line => line.Y < .10)
                     .Select(line => TrackedCamoRecognition.ReadWeapon(line.Text)).FirstOrDefault(name => name != null);
@@ -646,9 +647,9 @@ internal sealed class HudCapture : IDisposable
                     if (TrackedCamoRecognition.ReadWeapon(weapon) is { } recovered &&
                         !merged.Any(row => row.Weapon == recovered))
                     {
-                        var (objective, _) = await ReadTextAsync(frame, (x, .188, w, .030), cancel, pageMode: 7,
+                        var (objective, _) = await ReadTextAsync(frame, (x, .188, w * .76, .042), cancel, pageMode: 6,
                             trace: trace, regionName: "trackedFirstObjective");
-                        var firstCounterArea = (x + w * .56, .220, w * .44, .031);
+                        var firstCounterArea = (x + w * .66, .222, w * .34, .026);
                         var (counter, _) = await ReadTextAsync(frame, firstCounterArea, cancel,
                             pageMode: 7, countersOnly: true, trace: trace, regionName: "trackedFirstCounter");
                         if (!System.Text.RegularExpressions.Regex.IsMatch(counter.Trim(), @"\A[0-9]+\s*/\s*[0-9]+\z"))

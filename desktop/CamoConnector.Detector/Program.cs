@@ -217,6 +217,9 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             (previousMenuMilitary != null && !seenUnlocks.Contains(previousMenuMilitary));
         var menuWeapon = paddedMenu ?? (pollProgress ? await capture.ReadCamoMenuWeaponAsync(frame, cancel, requireHeading: true) : null);
         var scanGameplay = menuWeapon == null;
+        var trackedProgress = scanGameplay && pollProgress
+            ? ReadSnapshotAsync(frame, copy => capture.DetectTrackedCamosAsync(copy, cancel))
+            : null;
         var scanLobby = scanGameplay && now - lastLobbyScan >= TimeSpan.FromSeconds(1);
         var scanChallenge = scanGameplay && now - lastChallengeScan >= TimeSpan.FromMilliseconds(200);
         var unlockRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectMilitaryUnlockAsync(copy, cancel)) :
@@ -410,7 +413,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     context = "camo-menu", at = now
                 }, cancel);
             }
-            var reads = await ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
+            var reads = await ReadProgressAsync(frame, capture, menuWeapon, result.Replay, trackedProgress, cancel);
             camoReads += reads.Length;
             foreach (var progress in progressConfirmation.ObserveRows(reads))
             {
@@ -493,11 +496,12 @@ static async Task<T> ReadSnapshotAsync<T>(Bitmap frame, Func<Bitmap, Task<T>> re
     return await read(copy);
 }
 
-static async Task<CamoProgress[]> ReadProgressAsync(Bitmap frame, HudCapture capture, string? menuWeapon, bool replay, CancellationToken cancel)
+static async Task<CamoProgress[]> ReadProgressAsync(Bitmap frame, HudCapture capture, string? menuWeapon, bool replay, Task<CamoProgress[]>? trackedProgress, CancellationToken cancel)
 {
+    var tracked = trackedProgress == null ? null : await trackedProgress;
     if (replay) return [];
     var hovered = await capture.DetectCamoProgressAsync(frame, menuWeapon, cancel);
-    return hovered != null ? [hovered] : await capture.DetectTrackedCamosAsync(frame, cancel);
+    return hovered != null ? [hovered] : tracked ?? await capture.DetectTrackedCamosAsync(frame, cancel);
 }
 
 static Task AppendAsync(string log, object record, CancellationToken stop) =>
