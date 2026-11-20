@@ -33,11 +33,17 @@ internal sealed partial class ConnectorWindow
         Capture = true;
     }
 
-    protected override void OnMouseMove(MouseEventArgs e)
+    protected override void WndProc(ref Message message)
     {
-        base.OnMouseMove(e);
-        var direction = resizeDirection.IsEmpty ? ResizeDirection(e.Location) : resizeDirection;
-        Cursor = (direction.X, direction.Y) switch
+        const int setCursor = 0x0020;
+        if (message.Msg != setCursor || message.WParam != message.HWnd || WindowState != FormWindowState.Normal)
+        {
+            base.WndProc(ref message);
+            return;
+        }
+
+        var direction = ResizeDirection(PointToClient(Cursor.Position));
+        Cursor.Current = (direction.X, direction.Y) switch
         {
             (-1, -1) or (1, 1) => Cursors.SizeNWSE,
             (-1, 1) or (1, -1) => Cursors.SizeNESW,
@@ -45,7 +51,14 @@ internal sealed partial class ConnectorWindow
             (0, _) when direction.Y != 0 => Cursors.SizeNS,
             _ => Cursors.Default
         };
+        message.Result = 1;
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
         if (resizeDirection.IsEmpty || !Capture) return;
+        var direction = resizeDirection;
 
         var cursor = Cursor.Position;
         var dx = cursor.X - resizeStart.X;
