@@ -38,11 +38,56 @@ public static class CombatRecognition
     public static bool HasCompletionistGold(string text) =>
         Regex.IsMatch(text, @"\bCOMPLETIONIST\s*\[?\s*[1-4]\s*/\s*4\b", IgnoreCase);
 
-    public static bool IsPronePlatinumBanner(string detail)
+    // Interior of the Platinum swatch from a verified in-game completion banner.
+    private static readonly byte[] PlatinumArtwork = Convert.FromBase64String(
+        "q6CalpCNgnRrbGxrp5uSjYuLgnd0cGdZm5aQioOGgnp2cmhPmJCNi4Z/e3BsamFGlIuGhn9yaGBdV05Chn9xbGliWVZSTUdBdWtlYl9VU1BLSkNAbGdfWlxWV09LSUVHZ2dgWFhXVVJNSUlGYV1dWlhWU1NRTUpGYFtdWldXVFFRTktLX11cWllYVVNQTk5K");
+    private static readonly double[] PlatinumTexture = ArtworkTexture(Array.ConvertAll(PlatinumArtwork, value => (double)value));
+
+    public static bool IsPlatinumArtwork(byte[]? rgb)
     {
-        var objective = Regex.Replace(detail.ToUpperInvariant(), "[^A-Z0-9]", "");
-        // The banner font can turn GET into GEL and KILLS into KIELS.
-        return Regex.IsMatch(objective, @"\A(?:GE[TL])?75PLAYERKI[LE][LE]SWHILEPRONE\z");
+        if (rgb is not { Length: 432 }) return false;
+        var luminance = new double[144];
+        var colorDifference = 0d;
+        var brightnessDifference = 0d;
+        for (var i = 0; i < luminance.Length; i++)
+        {
+            var red = rgb[i * 3];
+            var green = rgb[i * 3 + 1];
+            var blue = rgb[i * 3 + 2];
+            luminance[i] = (red + green + blue) / 3d;
+            colorDifference += Math.Max(red, Math.Max(green, blue)) - Math.Min(red, Math.Min(green, blue));
+            brightnessDifference += Math.Abs(luminance[i] - PlatinumArtwork[i]);
+        }
+        if (colorDifference / 144 > 17 || brightnessDifference / 144 > 23) return false;
+        var texture = ArtworkTexture(luminance);
+        var overlap = 0d;
+        var energy = 0d;
+        var referenceEnergy = 0d;
+        for (var i = 0; i < texture.Length; i++)
+        {
+            overlap += texture[i] * PlatinumTexture[i];
+            energy += texture[i] * texture[i];
+            referenceEnergy += PlatinumTexture[i] * PlatinumTexture[i];
+        }
+        return energy >= referenceEnergy * .2 && overlap >= .65 * Math.Sqrt(energy * referenceEnergy);
+    }
+
+    private static double[] ArtworkTexture(double[] pixels)
+    {
+        // Compare texture after removing the horizontal and vertical lighting gradients.
+        var rows = new double[12];
+        var columns = new double[12];
+        var mean = 0d;
+        for (var i = 0; i < pixels.Length; i++)
+        {
+            rows[i / 12] += pixels[i] / 12;
+            columns[i % 12] += pixels[i] / 12;
+            mean += pixels[i] / pixels.Length;
+        }
+        var texture = new double[pixels.Length];
+        for (var i = 0; i < pixels.Length; i++)
+            texture[i] = pixels[i] - rows[i / 12] - columns[i % 12] + mean;
+        return texture;
     }
 
     public static bool IsGoldBanner(string heading, string detail, bool goldTile)

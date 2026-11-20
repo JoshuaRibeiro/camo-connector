@@ -272,12 +272,15 @@ if ($devices.Length -ne 2 -or $devices[0].Input -ne '@device_pnp_elgato' -or
     $devices[1].Input -ne 'OBS Virtual Camera') { throw 'DirectShow capture device enumeration failed.' }
 'Passed DirectShow device listing, stable identifiers and audio filtering.'
 $combat = [CamoConnector.Detector.CombatRecognition]
-if (!$combat::IsPronePlatinumBanner('GET 75 PLAYER KILLS WHILE PRONE') -or
-    !$combat::IsPronePlatinumBanner('GEL-75 PLAYER*KIELS WHILE PRONE') -or
-    $combat::IsPronePlatinumBanner('GET 25 PLAYER KILLS WHILE PRONE') -or
-    $combat::IsPronePlatinumBanner('GET 75 PLAYER KILLS WHILE CROUCHED')) {
-    throw 'Platinum prone objective did not require the recorded wording and goal'
+$swatch = [Convert]::FromBase64String('q6CalpCNgnRrbGxrp5uSjYuLgnd0cGdZm5aQioOGgnp2cmhPmJCNi4Z/e3BsamFGlIuGhn9yaGBdV05Chn9xbGliWVZSTUdBdWtlYl9VU1BLSkNAbGdfWlxWV09LSUVHZ2dgWFhXVVJNSUlGYV1dWlhWU1NRTUpGYFtdWldXVFFRTktLX11cWllYVVNQTk5K')
+[byte[]]$platinum = foreach ($value in $swatch) { $value; $value; $value }
+[byte[]]$flatGray = @(100) * 432
+[byte[]]$gradient = foreach ($index in 0..143) {
+    $value = 130 - 4 * [Math]::Floor($index / 12) - 3 * ($index % 12)
+    $value; $value; $value
 }
+if (!$combat::IsPlatinumArtwork($platinum) -or $combat::IsPlatinumArtwork($flatGray) -or
+    $combat::IsPlatinumArtwork($gradient)) { throw 'Platinum artwork texture check failed' }
 $specials = [CamoConnector.Detector.SpecialUnlocks]
 $camos = [CamoConnector.Detector.CamoReference[]]@(
     [CamoConnector.Detector.CamoReference]::new('A', $null, 1, 25)

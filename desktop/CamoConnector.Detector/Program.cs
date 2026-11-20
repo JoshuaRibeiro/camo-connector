@@ -358,13 +358,13 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                         {
                             kind = "completionist-unlock", source = "live", mode = "mp", weapon = result.Weapon?.Name, challenge = "Gold", at = now
                         }, cancel);
-                    else if (challenge == "platinum-prone-75")
+                    else if (challenge == "platinum")
                     {
-                        if (candidate == "KG-7 Vulcan" && seenChallenges.Add(candidate + "|" + challenge))
+                        if (result.Weapon?.Name is { } platinumWeapon && seenChallenges.Add(platinumWeapon + "|" + challenge))
                             await AppendAsync(log, new
                             {
                                 kind = "completionist-unlock", source = "live", mode = "mp",
-                                weapon = candidate, challenge = "Platinum", goal = 75, at = now
+                                weapon = platinumWeapon, challenge = "Platinum", at = now
                             }, cancel);
                     }
                     else if (challenge != null && challenge != "gold-15" && (candidate == "Sang 9mm" || candidate == null && challenge != "menu-space-time") &&
