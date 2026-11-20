@@ -582,7 +582,15 @@ internal sealed class HudCapture : IDisposable
         {
             var layout = layouts[i];
             var (heading, _) = await ReadTextAsync(frame, layout.Heading, cancel, trace: trace, regionName: $"trackedHeading{i + 1}");
-            if (!TrackedCamoRecognition.IsPanel(heading)) continue;
+            if (!TrackedCamoRecognition.IsPanel(heading) && layouts.Length == 3 && i >= 1)
+            {
+                var (headingX, headingY, _, _) = layout.Heading;
+                (heading, _) = await ReadTextAsync(frame, (headingX + .006, headingY + .006, .051, .026),
+                    cancel, pageMode: 7, adjustment: PixelAdjustment.Contrast, trace: trace,
+                    regionName: $"trackedHeadingTight{i + 1}");
+            }
+            if (!TrackedCamoRecognition.IsPanel(heading) &&
+                !(layouts.Length == 3 && i >= 1 && heading.Trim().Equals("CAMUS", StringComparison.OrdinalIgnoreCase))) continue;
             var (text, height) = await ReadTextAsync(frame, layout.Area, cancel, positioned: true, pageMode: 11,
                 trace: trace, regionName: "trackedRows");
             var lines = TrackedCamoRecognition.ReadTsv(text, height);
@@ -611,8 +619,12 @@ internal sealed class HudCapture : IDisposable
                     {
                         var (objective, _) = await ReadTextAsync(frame, (x, .188, w, .030), cancel, pageMode: 7,
                             trace: trace, regionName: "trackedFirstObjective");
-                        var (counter, _) = await ReadTextAsync(frame, (x + w * .56, .220, w * .44, .031), cancel,
+                        var firstCounterArea = (x + w * .56, .220, w * .44, .031);
+                        var (counter, _) = await ReadTextAsync(frame, firstCounterArea, cancel,
                             pageMode: 7, countersOnly: true, trace: trace, regionName: "trackedFirstCounter");
+                        if (!System.Text.RegularExpressions.Regex.IsMatch(counter.Trim(), @"\A[0-9]+\s*/\s*[0-9]+\z"))
+                            (counter, _) = await ReadTextAsync(frame, firstCounterArea, cancel, pageMode: 7,
+                                adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "trackedFirstCounterContrast");
                         var first = TrackedCamoRecognition.ReadRows(
                             [new(recovered, 0), new(objective, .12)], catalog, static _ => null, [new(counter, .22)]);
                         merged = TrackedCamoRecognition.MergeRows(merged, first);

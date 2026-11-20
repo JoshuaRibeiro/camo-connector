@@ -183,14 +183,14 @@ if ($rows.Length -ne 2 -or $rows[0].Weapon -ne 'Signal 50' -or $rows[0].Camo -ne
     throw 'The lobby failed to associate Signal 50 Platinum with its own 29/75 counter.'
 }
 $firstCard = [CamoConnector.Detector.HudLine[]]@(
-    [CamoConnector.Detector.HudLine]::new('SIGNAL 50', 0)
+    [CamoConnector.Detector.HudLine]::new('| SIGNAL SO', 0)
     [CamoConnector.Detector.HudLine]::new('Get 75 Player Kills while Prone', .12)
 )
 $firstCounter = [CamoConnector.Detector.HudLine[]]@([CamoConnector.Detector.HudLine]::new('51 / 75', .22))
 $rows = $tracked::ReadRows($firstCard, $catalog, [Func[double,byte[]]]{ param($y) return $null }, $firstCounter)
 if ($rows.Length -ne 1 -or $rows[0].Weapon -ne 'Signal 50' -or
     $rows[0].Camo -ne 'Platinum' -or $rows[0].Count -ne 51) {
-    throw 'The isolated first lobby card failed to recover Signal 50 Platinum at 51/75.'
+    throw 'The isolated first lobby card failed to recover Signal 50 Platinum from SIGNAL SO.'
 }
 $trackedLines = [CamoConnector.Detector.HudLine[]]@(
     [CamoConnector.Detector.HudLine]::new('Signal 50', .02)
