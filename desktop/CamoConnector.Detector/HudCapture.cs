@@ -407,9 +407,11 @@ internal sealed class HudCapture : IDisposable
         if (!completed && (heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
             heading.Contains("OMPLETED", StringComparison.OrdinalIgnoreCase)))
             completed = !goldTile && IdentifySpecialBanner(frame, null, null, bannerArtworkOnly: true) != null;
-        if (!goldTile && !completed) return (null, false, null);
-        if (completed && !goldTile && CombatRecognition.IsPlatinumArtwork(Sample(frame, .148, (.471, .058, .102, 0))))
+        if (!goldTile && (completed || heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
+            System.Text.RegularExpressions.Regex.IsMatch(heading, @"[CG]OMPLE", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) &&
+            CombatRecognition.IsPlatinumArtwork(Sample(frame, .148, (.471, .058, .102, 0))))
             return ("platinum", true, null);
+        if (!goldTile && !completed) return (null, false, null);
         var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)
             ? "gold-15" : SpecialUnlocks.ReadBanner(heading, text);

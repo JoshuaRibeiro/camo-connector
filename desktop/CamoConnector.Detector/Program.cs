@@ -360,7 +360,9 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                         }, cancel);
                     else if (challenge == "platinum")
                     {
-                        if (result.Weapon?.Name is { } platinumWeapon && seenChallenges.Add(platinumWeapon + "|" + challenge))
+                        var platinumWeapon = result.Weapon?.Name ??
+                            (now - lastConfirmedWeapon <= TimeSpan.FromSeconds(1.25) ? confirmedWeapon : null);
+                        if (platinumWeapon != null && seenChallenges.Add(platinumWeapon + "|" + challenge))
                             await AppendAsync(log, new
                             {
                                 kind = "completionist-unlock", source = "live", mode = "mp",
