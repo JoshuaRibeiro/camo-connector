@@ -1,4 +1,3 @@
-using CamoConnector.Capture;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text.Json;
@@ -12,7 +11,6 @@ internal sealed partial class ConnectorWindow
         public override string ToString() => Name;
     }
 
-    private static readonly Source AutomaticSource = new("", "", "Detect Call of Duty automatically");
 
     private sealed record Device(string Name, string Input);
     private readonly ComboBox sources = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
@@ -20,7 +18,7 @@ internal sealed partial class ConnectorWindow
     private readonly Label detectorStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly PictureBox preview = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
     private readonly Label previewStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
-    private readonly System.Windows.Forms.Timer previewTimer = new() { Interval = 66 };
+    private readonly System.Windows.Forms.Timer previewTimer = new() { Interval = 33 };
     private byte[]? pendingPreview;
     private CancellationTokenSource? previewRead;
     private Process? previewWorker;
@@ -91,11 +89,9 @@ internal sealed partial class ConnectorWindow
         scanning = true;
         UpdateCaptureButtons();
         var selected = sources.SelectedItem as Source;
-        var found = GameWindows.List().OrderByDescending(window => window.IsCallOfDuty)
-            .Select(window => new Source("--window", window.Input, window.Title)).ToList();
-        found.AddRange(Screen.AllScreens.Select((screen, index) =>
+        var found = Screen.AllScreens.Select((screen, index) =>
             new Source("--monitor", index.ToString(), $"Monitor {index + 1} ({screen.Bounds.Width} × {screen.Bounds.Height})",
-                screen.DeviceName)));
+                screen.DeviceName)).ToList();
         try
         {
             StopPreview();
@@ -138,11 +134,11 @@ internal sealed partial class ConnectorWindow
             if (!IsDisposed && !closing.IsCancellationRequested)
             {
                 sources.Items.Clear();
-                sources.Items.Add(AutomaticSource);
                 sources.Items.AddRange(found.ToArray());
                 var preferred = found.FindIndex(source => selected != null && source.Mode == selected.Mode &&
                     (selected.MonitorId != null ? source.MonitorId == selected.MonitorId : source.Input == selected.Input));
-                sources.SelectedIndex = preferred + 1;
+                sources.SelectedIndex = preferred >= 0 || selected != null ? preferred :
+                    found.FindIndex(source => source.MonitorId == Screen.PrimaryScreen?.DeviceName);
             }
             scanning = false;
             if (!IsDisposed && !closing.IsCancellationRequested)
@@ -251,7 +247,7 @@ internal sealed partial class ConnectorWindow
         {
             StopPreview();
             if (scanning || detector != null || closing.IsCancellationRequested || pages.SelectedTab != capturePage ||
-                sources.SelectedItem is not Source source || source.Mode is "" or "--window" || !File.Exists(DetectorPath)) return;
+                sources.SelectedItem is not Source source || !File.Exists(DetectorPath)) return;
             var mode = source.Mode == "--device" ? "--preview-device" : "--preview-monitor";
             previewWorker = LaunchDetector(mode, source.MonitorId ?? source.Input);
             _ = StartReadingPreview(previewWorker);

@@ -75,7 +75,15 @@ function renderOverview() {
   const entries = [element('p', heading.join(' · '), 'subtitle')];
   const rules = new Map(weapon.camos.map(rule => [rule.id, rule]));
   for (const row of overview.rows) entries.push(camoRow(rules.get(row.id), weapon.id, row));
-  if (!overview.rows.length) entries.push(element('p', overview.complete
+  if (overview.waiting && rules.has(overview.waiting)) {
+    const waiting = rules.get(overview.waiting);
+    const next = element('div', null, 'camo-row');
+    const copy = element('div');
+    copy.append(element('div', waiting.name, 'camo-name'));
+    copy.append(element('p', waiting.unlock ?? 'Complete the prerequisite camos to unlock this challenge.', 'prerequisite'));
+    next.append(copy, element('span', 'Waiting to unlock', 'subtitle'));
+    entries.push(next);
+  } else if (!overview.rows.length) entries.push(element('p', overview.complete
     ? 'All weapon camos complete' : 'No camo challenges available', 'overview-empty'));
 
   const completed = weapon.camos.filter(rule => state.progress[weapon.id + ':' + rule.id]?.done);
@@ -196,7 +204,7 @@ async function poll() {
     state = next;
     render();
   } catch (error) { statusLine.textContent = error.message; }
-  finally { setTimeout(poll, 750); }
+  finally { setTimeout(poll, 300); }
 }
 
 byId('search').addEventListener('input', renderRoster);

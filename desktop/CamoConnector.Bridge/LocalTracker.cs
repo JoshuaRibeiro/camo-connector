@@ -127,7 +127,9 @@ internal sealed class LocalTracker
                     };
                 }).ToArray();
             return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
-                minimumLevel = knownLevel, rows, complete = remaining.Length == 0 };
+                minimumLevel = knownLevel, rows,
+                waiting = rows.Length == 0 ? remaining.FirstOrDefault()?.Id : null,
+                complete = remaining.Length == 0 };
         }
     }
 

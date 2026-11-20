@@ -57,7 +57,7 @@ internal sealed partial class ConnectorWindow
         detectionSummary = new Label { AutoSize = true };
         var trackerShortcut = new Button { Text = "Open Tracker", AutoSize = true };
         trackerShortcut.Click += (_, _) => pages.SelectedTab = localTrackerPage;
-        var syncHelp = new Label { Text = "Use automatic PC detection or select a window, monitor, or capture device.", AutoSize = true };
+        var syncHelp = new Label { Text = "Select the monitor showing the game, an Elgato capture card, or OBS Virtual Camera.", AutoSize = true };
         var sidebar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Margin = new Padding(4, 0, 0, 0) };
         AddSetupRow(sidebar, SetupSection("Connection", status, detectionSummary));
         AddSetupRow(sidebar, SetupSection("Capture sources", syncHelp, trackerShortcut));

@@ -237,6 +237,9 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         var scanStarted = Stopwatch.GetTimestamp();
         var pollProgress = lastMenuWeapon != null || now - lastProgressScan >= TimeSpan.FromMilliseconds(400) ||
             (previousMenuMilitary != null && !seenUnlocks.Contains(previousMenuMilitary));
+        var gameplayWeapon = paddedMenu == null
+            ? ReadSnapshotAsync(frame, copy => capture.DetectAsync(copy, cancel))
+            : null;
         var menuWeapon = paddedMenu ?? (pollProgress ? await capture.ReadCamoMenuWeaponAsync(frame, cancel, requireHeading: true) : null);
         var scanGameplay = menuWeapon == null;
         var scanLobby = scanGameplay && now - lastLobbyScan >= TimeSpan.FromSeconds(1);
@@ -247,11 +250,10 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         var challengeRead = scanChallenge ? ReadSnapshotAsync(frame, copy => capture.DetectChallengeBannerAsync(copy, cancel)) : null;
         var combatRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectCombatAsync(copy, cancel)) :
             Task.FromResult(new CombatRead(false, false, null));
-        var weaponRead = scanGameplay ? capture.DetectAsync(frame, cancel) :
-            Task.FromResult<(WeaponRead? Weapon, bool Replay)>((null, false));
+        var weaponRead = gameplayWeapon ?? Task.FromResult<(WeaponRead? Weapon, bool Replay)>((null, false));
         await Task.WhenAll(unlockRead, (Task?)lobbyRead ?? Task.CompletedTask,
             (Task?)challengeRead ?? Task.CompletedTask, combatRead, weaponRead);
-        var result = await weaponRead;
+        var result = scanGameplay ? await weaponRead : (Weapon: (WeaponRead?)null, Replay: false);
         if (result.Weapon != null) weaponReads++;
         if (result.Replay) replayReads++;
         if (!result.Replay && lobbyRead != null)

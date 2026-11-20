@@ -40,7 +40,7 @@ internal sealed class ExternalCapture : IAsyncDisposable
     public static ExternalCapture Open(string executable, string input) => new(Launch(executable,
         ["-hide_banner", "-loglevel", "warning", "-nostdin", "-f", "dshow", "-rtbufsize", "128M",
             "-i", "video=" + input, "-an", "-vf",
-            "fps=15,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
+            "fps=30,scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2",
             "-threads", "1", "-pix_fmt", "bgr24", "-f", "rawvideo", "pipe:1"]));
 
     public static ExternalCapture OpenVideoForTest(string executable, string input) => new(Launch(executable,

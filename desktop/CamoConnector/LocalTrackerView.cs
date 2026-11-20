@@ -6,26 +6,24 @@ namespace CamoConnector;
 internal sealed partial class ConnectorWindow
 {
     private readonly TabPage localTrackerPage = new("Tracker");
+    private readonly Button reloadTracker = new() { Text = "Refresh tracker", AutoSize = true };
+    private readonly Label trackerMessage = new() { AutoSize = true, Dock = DockStyle.Top };
     private WebView2? localTrackerView;
     private bool localTrackerLoading;
 
     private void AddLocalTrackerPage()
     {
-        var controls = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
-        var reload = new Button { Text = "Reload tracker", AutoSize = true };
-        var message = new Label { AutoSize = true, Margin = new Padding(8) };
-        controls.Controls.AddRange([reload, message]);
-        localTrackerPage.Controls.Add(controls);
+        localTrackerPage.Controls.Add(trackerMessage);
         pages.TabPages.Add(localTrackerPage);
-        reload.Click += async (_, _) =>
+        reloadTracker.Click += async (_, _) =>
         {
             if (localTrackerView?.CoreWebView2 is { } core) core.Reload();
-            else await OpenLocalTrackerAsync(message);
+            else await OpenLocalTrackerAsync(trackerMessage);
         };
         pages.SelectedIndexChanged += async (_, _) =>
         {
             if (pages.SelectedTab == localTrackerPage && localTrackerView == null)
-                await OpenLocalTrackerAsync(message);
+                await OpenLocalTrackerAsync(trackerMessage);
         };
     }
 

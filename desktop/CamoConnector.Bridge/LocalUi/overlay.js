@@ -66,7 +66,7 @@ async function refresh() {
     previous = undefined;
     byId('overlay-card').hidden = true;
   } finally {
-    setTimeout(refresh, 750);
+    setTimeout(refresh, 300);
   }
 }
 void refresh();

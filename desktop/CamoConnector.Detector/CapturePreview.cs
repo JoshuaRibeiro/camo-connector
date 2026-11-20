@@ -11,10 +11,9 @@ internal static class CapturePreview
         bool filterIsolatedFrames = false, Action<Bitmap>? onAccepted = null)
     {
         using var output = Console.OpenStandardOutput();
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(filterIsolatedFrames ? 33 : 66));
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(33));
         using var encoded = new MemoryStream();
         var header = new byte[4];
-        byte[]? pending = null;
         Color[]? previous = null, pendingSample = null;
         var sentFirstFrame = false;
         var suppressed = 0;
@@ -36,20 +35,15 @@ internal static class CapturePreview
                 encoded.SetLength(0);
                 reduced.Save(encoded, ImageFormat.Jpeg);
                 var bytes = encoded.GetBuffer().AsMemory(0, (int)encoded.Length);
-                if (!filterIsolatedFrames)
-                {
-                    await SendAsync(bytes);
-                    continue;
-                }
+                await SendAsync(bytes);
+                if (!filterIsolatedFrames) continue;
 
-                // Wait one frame before displaying. If the next frame returns to
-                // the previous scene, hold the displayed frame through the flash.
+                // Stabilize the frames used by OCR without holding back the live preview.
                 var sample = Sample(reduced);
-                if (pending != null && pendingSample != null)
+                if (pendingSample != null)
                 {
                     if (previous == null || !IsIsolatedChange(previous, pendingSample, sample))
                     {
-                        await SendAsync(pending);
                         previous = pendingSample;
                         if (pendingFrame != null) onAccepted!(pendingFrame);
                     }
@@ -64,7 +58,6 @@ internal static class CapturePreview
                 }
                 pendingFrame?.Dispose();
                 pendingFrame = onAccepted == null ? null : (Bitmap)frame.Clone();
-                pending = bytes.ToArray();
                 pendingSample = sample;
             } while (await timer.WaitForNextTickAsync(cancel));
         }
@@ -79,7 +72,7 @@ internal static class CapturePreview
             {
                 sentFirstFrame = true;
                 Console.Error.WriteLine(filterIsolatedFrames
-                    ? "Capture preview: first frame delivered. Isolated-frame filter active."
+                    ? "Capture preview: first frame delivered. OCR frame filter active."
                     : "Capture preview: first frame delivered.");
             }
         }

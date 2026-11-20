@@ -15,8 +15,9 @@ internal sealed partial class ConnectorWindow
     private readonly List<Font> shellFonts = [];
     private readonly Dictionary<TabPage, Button> railButtons = [];
     private readonly Panel rail = new() { Dock = DockStyle.Left };
-    private readonly TableLayoutPanel captureBanner = new() { Dock = DockStyle.Top, ColumnCount = 2, Padding = new Padding(12, 5, 12, 5) };
+    private readonly TableLayoutPanel captureBanner = new() { Dock = DockStyle.Top, ColumnCount = 3, Padding = new Padding(12, 5, 12, 5) };
     private Button? versionBadge;
+    private Button? navigationToggle;
     private bool railExpanded, diagnosticsUnlocked;
 
     private sealed class RoundedCard : TableLayoutPanel
@@ -82,7 +83,7 @@ internal sealed partial class ConnectorWindow
         var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 46, WrapContents = false, Padding = new Padding(6, 4, 0, 0) };
         var version = versionBadge = new Button { Text = "v" + build, Height = 30, AutoSize = true, Margin = Padding.Empty, AccessibleName = "Version " + build };
         footer.Controls.Add(version);
-        var toggle = new Button { Height = 38, AccessibleName = "Expand navigation", Margin = new Padding(0, 0, 0, 8) };
+        var toggle = navigationToggle = new Button { Height = 38, AccessibleName = "Expand navigation", Margin = new Padding(0, 0, 0, 8) };
         menu.Controls.Add(toggle);
         var entries = new[] { (localTrackerPage, ""), (capturePage, "\uE7F8"),
             (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
@@ -155,9 +156,12 @@ internal sealed partial class ConnectorWindow
         var captureShortcut = PageButton("Open Auto tracking", capturePage);
         captureBanner.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         captureBanner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        captureBanner.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         captureBanner.Controls.Add(captureBannerText, 0, 0);
+        captureBanner.Controls.Add(reloadTracker, 2, 0);
+        reloadTracker.Visible = pages.SelectedTab == localTrackerPage;
         captureBanner.Controls.Add(captureShortcut, 1, 0);
-        captureBanner.Height = 46;
+        captureBanner.Height = LogicalToDeviceUnits(54);
         captureBannerText.AutoSize = false;
         captureBannerText.Dock = DockStyle.Fill;
         captureBannerText.TextAlign = ContentAlignment.MiddleLeft;
@@ -169,7 +173,7 @@ internal sealed partial class ConnectorWindow
         Controls.Add(rail);
 
         var help = PageBody(helpPage, "How it works", "Camo Connector reads your game capture and saves progress on this PC.");
-        AddSetupRow(help, SetupSection("PC capture", new Label { AutoSize = true, Text = "Open Call of Duty and bring the game to the foreground. If needed, select its window in Auto tracking." }));
+        AddSetupRow(help, SetupSection("PC capture", new Label { AutoSize = true, Text = "Select the monitor showing Call of Duty in Auto tracking." }));
         AddSetupRow(help, SetupSection("Console or OBS", new Label { AutoSize = true, Text = "Select your capture card or OBS Virtual Camera in Auto tracking and turn on Auto tracking." }));
         AddSetupRow(help, SetupSection("OBS overlay", new Label { AutoSize = true, Text = "Copy the URL from Camo tracker and paste it into an OBS Browser Source." }));
         var settings = PageBody(settingsPage, "Settings", "Manage the desktop app and website sync.");
@@ -185,6 +189,7 @@ internal sealed partial class ConnectorWindow
             new Label { Text = "Keep Camo Connector running in the notification area.", AutoSize = true }, tray));
         pages.SelectedIndexChanged += (_, _) =>
         {
+            reloadTracker.Visible = pages.SelectedTab == localTrackerPage;
             StyleShell();
             if (pages.SelectedTab == capturePage) StartPreview();
             else if (detector == null) StopPreview();
@@ -197,7 +202,7 @@ internal sealed partial class ConnectorWindow
 
     private void ShapeButtons(Control parent)
     {
-        if (parent is Button button)
+        if (parent is Button button && button != navigationToggle && !railButtons.ContainsValue(button))
         {
             if (button.AutoSize && button != versionBadge)
             {
@@ -269,7 +274,8 @@ internal sealed partial class ConnectorWindow
             version.ForeColor = dark == true ? ShellMuted : SystemColors.GrayText;
         }
         if (dark != true) return;
-        rail.BackColor = captureBanner.BackColor = ShellPanel;
+        rail.BackColor = ShellPanel;
+        captureBanner.BackColor = captureBannerText.BackColor = ShellBackground;
         foreach (Control child in rail.Controls) child.BackColor = ShellPanel;
         foreach (var (page, button) in railButtons)
         {
