@@ -36,7 +36,7 @@ internal sealed partial class ConnectorWindow
             logs.Controls.Add(group, 0, logs.RowStyles.Count - 1);
         }
         logsPage.Controls.Add(logs);
-        pages.TabPages.AddRange([homePage, capturePage, helpPage, settingsPage]);
+        pages.TabPages.AddRange([capturePage, helpPage, settingsPage]);
         AddLocalTrackerPage();
         AddTrackerPage();
         BuildShell(build);
@@ -140,14 +140,19 @@ internal sealed partial class ConnectorWindow
         ApplyTheme(this, useDark);
         StyleShell();
         var enabled = useDark ? 1 : 0;
-        if (IsHandleCreated) DwmSetWindowAttribute(Handle, 20, ref enabled, sizeof(int));
+        if (IsHandleCreated)
+        {
+            DwmSetWindowAttribute(Handle, 20, ref enabled, sizeof(int));
+            var rounded = 2;
+            DwmSetWindowAttribute(Handle, 33, ref rounded, sizeof(int));
+        }
         Invalidate(true);
     }
 
-    private static void ApplyTheme(Control control, bool dark)
+    private static void ApplyTheme(Control control, bool dark, bool insideCard = false)
     {
         if (control is PictureBox) return;
-        var surface = dark ? ShellBackground : SystemColors.Control;
+        var surface = dark ? (insideCard ? ShellPanel : ShellBackground) : SystemColors.Control;
         var ink = dark ? Color.FromArgb(234, 236, 240) : SystemColors.ControlText;
         control.BackColor = surface;
         control.ForeColor = ink;
@@ -159,12 +164,14 @@ internal sealed partial class ConnectorWindow
             button.UseVisualStyleBackColor = !dark;
             if (dark)
             {
-                button.BackColor = ShellPanel;
-                button.FlatAppearance.BorderColor = Color.FromArgb(57, 79, 94);
+                button.BackColor = ShellButton;
+                button.FlatAppearance.BorderSize = 0;
+                button.FlatAppearance.MouseOverBackColor = Color.FromArgb(42, 79, 86);
+                button.FlatAppearance.MouseDownBackColor = Color.FromArgb(34, 103, 106);
             }
         }
         if (control is TabPage page) page.UseVisualStyleBackColor = !dark;
-        foreach (Control child in control.Controls) ApplyTheme(child, dark);
+        foreach (Control child in control.Controls) ApplyTheme(child, dark, insideCard || control is RoundedCard);
     }
 
     [DllImport("dwmapi.dll")]

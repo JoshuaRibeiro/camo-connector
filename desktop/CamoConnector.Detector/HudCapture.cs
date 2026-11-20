@@ -471,6 +471,13 @@ internal sealed class HudCapture : IDisposable
         var (titleText, _) = await ReadTextAsync(frame, (.344, .628, .310, .041), cancel, pageMode: 7,
             trace: trace, regionName: "camoTitle");
         var title = CamoMenuRecognition.ReadKnownCamoTitle(titleText, names);
+        if (title == null && weapon == "Mojave .357")
+        {
+            // Keep Garland's heading clear of the lock icon and the description.
+            var (specialTitle, _) = await ReadTextAsync(frame, (.344, .615, .152, .056), cancel, pageMode: 7,
+                adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "mojaveCamoTitle");
+            title = CamoMenuRecognition.ReadKnownCamoTitle(specialTitle, names);
+        }
         if (title == null)
         {
             var (wideTitle, _) = await ReadTextAsync(frame, (.312, .614, .472, .064), cancel,

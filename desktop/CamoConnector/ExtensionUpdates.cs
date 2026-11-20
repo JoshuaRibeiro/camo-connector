@@ -39,7 +39,7 @@ internal sealed partial class ConnectorWindow
                     continue;
                 }
                 if (IsDisposed || cancel.IsCancellationRequested) return;
-                extensionStatus.Text = $"Downloading {browser} extension v{package.Version}.";
+                LogLine(bridgeMessages, $"Downloading {browser} extension v{package.Version}.");
                 using var zip = new MemoryStream();
                 await releases.DownloadExtensionAsync(package, zip, deadline.Token);
                 deadline.Token.ThrowIfCancellationRequested();
@@ -55,7 +55,7 @@ internal sealed partial class ConnectorWindow
         }
 
         if (IsDisposed || cancel.IsCancellationRequested) return;
-        extensionStatus.Text = string.Join(Environment.NewLine, results);
+        foreach (var result in results) LogLine(bridgeMessages, result);
         if (changed.Count == 0) return;
         var instructions = new List<string>();
         if (changed.Contains("Firefox"))

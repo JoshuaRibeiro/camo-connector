@@ -12,11 +12,11 @@ internal sealed partial class ConnectorWindow
         public override string ToString() => Name;
     }
 
+    private static readonly Source AutomaticSource = new("", "", "Detect Call of Duty automatically");
+
     private sealed record Device(string Name, string Input);
     private readonly ComboBox sources = new() { DropDownStyle = ComboBoxStyle.DropDownList, Dock = DockStyle.Fill };
     private readonly Button refreshSources = new() { Text = "Refresh sources", AutoSize = true };
-    private readonly Button startDetection = new() { Text = "Start detection", AutoSize = true };
-    private readonly Button stopDetection = new() { Text = "Stop", AutoSize = true };
     private readonly Label detectorStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly PictureBox preview = new() { Dock = DockStyle.Fill, SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.Black };
     private readonly Label previewStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
@@ -35,7 +35,24 @@ internal sealed partial class ConnectorWindow
 
     private void BindCaptureControls()
     {
-        sources.SelectedIndexChanged += (_, _) => { UpdateCaptureButtons(); StartPreview(); };
+        sources.SelectedIndexChanged += (_, _) =>
+        {
+            nextAutomaticCheck = DateTimeOffset.MinValue;
+            if (!scanning && sources.SelectedItem is Source source)
+            {
+                try
+                {
+                    Directory.CreateDirectory(DataDirectory);
+                    if (source.Mode is "--monitor" or "--device")
+                        File.WriteAllText(SourceSettings, JsonSerializer.Serialize(source));
+                    else File.Delete(SourceSettings);
+                }
+                catch (IOException error) { LogLine(captureMessages, error.Message); }
+                catch (UnauthorizedAccessException error) { LogLine(captureMessages, error.Message); }
+            }
+            UpdateCaptureButtons();
+            StartPreview();
+        };
         refreshSources.Click += async (_, _) => await RefreshSourcesAsync();
         enableCaptureDevices.Click += async (_, _) =>
         {
@@ -51,16 +68,6 @@ internal sealed partial class ConnectorWindow
                 LogLine(captureMessages, error.Message);
             }
         };
-        startDetection.Click += async (_, _) => await RunDetectorAsync();
-        stopDetection.Click += (_, _) =>
-        {
-            try
-            {
-                automaticTracking.Checked = false;
-                if (!detectorStopRequested) StopDetector();
-            }
-            catch (Exception error) { detectorStatus.Text = "Could not stop the detector: " + error.Message; }
-        };
         previewTimer.Tick += (_, _) => ReadPreview();
         previewTimer.Start();
         UpdateCaptureButtons();
@@ -70,15 +77,12 @@ internal sealed partial class ConnectorWindow
     {
         sources.Enabled = detector == null && !scanning && !installingRuntime;
         refreshSources.Enabled = detector == null && !scanning && !installingRuntime;
-        startDetection.Enabled = bridgeReady && detector == null && !scanning && !installingRuntime && sources.SelectedItem != null &&
-            File.Exists(DetectorPath);
         enableCaptureDevices.Visible = !BundledCaptureReady;
         enableCaptureDevices.Enabled = !scanning && !installingRuntime && detector == null;
-        stopDetection.Enabled = detector != null;
         RefreshCaptureBanner();
         if (detectionSummary != null)
             detectionSummary.Text = scanning ? "Finding capture sources…" : detector != null ? "Detection running" :
-                startDetection.Enabled ? "Ready to detect" : "Detection stopped";
+                automaticTracking.Checked ? "Waiting for capture" : "Auto tracking is off";
     }
 
     private async Task RefreshSourcesAsync()
@@ -131,15 +135,20 @@ internal sealed partial class ConnectorWindow
         }
         finally
         {
-            scanning = false;
             if (!IsDisposed && !closing.IsCancellationRequested)
             {
                 sources.Items.Clear();
+                sources.Items.Add(AutomaticSource);
                 sources.Items.AddRange(found.ToArray());
                 var preferred = found.FindIndex(source => selected != null && source.Mode == selected.Mode &&
                     (selected.MonitorId != null ? source.MonitorId == selected.MonitorId : source.Input == selected.Input));
-                if (preferred >= 0) sources.SelectedIndex = preferred;
+                sources.SelectedIndex = preferred + 1;
+            }
+            scanning = false;
+            if (!IsDisposed && !closing.IsCancellationRequested)
+            {
                 UpdateCaptureButtons();
+                StartPreview();
             }
         }
     }
@@ -155,29 +164,17 @@ internal sealed partial class ConnectorWindow
         return Process.Start(start) ?? throw new IOException("Could not start the detector.");
     }
 
-    private async Task RunDetectorAsync(Source? automaticSource = null)
+    private async Task RunDetectorAsync(Source source)
     {
-        var source = automaticSource ?? sources.SelectedItem as Source;
-        if (!bridgeReady || detector != null || installingRuntime || source == null || !File.Exists(DetectorPath)) return;
+        if (!bridgeReady || detector != null || installingRuntime || !File.Exists(DetectorPath)) return;
         activeCapture = source;
-        captureWasAutomatic = automaticSource != null;
         Process? child = null;
         try
         {
             StopPreview();
             if (!OcrReady) await InstallRuntimeAsync("Ocr");
-            if (closing.IsCancellationRequested || automaticSource != null && !automaticTracking.Checked) return;
+            if (closing.IsCancellationRequested || !automaticTracking.Checked) return;
             Directory.CreateDirectory(DataDirectory);
-            var staging = SourceSettings + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            try
-            {
-                if (automaticSource == null && source.Mode != "--window")
-                {
-                    File.WriteAllText(staging, JsonSerializer.Serialize(source));
-                    File.Move(staging, SourceSettings, true);
-                }
-            }
-            finally { File.Delete(staging); }
             detectorStopRequested = false;
             const int retryLimit = 3;
             for (var attempt = 0; ; attempt++)
@@ -225,7 +222,7 @@ internal sealed partial class ConnectorWindow
         catch (Exception error)
         {
             if (!IsDisposed) detectorStatus.Text = error.Message;
-            if (automaticSource != null) nextAutomaticCheck = DateTimeOffset.UtcNow.AddMinutes(1);
+            nextAutomaticCheck = DateTimeOffset.UtcNow.AddMinutes(1);
         }
         finally
         {
@@ -254,7 +251,7 @@ internal sealed partial class ConnectorWindow
         {
             StopPreview();
             if (scanning || detector != null || closing.IsCancellationRequested || pages.SelectedTab != capturePage ||
-                sources.SelectedItem is not Source source || source.Mode == "--window" || !File.Exists(DetectorPath)) return;
+                sources.SelectedItem is not Source source || source.Mode is "" or "--window" || !File.Exists(DetectorPath)) return;
             var mode = source.Mode == "--device" ? "--preview-device" : "--preview-monitor";
             previewWorker = LaunchDetector(mode, source.MonitorId ?? source.Input);
             _ = StartReadingPreview(previewWorker);

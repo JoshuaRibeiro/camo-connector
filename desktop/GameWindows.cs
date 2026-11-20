@@ -16,18 +16,18 @@ internal static class GameWindows
         var windows = new List<Window>();
         EnumWindows((handle, _) =>
         {
-            if (!IsWindowVisible(handle) || GetWindowTextLength(handle) is not (> 0 and <= 1024)) return true;
+            if (!IsWindowVisible(handle)) return true;
             GetWindowThreadProcessId(handle, out var pid);
             if (pid == Environment.ProcessId || pid == 0) return true;
             var title = new StringBuilder(1025);
-            if (GetWindowText(handle, title, title.Capacity) == 0) return true;
+            GetWindowText(handle, title, title.Capacity);
             try
             {
                 using var process = Process.GetProcessById(pid);
                 var name = title.ToString();
-                var isGame = process.ProcessName.Equals("cod", StringComparison.OrdinalIgnoreCase) &&
-                    name.Contains("Call of Duty", StringComparison.OrdinalIgnoreCase);
-                windows.Add(new(handle, pid, name, isGame));
+                var isGame = process.ProcessName.Equals("cod", StringComparison.OrdinalIgnoreCase);
+                if (isGame || name.Length > 0)
+                    windows.Add(new(handle, pid, name.Length == 0 ? "Call of Duty" : name, isGame));
             }
             catch (ArgumentException) { }
             catch (InvalidOperationException) { }
@@ -73,7 +73,6 @@ internal static class GameWindows
     [DllImport("user32.dll")] private static extern bool IsIconic(nint window);
     [DllImport("user32.dll")] private static extern nint GetForegroundWindow();
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(nint window, out int processId);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowTextLength(nint window);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetWindowText(nint window, StringBuilder text, int size);
     [DllImport("user32.dll")] private static extern bool GetClientRect(nint window, out NativeRect rect);
     [DllImport("user32.dll")] private static extern bool ClientToScreen(nint window, ref NativePoint point);

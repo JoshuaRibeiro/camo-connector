@@ -7,22 +7,27 @@ internal sealed partial class ConnectorWindow
 
     private Control CreateSetupView()
     {
-        setupHeadingFont = new Font(Font.FontFamily, Font.Size + 4, FontStyle.Bold);
+        setupHeadingFont = new Font(Font.FontFamily, Font.Size + 13, FontStyle.Bold);
         var viewport = new Panel { Dock = DockStyle.Fill, AutoScroll = true };
         var grid = new TableLayoutPanel
         {
-            Dock = DockStyle.Top, ColumnCount = 2, RowCount = 2, Padding = new Padding(16)
+            Dock = DockStyle.Top, ColumnCount = 2, RowCount = 2, Padding = new Padding(24)
         };
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 68));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 32));
         grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
         grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var capture = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 1 };
+        var capture = new RoundedCard { Dock = DockStyle.Fill, Padding = new Padding(20), ColumnCount = 1 };
         var heading = new Label { Text = "Auto tracking", AutoSize = true, Font = setupHeadingFont };
         AddSetupRow(capture, heading);
+        AddSetupRow(capture, new Label
+        {
+            Text = "Choose a capture source and track camo progress as you play.",
+            AutoSize = true, Margin = new Padding(3, 2, 3, 14), ForeColor = ShellMuted
+        });
         AddSetupRow(capture, automaticTracking);
-        var sourceLabel = new Label { Text = "Select your game window or capture source", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
+        var sourceLabel = new Label { Text = "Capture source", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
         AddSetupRow(capture, sourceLabel);
         var picker = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Margin = Padding.Empty };
         picker.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -32,20 +37,28 @@ internal sealed partial class ConnectorWindow
         AddSetupRow(capture, picker);
         var actions = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Dock = DockStyle.Fill, Margin = Padding.Empty };
         actions.WrapContents = true;
-        actions.Controls.AddRange([startDetection, stopDetection, enableCaptureDevices]);
+        actions.Controls.Add(enableCaptureDevices);
         AddSetupRow(capture, actions);
         AddSetupRow(capture, detectorStatus);
         AddSetupRow(capture, new Label { Text = "Capture preview", AutoSize = true, Margin = new Padding(3, 12, 3, 4) });
         var previewRow = capture.RowCount++;
         capture.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        capture.Controls.Add(preview, 0, previewRow);
+        var previewFrame = new RoundedCard
+        {
+            ColumnCount = 1, RowCount = 1, Dock = DockStyle.Fill,
+            Margin = new Padding(3), Padding = new Padding(10)
+        };
+        previewFrame.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        previewFrame.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        previewFrame.Controls.Add(preview, 0, 0);
+        capture.Controls.Add(previewFrame, 0, previewRow);
         AddSetupRow(capture, previewStatus);
 
         detectionSummary = new Label { AutoSize = true };
         var trackerShortcut = new Button { Text = "Open Tracker", AutoSize = true };
         trackerShortcut.Click += (_, _) => pages.SelectedTab = localTrackerPage;
-        var syncHelp = new Label { Text = "Choose a window for manual PC tracking, or a capture device for console or OBS.", AutoSize = true };
-        var sidebar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Padding = new Padding(8) };
+        var syncHelp = new Label { Text = "Use automatic PC detection or select a window, monitor, or capture device.", AutoSize = true };
+        var sidebar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Margin = new Padding(4, 0, 0, 0) };
         AddSetupRow(sidebar, SetupSection("Connection", status, detectionSummary));
         AddSetupRow(sidebar, SetupSection("Capture sources", syncHelp, trackerShortcut));
         grid.Controls.Add(capture, 0, 0);
@@ -67,7 +80,7 @@ internal sealed partial class ConnectorWindow
                 label!.MaximumSize = new Size(sidebarWidth, 0);
             var captureWidth = Math.Max(1, (wide ? available * 68 / 100 : available) - LogicalToDeviceUnits(35));
             detectorStatus.MaximumSize = previewStatus.MaximumSize = new Size(captureWidth, 0);
-            var minimumCaptureHeight = LogicalToDeviceUnits(385) + detectorStatus.Height + previewStatus.Height;
+            var minimumCaptureHeight = LogicalToDeviceUnits(445) + detectorStatus.Height + previewStatus.Height;
             var sidebarHeight = sidebar.GetPreferredSize(new Size(sidebarWidth + LogicalToDeviceUnits(55), 0)).Height;
             var minimum = (wide ? Math.Max(minimumCaptureHeight, sidebarHeight) : minimumCaptureHeight + sidebarHeight)
                 + grid.Padding.Vertical + LogicalToDeviceUnits(12);
@@ -89,12 +102,20 @@ internal sealed partial class ConnectorWindow
         table.Controls.Add(control, 0, row);
     }
 
-    private static GroupBox SetupSection(string title, params Control[] controls)
+    private RoundedCard SetupSection(string title, params Control[] controls)
     {
-        var body = new TableLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, ColumnCount = 1 };
-        foreach (var control in controls) AddSetupRow(body, control);
-        var section = new GroupBox { Text = title, AutoSize = true, Dock = DockStyle.Top, Padding = new Padding(12) };
-        section.Controls.Add(body);
+        var section = new RoundedCard
+        {
+            AutoSize = true, Dock = DockStyle.Top, ColumnCount = 1,
+            Margin = new Padding(3, 0, 3, 14), Padding = new Padding(20, 16, 20, 15)
+        };
+        section.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        AddSetupRow(section, new Label
+        {
+            Text = title, AutoSize = true, Font = ShellFont(Font.FontFamily.Name, 12, FontStyle.Bold),
+            Margin = new Padding(3, 0, 3, 8)
+        });
+        foreach (var control in controls) AddSetupRow(section, control);
         return section;
     }
 }

@@ -75,12 +75,13 @@ public static class TrackedCamoRecognition
                 .ToHashSet(StringComparer.Ordinal);
             var named = entries.Select(entry => entry.Name).Where(camo => names.Contains(Key(camo))).Distinct().ToArray();
             if (named.Length > 1) continue;
-            var objectiveCamo = name == ".50 GS" ? (goal, Key(text)) switch
+            var objectiveCamo = (name, goal, Key(text)) switch
             {
-                (20, var objective) when objective.Contains("get20headshotkills", StringComparison.Ordinal) => "Frosted",
-                (30, var objective) when objective.Contains("get30pointblankkills", StringComparison.Ordinal) => "Red Tiger",
+                (".50 GS", 20, var objective) when objective.Contains("get20headshotkills", StringComparison.Ordinal) => "Frosted",
+                (".50 GS", 30, var objective) when objective.Contains("get30pointblankkills", StringComparison.Ordinal) => "Red Tiger",
+                ("Mojave .357", 30, var objective) when objective.Contains("get30pointblankkills", StringComparison.Ordinal) => "Garland",
                 _ => null
-            } : null;
+            };
             if (objectiveCamo != null && !entries.Any(entry => entry.Name == objectiveCamo)) objectiveCamo = null;
             var camo = named.SingleOrDefault() ?? objectiveCamo;
             if (camo == null)

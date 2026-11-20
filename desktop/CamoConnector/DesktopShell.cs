@@ -1,18 +1,51 @@
+using System.Drawing.Drawing2D;
+
 namespace CamoConnector;
 
 internal sealed partial class ConnectorWindow
 {
     private static readonly Color ShellBackground = Color.FromArgb(17, 24, 33);
-    private static readonly Color ShellPanel = Color.FromArgb(27, 40, 53);
+    private static readonly Color ShellPanel = Color.FromArgb(24, 42, 51);
+    private static readonly Color ShellBorder = Color.FromArgb(57, 111, 117);
+    private static readonly Color ShellButton = Color.FromArgb(32, 61, 70);
     private static readonly Color ShellAccent = Color.FromArgb(123, 224, 205);
     private static readonly Color ShellMuted = Color.FromArgb(176, 198, 216);
-    private readonly TabPage homePage = new("Home"), capturePage = new("Auto tracking"),
+    private readonly TabPage capturePage = new("Auto tracking"),
         helpPage = new("How it works"), settingsPage = new("Settings");
     private readonly List<Font> shellFonts = [];
     private readonly Dictionary<TabPage, Button> railButtons = [];
     private readonly Panel rail = new() { Dock = DockStyle.Left };
     private readonly TableLayoutPanel captureBanner = new() { Dock = DockStyle.Top, ColumnCount = 2, Padding = new Padding(12, 5, 12, 5) };
+    private Button? versionBadge;
     private bool railExpanded, diagnosticsUnlocked;
+
+    private sealed class RoundedCard : TableLayoutPanel
+    {
+        public RoundedCard() => DoubleBuffered = true;
+
+        protected override void OnPaintBackground(PaintEventArgs e)
+        {
+            base.OnPaintBackground(e);
+            if (SystemInformation.HighContrast || Width < 4 || Height < 4) return;
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var outline = RoundedOutline(ClientSize, LogicalToDeviceUnits(19), 1);
+            using var fill = new SolidBrush(ShellPanel);
+            using var stroke = new Pen(ShellBorder);
+            e.Graphics.FillPath(fill, outline);
+            e.Graphics.DrawPath(stroke, outline);
+        }
+    }
+
+    private static GraphicsPath RoundedOutline(Size size, int radius, int inset)
+    {
+        var bounds = new Rectangle(inset, inset, size.Width - inset * 2, size.Height - inset * 2);
+        radius = Math.Min(radius, Math.Min(bounds.Width, bounds.Height) / 2);
+        var path = new GraphicsPath();
+        if (radius == 0) path.AddRectangle(bounds);
+        else if (bounds.Width == bounds.Height && radius == bounds.Height / 2) path.AddEllipse(bounds);
+        else path.AddRoundedRectangle(bounds, new Size(radius, radius));
+        return path;
+    }
 
     private sealed class PageDeck : TabControl
     {
@@ -47,19 +80,32 @@ internal sealed partial class ConnectorWindow
             AutoScroll = true
         };
         var footer = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 46, WrapContents = false, Padding = new Padding(6, 4, 0, 0) };
-        var version = new Button { Text = "v" + build, Height = 30, AutoSize = true, Margin = Padding.Empty, AccessibleName = "Version " + build };
+        var version = versionBadge = new Button { Text = "v" + build, Height = 30, AutoSize = true, Margin = Padding.Empty, AccessibleName = "Version " + build };
         footer.Controls.Add(version);
         var toggle = new Button { Height = 38, AccessibleName = "Expand navigation", Margin = new Padding(0, 0, 0, 8) };
         menu.Controls.Add(toggle);
-        var entries = new[] { (homePage, "\uE80F"), (localTrackerPage, "\uE8FD"), (capturePage, "\uE7F8"),
+        var entries = new[] { (localTrackerPage, ""), (capturePage, "\uE7F8"),
             (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
         var icons = ShellFont("Segoe MDL2 Assets", 14);
         var hints = new ToolTip();
         Disposed += (_, _) => { hints.Dispose(); logsPage.Dispose(); };
         hints.SetToolTip(version, "Camo Connector version");
-        foreach (var (page, _) in entries)
+        using var appBitmap = Icon!.ToBitmap();
+        var trackerIcon = new Bitmap(appBitmap, new Size(LogicalToDeviceUnits(20), LogicalToDeviceUnits(20)));
+        Disposed += (_, _) => trackerIcon.Dispose();
+        foreach (var (page, glyph) in entries)
         {
             var button = new Button { Height = 40, Margin = new Padding(0, 0, 0, 4), AccessibleName = page.Text };
+            button.Paint += (_, args) =>
+            {
+                var iconArea = new Rectangle(0, 0, railExpanded ? LogicalToDeviceUnits(42) : button.Width, button.Height);
+                if (page == localTrackerPage)
+                    args.Graphics.DrawImageUnscaled(trackerIcon,
+                        (iconArea.Width - trackerIcon.Width) / 2, (iconArea.Height - trackerIcon.Height) / 2);
+                else
+                    TextRenderer.DrawText(args.Graphics, glyph, icons, iconArea, button.ForeColor,
+                        TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
+            };
             button.Click += (_, _) => pages.SelectedTab = page;
             hints.SetToolTip(button, page.Text);
             menu.Controls.Add(button);
@@ -68,19 +114,20 @@ internal sealed partial class ConnectorWindow
         void UpdateRail()
         {
             rail.Width = LogicalToDeviceUnits(railExpanded ? 174 : 72);
-            var buttonWidth = LogicalToDeviceUnits(railExpanded ? 150 : 54);
+            var buttonWidth = LogicalToDeviceUnits(railExpanded ? 150 : 40);
+            toggle.Height = LogicalToDeviceUnits(40);
             toggle.Width = buttonWidth;
             toggle.Font = railExpanded ? Font : icons;
             toggle.Text = railExpanded ? "Collapse" : "\uE700";
             toggle.AccessibleName = railExpanded ? "Collapse navigation" : "Expand navigation";
             hints.SetToolTip(toggle, toggle.AccessibleName);
-            foreach (var (page, glyph) in entries)
+            foreach (var (page, _) in entries)
             {
                 var button = railButtons[page];
                 button.Visible = page != logsPage || diagnosticsUnlocked;
-                button.Width = buttonWidth;
-                button.Font = railExpanded ? Font : icons;
-                button.Text = railExpanded ? page.Text : glyph;
+                button.Size = new Size(buttonWidth, LogicalToDeviceUnits(40));
+                button.Padding = railExpanded ? new Padding(LogicalToDeviceUnits(42), 0, 0, 0) : Padding.Empty;
+                button.Text = railExpanded ? page.Text : "";
                 button.TextAlign = railExpanded ? ContentAlignment.MiddleLeft : ContentAlignment.MiddleCenter;
             }
             StyleShell();
@@ -121,31 +168,66 @@ internal sealed partial class ConnectorWindow
         Controls.Add(content);
         Controls.Add(rail);
 
-        var home = PageBody(homePage, "Camo Connector", "Track your multiplayer camo grind and keep your OBS overlay in sync.");
-        AddSetupRow(home, SetupSection("Camo tracker", new Label { AutoSize = true, Text = "See your next unlocks, search the weapon roster, and adjust progress." },
-            PageButton("Open Camo tracker", localTrackerPage)));
-        AddSetupRow(home, SetupSection("Tracking setup", new Label { AutoSize = true, Text = "Use automatic PC detection or select a window, monitor, or capture device." },
-            PageButton("Open Auto tracking", capturePage)));
         var help = PageBody(helpPage, "How it works", "Camo Connector reads your game capture and saves progress on this PC.");
         AddSetupRow(help, SetupSection("PC capture", new Label { AutoSize = true, Text = "Open Call of Duty and bring the game to the foreground. If needed, select its window in Auto tracking." }));
-        AddSetupRow(help, SetupSection("Console or OBS", new Label { AutoSize = true, Text = "Select your capture card or OBS Virtual Camera in Auto tracking, then start detection." }));
+        AddSetupRow(help, SetupSection("Console or OBS", new Label { AutoSize = true, Text = "Select your capture card or OBS Virtual Camera in Auto tracking and turn on Auto tracking." }));
         AddSetupRow(help, SetupSection("OBS overlay", new Label { AutoSize = true, Text = "Copy the URL from Camo tracker and paste it into an OBS Browser Source." }));
         var settings = PageBody(settingsPage, "Settings", "Manage the desktop app and website sync.");
         update.AutoSize = true;
-        updateStatus.Text = "Check for a new desktop release.";
-        AddSetupRow(settings, SetupSection("App updates", update, updateStatus, extensionStatus));
-        AddSetupRow(settings, SetupSection("Website sync", PageButton("Open website sync", trackerPage)));
+        updateStatus.Text = $"Camo Connector v{build}";
+        AddSetupRow(settings, SetupSection("App updates", updateStatus, update));
+        AddSetupRow(settings, SetupSection("Website sync",
+            new Label { Text = "Pair Camo Connector with your online tracker.", AutoSize = true },
+            PageButton("Open website sync", trackerPage)));
         var tray = new Button { Text = "Hide to tray", AutoSize = true };
         tray.Click += (_, _) => HideTrackerToTray();
-        AddSetupRow(settings, SetupSection("Desktop", tray));
+        AddSetupRow(settings, SetupSection("Desktop",
+            new Label { Text = "Keep Camo Connector running in the notification area.", AutoSize = true }, tray));
         pages.SelectedIndexChanged += (_, _) =>
         {
             StyleShell();
             if (pages.SelectedTab == capturePage) StartPreview();
             else if (detector == null) StopPreview();
         };
-        pages.SelectedTab = homePage;
+        pages.SelectedTab = localTrackerPage;
         UpdateRail();
+        ShapeButtons(this);
+        ShapeButtons(logsPage);
+    }
+
+    private void ShapeButtons(Control parent)
+    {
+        if (parent is Button button)
+        {
+            if (button.AutoSize && button != versionBadge)
+            {
+                button.MinimumSize = new Size(0, LogicalToDeviceUnits(34));
+                var padding = LogicalToDeviceUnits(12);
+                button.Padding = new Padding(Math.Max(button.Padding.Left, padding), button.Padding.Top,
+                    Math.Max(button.Padding.Right, padding), button.Padding.Bottom);
+            }
+            void ResizeShape(object? sender, EventArgs args)
+            {
+                if (button.Width < 2 || button.Height < 2) return;
+                using var path = RoundedOutline(button.ClientSize, Math.Min(button.Width, button.Height) / 2, 0);
+                var previous = button.Region;
+                button.Region = new Region(path);
+                previous?.Dispose();
+            }
+            button.SizeChanged += ResizeShape;
+            button.Paint += (_, args) =>
+            {
+                if (SystemInformation.HighContrast || button.FlatAppearance.BorderSize != 0 ||
+                    button.AccessibleName?.StartsWith("Version ", StringComparison.Ordinal) == true ||
+                    button.Width < 4 || button.Height < 4) return;
+                args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                using var outline = RoundedOutline(button.ClientSize, button.Height / 2, 1);
+                using var stroke = new Pen(button.Focused ? ShellAccent : ShellBorder);
+                args.Graphics.DrawPath(stroke, outline);
+            };
+            ResizeShape(null, EventArgs.Empty);
+        }
+        foreach (Control child in parent.Controls) ShapeButtons(child);
     }
 
     private TableLayoutPanel PageBody(TabPage page, string title, string description)
@@ -163,8 +245,9 @@ internal sealed partial class ConnectorWindow
             foreach (Control child in body.Controls)
             {
                 if (child is Label label) label.MaximumSize = new Size(width, 0);
-                if (child is GroupBox group)
-                    foreach (var text in group.Controls[0].Controls.OfType<Label>()) text.MaximumSize = new Size(width, 0);
+                if (child is RoundedCard card)
+                    foreach (var text in card.Controls.OfType<Label>())
+                        text.MaximumSize = new Size(Math.Max(80, width - card.Padding.Horizontal), 0);
             }
         };
         return body;
@@ -179,6 +262,12 @@ internal sealed partial class ConnectorWindow
 
     private void StyleShell()
     {
+        if (versionBadge is { } version)
+        {
+            version.FlatStyle = FlatStyle.Flat;
+            version.FlatAppearance.BorderSize = 0;
+            version.ForeColor = dark == true ? ShellMuted : SystemColors.GrayText;
+        }
         if (dark != true) return;
         rail.BackColor = captureBanner.BackColor = ShellPanel;
         foreach (Control child in rail.Controls) child.BackColor = ShellPanel;

@@ -525,7 +525,8 @@
     {
       "slot": 3,
       "artworkRGB12": "RkEsNTMlRUQxQEAwPDssMjImPTwtQUAwMC8kOzssPz4vPT0tQTwoLCsgPDwsQ0MyOzorNzcpMDAkODcpODcqOTgqNjYpOTkrLiweJCQbNzcpNTUoNTUnNDQnPDssNTQnKCgeNjUnODgqOjosRkEtLiwfKikfMTAkPj0uMjIlNDMlOzgoLSwgNTUoODgqMTElUUozLyweJyYbNzYnMzIlPTwtNTMkMS8iHR0WKiogOjorNTUoOzclQz4pMi8gLCwgMDAjNjUnNzUmLi4jOTgqMDAjKiofNTUqQDsoTEYuPDgmKCYcKCcdKiofKSkeJyYcOzssOzorMzMrLC0nSUMtUUowPzooLCoeKScbNzUmJSQcLi4jNDMnOTksMTMuLjArQTwoQjwoPjknPTopQz8sPTssMjIkQkIxOTktLC0nJCUgLC4qIyEXPzsoRkErPTwtODcoPT0tMTAkNjYqMjMtMzUwKSsmKyojJCMYRD8rRkIuOjoqLy4jOTgqKyohJSYiLi8pMDAoKykiLioiLi0fPDopOjorMDAjMDAkMTElMDAoKy0oNTUsODYqOzYpKygg",
-      "name": "Garland"
+      "name": "Garland",
+      "goal": 30
     }
   ],
   ".50 GS": [

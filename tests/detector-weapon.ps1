@@ -368,3 +368,16 @@ if ($specials::ReadNamedBanner([string[]]@('SPLATTER OPS'), $pistolSpecials) -ne
     throw 'Named Special badge recognition failed'
 }
 'Passed named Special completion banner rules.'
+
+$garland = $menuReader::ReadProgress('Mojave .357', 'GARLAND', @(
+    'Earn 43 more weapon unlocks',
+    'Get 30 Point Blank Kills against Players',
+    '3/30'
+), @('Miami', 'Wallpaper', 'Garland'))
+if ($garland.Weapon -ne 'Mojave .357' -or $garland.Camo -ne 'Garland' -or $garland.Count -ne 3 -or $garland.Goal -ne 30) {
+    throw 'Garland should report 3/30 point-blank kills from the camo menu.'
+}
+$catalog = Get-Content "$PSScriptRoot/../special-catalog.json" -Raw | ConvertFrom-Json
+if (($catalog.'Mojave .357' | Where-Object name -eq 'Garland').goal -ne 30) {
+    throw 'Garland should have a 30-kill catalog goal.'
+}

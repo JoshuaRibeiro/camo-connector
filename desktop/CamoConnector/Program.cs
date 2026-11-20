@@ -57,7 +57,6 @@ internal sealed partial class ConnectorWindow : Form
     private readonly Label status = new() { Text = "Starting the local bridge…", AutoSize = true };
     private readonly Button update = new() { Text = "Check for updates" };
     private readonly Label updateStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
-    private readonly Label extensionStatus = new() { AutoSize = true, MaximumSize = new Size(510, 0) };
     private readonly string? updateKey = UpdateEnvironment.TrustedKey();
     private static readonly Version desktopVersion = typeof(Program).Assembly.GetName().Version!;
     private ReleaseVerification.Manifest? available;
@@ -102,7 +101,6 @@ internal sealed partial class ConnectorWindow : Form
             using var http = new HttpClient();
             var releases = new GitHubRelease(http);
             updateStatus.Text = "Checking desktop version.";
-            extensionStatus.Text = "Checking Firefox and Opera extensions.";
             var browserUpdate = UpdateBrowserExtensionsAsync(releases, closing.Token);
             try
             {
