@@ -22,22 +22,25 @@ internal sealed partial class ConnectorWindow
         const int client = 1, topEdge = 12;
         if (message.Msg == calculateClient && message.LParam != 0 && !IsZoomed(message.HWnd))
         {
-            // The first RECT is the proposed window rectangle on entry.
-            const int topOffset = sizeof(int);
-            var top = Marshal.ReadInt32(message.LParam, topOffset);
-            base.WndProc(ref message);
-            Marshal.WriteInt32(message.LParam, topOffset, top);
+            // Preserve the proposed window rectangle as the client rectangle.
             message.Result = 0;
             return;
         }
 
         base.WndProc(ref message);
-        if (message.Msg == hitTest && message.Result == client && !IsZoomed(message.HWnd))
+        if (message.Msg != hitTest || message.Result != client || IsZoomed(message.HWnd)) return;
+
+        var packed = message.LParam.ToInt64();
+        var point = PointToClient(new Point(unchecked((short)packed), unchecked((short)(packed >> 16))));
+        var edge = LogicalToDeviceUnits(5);
+        var horizontal = point.X < edge ? -1 : point.X >= ClientSize.Width - edge ? 1 : 0;
+        var vertical = point.Y < edge ? -1 : point.Y >= ClientSize.Height - edge ? 1 : 0;
+        message.Result = (horizontal, vertical) switch
         {
-            var packed = message.LParam.ToInt64();
-            var point = PointToClient(new Point(unchecked((short)packed), unchecked((short)(packed >> 16))));
-            if (point.Y >= 0 && point.Y < LogicalToDeviceUnits(5)) message.Result = topEdge;
-        }
+            (-1, -1) => 13, (1, -1) => 14, (-1, 1) => 16, (1, 1) => 17,
+            (-1, 0) => 10, (1, 0) => 11, (0, -1) => topEdge, (0, 1) => 15,
+            _ => client
+        };
     }
 
     [DllImport("user32.dll")]
