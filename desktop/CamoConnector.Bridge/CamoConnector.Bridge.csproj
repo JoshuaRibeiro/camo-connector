@@ -14,6 +14,7 @@
     <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
   </PropertyGroup>
   <ItemGroup>
+    <Content Remove="multiplayer-catalog.json" />
     <EmbeddedResource Include="multiplayer-catalog.json" LogicalName="CamoConnector.MultiplayerCatalog" />
     <EmbeddedResource Include="LocalUi/*" LogicalName="CamoConnector.LocalUi.%(Filename)%(Extension)" />
     <Content Include="../../special-catalog.json" Link="special-catalog.json" CopyToPublishDirectory="PreserveNewest" CopyToOutputDirectory="PreserveNewest" />
