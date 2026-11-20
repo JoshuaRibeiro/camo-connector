@@ -78,7 +78,7 @@ internal sealed class LocalTrackerRoutes(LocalTracker tracker, ProgressFeed feed
             await response.WriteAsJsonAsync(new { catalog = tracker.GetCatalog(),
                 overlayUrl = "http://" + host + "/local/overlay#" + overlayToken });
         else if (read && path == "/local/state")
-            await response.WriteAsJsonAsync(tracker.Snapshot());
+            await response.WriteAsJsonAsync(tracker.TrackerView());
         else if (write && path == "/local/edit")
         {
             LocalTracker.Edit? edit;
@@ -91,7 +91,7 @@ internal sealed class LocalTrackerRoutes(LocalTracker tracker, ProgressFeed feed
                 var weapon = tracker.GetCatalog().Weapons.Single(item => item.Id == edit.Weapon);
                 feed.ReportFocus(weapon.Name);
             }
-            await response.WriteAsJsonAsync(tracker.Snapshot());
+            await response.WriteAsJsonAsync(tracker.TrackerView());
         }
         else if (write && path == "/local/import")
         {
@@ -100,7 +100,7 @@ internal sealed class LocalTrackerRoutes(LocalTracker tracker, ProgressFeed feed
                 if (!tracker.ImportBackup()) { response.StatusCode = 404; return; }
             }
             catch (JsonException) { response.StatusCode = 400; return; }
-            await response.WriteAsJsonAsync(tracker.Snapshot());
+            await response.WriteAsJsonAsync(tracker.TrackerView());
         }
         else response.StatusCode = 404;
     }

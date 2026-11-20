@@ -153,6 +153,25 @@ try {
     if ($garland.count -ne 3 -or $garland.goal -ne 30) {
         throw 'Garland progress must appear even when the Military tiers only confirm 39 unlocks.'
     }
+    $tracker = Check-Events 200 $native 'local/state'
+    if ($tracker.focus -ne 'mojave-357' -or ($tracker.overview.rows | Where-Object id -eq 'sp-3').count -ne 3) {
+        throw 'Tracker overview did not match the overlay.'
+    }
+    $editUrl = 'http://127.0.0.1:47150/local/edit'
+    foreach ($increment in 1, 5) {
+        $body = @{ weapon = 'mojave-357'; camo = 'sp-3'; increment = $increment } | ConvertTo-Json
+        $tracker = Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $body
+    }
+    if (($tracker.overview.rows | Where-Object id -eq 'sp-3').count -ne 9) {
+        throw 'The +1 and +5 controls did not update the overview.'
+    }
+    foreach ($done in $true, $false) {
+        $body = @{ weapon = 'mojave-357'; camo = 'sp-3'; count = 0; done = $done } | ConvertTo-Json
+        $tracker = Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $body
+        if ($tracker.progress.'mojave-357:sp-3'.done -ne $done) {
+            throw 'Tick and untick did not update the saved progress.'
+        }
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

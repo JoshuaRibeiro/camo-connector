@@ -25,7 +25,7 @@ internal sealed class LocalTracker
     internal sealed record Catalog(Weapon[] Weapons, Rule[] Shared);
     internal sealed record Entry(int Count, bool Done);
     internal sealed record State(string? Focus, Dictionary<string, Entry> Progress);
-    internal sealed record Edit(string? Weapon, string? Camo, int? Count, bool? Done);
+    internal sealed record Edit(string? Weapon, string? Camo, int? Count, bool? Done, int? Increment = null);
 
     public LocalTracker(string data)
     {
@@ -67,9 +67,9 @@ internal sealed class LocalTracker
 
     public Catalog GetCatalog() => catalog;
 
-    public State Snapshot()
+    public object TrackerView()
     {
-        lock (gate) return state;
+        lock (gate) return new { state.Focus, state.Progress, overview = Overlay() };
     }
 
     public object Overlay()
@@ -120,7 +120,7 @@ internal sealed class LocalTracker
                     var levelBased = IsLevelRule(camo);
                     return new
                     {
-                        name = camo.Name, camo.Artwork, objective = camo.Objective ?? camo.Unlock,
+                        camo.Id, name = camo.Name, camo.Artwork, objective = camo.Objective ?? camo.Unlock,
                         count = military ? (levelBased ? level : (int?)null) :
                             state.Progress.GetValueOrDefault(weapon.Id + ":" + camo.Id)?.Count ?? 0,
                         goal = military && levelBased ? camo.UnlockTotal : camo.Goal
@@ -136,12 +136,25 @@ internal sealed class LocalTracker
         if (edit.Weapon == null) return false;
         if (edit.Camo == null)
         {
-            if (!weapons.ContainsKey(edit.Weapon)) return false;
+            if (!weapons.ContainsKey(edit.Weapon) || edit.Increment != null) return false;
             Change((next, _) => edit.Weapon);
             return true;
         }
         var key = edit.Weapon + ":" + edit.Camo;
-        if (!rules.TryGetValue(key, out var rule) || edit.Count is not int count || edit.Done is not bool done ||
+        if (!rules.TryGetValue(key, out var rule)) return false;
+        if (edit.Increment is int increment)
+        {
+            if (rule.Goal is not int target || increment is not (1 or 5) || edit.Count != null || edit.Done != null)
+                return false;
+            Change((next, focus) =>
+            {
+                if (next.GetValueOrDefault(key)?.Done != true)
+                    ApplyProgress(next, key, (next.GetValueOrDefault(key)?.Count ?? 0) + increment, false);
+                return focus;
+            });
+            return true;
+        }
+        if (edit.Count is not int count || edit.Done is not bool done ||
             count < 0 || count > (rule.Goal ?? 0)) return false;
         Change((next, focus) =>
         {

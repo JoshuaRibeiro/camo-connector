@@ -20,6 +20,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 button:disabled { opacity: .5; cursor: default; }
 #status { padding: 0 clamp(.85rem, 3vw, 2rem); color: var(--accent); }
 #status:not(:empty) { padding-top: .65rem; }
+.overview { padding: 1rem clamp(.85rem, 3vw, 2rem); border-bottom: 1px solid #304044; }
+.overview h2 { font-size: 1.15rem; margin-bottom: .25rem; }
+.overview .subtitle { margin-bottom: .55rem; }
+.overview-empty { margin: .5rem 0; }
+.overview-meter { display: flex; align-items: center; gap: .5rem; margin-top: .3rem; font-size: .82rem; }
+.overview-meter progress { width: 6rem; }
+.overview-completed { margin-top: .65rem; }
+.overview-completed summary { cursor: pointer; color: #a2b2b8; }
 main { display: grid; grid-template-columns: minmax(10rem, 15rem) 1fr; min-height: 65vh; }
 aside { padding: 1rem; border-right: 1px solid #304044; }
 aside input { width: 100%; margin: .35rem 0 .6rem; }

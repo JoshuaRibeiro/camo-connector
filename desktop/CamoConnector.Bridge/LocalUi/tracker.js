@@ -60,7 +60,37 @@ function selection(id, label) {
   return button;
 }
 
+function renderOverview() {
+  const content = byId('overview-content');
+  const wasExpanded = content.querySelector('details')?.open ?? false;
+  const weapon = catalog.weapons.find(item => item.id === state.focus);
+  if (!weapon) {
+    content.replaceChildren(element('p', 'Select a weapon to see its next unlocks.', 'subtitle'));
+    return;
+  }
+
+  const overview = state.overview;
+  const heading = [weapon.name];
+  if (overview.minimumLevel) heading.push('Weapon level ' + (overview.level ?? overview.minimumLevel + '+'));
+  const entries = [element('p', heading.join(' · '), 'subtitle')];
+  const rules = new Map(weapon.camos.map(rule => [rule.id, rule]));
+  for (const row of overview.rows) entries.push(camoRow(rules.get(row.id), weapon.id, row));
+  if (!overview.rows.length) entries.push(element('p', overview.complete
+    ? 'All weapon camos complete' : 'No camo challenges available', 'overview-empty'));
+
+  const completed = weapon.camos.filter(rule => state.progress[weapon.id + ':' + rule.id]?.done);
+  if (completed.length) {
+    const history = element('details', null, 'overview-completed');
+    history.open = wasExpanded;
+    history.append(element('summary', 'Completed unlocks (' + completed.length + ')'));
+    for (const rule of completed) history.append(camoRow(rule, weapon.id, {}));
+    entries.push(history);
+  }
+  content.replaceChildren(...entries);
+}
+
 function render() {
+  renderOverview();
   renderRoster();
   const detail = byId('detail');
   const weapon = catalog.weapons.find(weapon => weapon.id === selected);
@@ -85,7 +115,7 @@ function render() {
   detail.replaceChildren(...entries);
 }
 
-function camoRow(rule, weapon) {
+function camoRow(rule, weapon, overview) {
   const current = state.progress[weapon + ':' + rule.id] ?? { count: 0, done: false };
   const row = element('div', null, 'camo-row');
   const copy = element('div');
@@ -94,7 +124,24 @@ function camoRow(rule, weapon) {
   if (rule.unlock) copy.append(element('p', rule.unlockTotal == null ? rule.unlock :
     rule.unlock.replace(/\bmore\s+/i, ''), 'prerequisite'));
   const controls = element('div', null, 'controls');
-  if (rule.goal != null) {
+  if (overview && !current.done && overview.count != null && overview.goal != null) {
+    const meter = element('progress');
+    meter.max = overview.goal;
+    meter.value = overview.count;
+    meter.setAttribute('aria-label', rule.name + ' progress');
+    const progress = element('div', null, 'overview-meter');
+    progress.append(meter, element('span', overview.count + ' / ' + overview.goal));
+    copy.append(progress);
+  }
+  if (overview && rule.goal != null && !current.done) {
+    for (const increment of [1, 5]) {
+      const button = element('button', '+' + increment);
+      button.setAttribute('aria-label', 'Add ' + increment + ' to ' + rule.name);
+      button.addEventListener('click', () => void save('edit', { weapon, camo: rule.id, increment }));
+      controls.append(button);
+    }
+  }
+  if (!overview && rule.goal != null) {
     const input = element('input');
     input.type = 'number';
     input.min = '0';
@@ -107,7 +154,7 @@ function camoRow(rule, weapon) {
     });
     controls.append(input, element('span', '/ ' + rule.goal));
   }
-  const done = element('button', current.done ? 'Done' : 'Mark done');
+  const done = element('button', current.done ? (overview ? 'Untick' : 'Done') : (overview ? 'Tick' : 'Mark done'));
   done.setAttribute('aria-label', (current.done ? 'Undo ' : 'Mark complete: ') + rule.name);
   done.setAttribute('aria-pressed', String(current.done));
   done.addEventListener('click', () => void save('edit', {
