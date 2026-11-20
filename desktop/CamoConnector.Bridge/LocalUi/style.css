@@ -61,6 +61,19 @@ dialog form { display: grid; gap: .7rem; }
 .overlay-meter { display: flex; align-items: center; gap: .8rem; font-variant-numeric: tabular-nums; }
 .camo-description, .overlay-unlock { display: flex; align-items: flex-start; gap: .65em; }
 .camo-artwork { width: 2.6em; height: 2.6em; flex: 0 0 auto; object-fit: cover; border-radius: .3em; }
+/* Crop out padlocks baked into the top-left of these source images. */
+.camo-artwork:is(
+  [src="/local/artwork/blue-tiger.png"], [src="/local/artwork/bubblegum-ops.png"],
+  [src="/local/artwork/deathbed.png"], [src="/local/artwork/digi-bark.png"],
+  [src="/local/artwork/digital-fall.png"], [src="/local/artwork/garland.png"],
+  [src="/local/artwork/night-snow.png"], [src="/local/artwork/pyroclast-cascade.png"],
+  [src="/local/artwork/pyroclast-scatter.png"], [src="/local/artwork/pyroclast-terminus.png"],
+  [src="/local/artwork/pyroclast.png"], [src="/local/artwork/raster-lite.png"],
+  [src="/local/artwork/recursive.png"], [src="/local/artwork/sandwash.png"],
+  [src="/local/artwork/stockpile.png"], [src="/local/artwork/stone-bits.png"],
+  [src="/local/artwork/tectonic.png"], [src="/local/artwork/thicket.png"],
+  [src="/local/artwork/urban-standard.png"]
+) { object-view-box: inset(24% 0 0 24%); object-position: right bottom; }
 .overlay-unlock > div { flex: 1; min-width: 0; }
 .overlay-unlock { padding: .55em 0; border-top: 1px solid #344344; }
 .overlay-unlock:last-child { padding-bottom: 0; }
