@@ -215,6 +215,8 @@ internal sealed partial class ConnectorWindow
                 button.Padding = new Padding(Math.Max(button.Padding.Left, padding), button.Padding.Top,
                     Math.Max(button.Padding.Right, padding), button.Padding.Bottom);
             }
+            if (button is BannerButton) return;
+
             void ResizeShape(object? sender, EventArgs args)
             {
                 if (button.Width < 2 || button.Height < 2) return;
@@ -264,8 +266,43 @@ internal sealed partial class ConnectorWindow
 
     private sealed class BannerButton : Button
     {
-        // The shell paints a rounded focus outline in its normal theme.
-        protected override bool ShowFocusCues => SystemInformation.HighContrast && base.ShowFocusCues;
+        public BannerButton()
+        {
+            DoubleBuffered = true;
+            MouseEnter += (_, _) => Invalidate();
+            MouseLeave += (_, _) => Invalidate();
+            MouseCaptureChanged += (_, _) => Invalidate();
+            GotFocus += (_, _) => Invalidate();
+            LostFocus += (_, _) => Invalidate();
+        }
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            if (SystemInformation.HighContrast || FlatStyle != FlatStyle.Flat)
+            {
+                base.OnPaint(e);
+                return;
+            }
+
+            using var backdrop = new SolidBrush(Parent?.BackColor ?? ShellBackground);
+            e.Graphics.FillRectangle(backdrop, ClientRectangle);
+            if (Width < 4 || Height < 4) return;
+
+            var hovered = Enabled && ClientRectangle.Contains(PointToClient(Cursor.Position));
+            var pressed = hovered && Capture && (MouseButtons & MouseButtons.Left) != 0;
+            var color = pressed ? FlatAppearance.MouseDownBackColor :
+                hovered ? FlatAppearance.MouseOverBackColor : BackColor;
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+            using var shape = RoundedOutline(ClientSize, LogicalToDeviceUnits(10), 1);
+            using var fill = new SolidBrush(color);
+            using var border = new Pen(Focused ? ShellAccent : ShellBorder);
+            e.Graphics.FillPath(fill, shape);
+            e.Graphics.DrawPath(border, shape);
+            TextRenderer.DrawText(e.Graphics, Text, Font, ClientRectangle, Enabled ? ForeColor : ShellMuted,
+                TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter |
+                TextFormatFlags.SingleLine | TextFormatFlags.NoPrefix);
+        }
     }
 
     private Button PageButton(string label, TabPage page)
