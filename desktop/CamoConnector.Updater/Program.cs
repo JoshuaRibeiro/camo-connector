@@ -19,14 +19,14 @@ internal static class Program
         window.FormClosing += (_, e) => e.Cancel = !finished && e.CloseReason == CloseReason.UserClosing;
         window.Shown += async (_, _) =>
         {
-            IProgress<(string Message, int? Percent)> progress =
-                new Progress<(string Message, int? Percent)>(step => window.Report(step.Message, step.Percent));
+            IProgress<string> progress =
+                new Progress<string>(window.Report);
             try
             {
                 await Task.Run(() => Run(root, parentId, expected, recovery, progress.Report,
                     (message, title) => window.Invoke(() =>
                     {
-                        window.Report(title, null);
+                        window.Report(title);
                         MessageBox.Show(window, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error);
                     })));
             }
@@ -40,9 +40,8 @@ internal static class Program
     }
 
     private static void Run(string root, int parentId, Version? expected, bool recovery,
-        Action<(string Message, int? Percent)> progress, Action<string, string> showError)
+        Action<string> report, Action<string, string> showError)
     {
-        void report(string message) => progress((message, null));
         var restart = false;
         try
         {
@@ -81,7 +80,7 @@ internal static class Program
                     using var archive = new FileStream(staged, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
                         65536, FileOptions.DeleteOnClose);
                     var totalMiB = manifest.Size / 1048576d;
-                    progress(($"Downloading 0.0 / {totalMiB:F1} MiB.", 0));
+                    report($"Downloading 0.0 / {totalMiB:F1} MiB.");
                     var lastReport = Stopwatch.GetTimestamp();
                     release.DownloadArchiveAsync(manifest, archive, CancellationToken.None, bytes =>
                     {
@@ -89,7 +88,7 @@ internal static class Program
                             return;
                         lastReport = Stopwatch.GetTimestamp();
                         var percent = (int)Math.Clamp(bytes * 100d / manifest.Size, 0, 100);
-                        progress(($"Downloading {bytes / 1048576d:F1} / {totalMiB:F1} MiB ({percent}%).", percent));
+                        report($"Downloading {bytes / 1048576d:F1} / {totalMiB:F1} MiB ({percent}%).");
                     }).GetAwaiter().GetResult();
                     report("Preparing the verified update.");
                     transaction.Apply(archive, manifest, report: report);
