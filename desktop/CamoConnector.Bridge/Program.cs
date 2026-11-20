@@ -5,8 +5,10 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using CamoConnector.Bridge;
 
-const string host = "127.0.0.1:47150";
-var data = args.Length == 1 ? Path.GetFullPath(args[0])
+const int defaultPort = 47150;
+var ephemeralPort = args is [_, "--ephemeral-port"];
+var host = $"127.0.0.1:{defaultPort}";
+var data = args.Length == 1 || ephemeralPort ? Path.GetFullPath(args[0])
     : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "Data"));
 Directory.CreateDirectory(data);
 var secret = BridgeFiles.LoadSecret(data);
@@ -21,7 +23,7 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 });
 builder.WebHost.ConfigureKestrel(server =>
 {
-    server.Listen(IPAddress.Loopback, 47150);
+    server.Listen(IPAddress.Loopback, ephemeralPort ? 0 : defaultPort);
     server.Limits.MaxRequestBodySize = 1024 * 1024;
     server.AddServerHeader = false;
 });
@@ -179,7 +181,11 @@ app.Run(async context =>
     else response.StatusCode = 404;
 });
 
-app.Lifetime.ApplicationStarted.Register(() => Console.WriteLine("Camo bridge ready. Watching portable data."));
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    if (ephemeralPort) host = new Uri(app.Urls.Single()).Authority;
+    Console.WriteLine($"Camo bridge ready at http://{host}");
+});
 await app.RunAsync();
 await reader;
 

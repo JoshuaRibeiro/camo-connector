@@ -113,7 +113,18 @@ jobs:
       - run: ./tests/native-bridge.ps1 -Executable (Join-Path $env:CAMO_CHECK_ROOT 'Runtime/Bridge/CamoConnector.Bridge.exe')
       - name: Check the standard bridge without bundled runtimes
         if: github.ref_type == 'tag'
-        run: ./tests/native-bridge.ps1 -Executable dist/portable-release/slim/Runtime/Bridge/CamoConnector.Bridge.exe
+        run: |
+          $dotnet = (Get-Command dotnet -CommandType Application | Select-Object -First 1).Source
+          $env:DOTNET_ROOT_X64 = Split-Path -Parent $dotnet
+          $runtimes = & $dotnet --list-runtimes
+          $runtimes | Write-Output
+          foreach ($framework in 'Microsoft.NETCore.App', 'Microsoft.WindowsDesktop.App', 'Microsoft.AspNetCore.App') {
+            if (-not ($runtimes -match ('^' + [regex]::Escape($framework) + ' 10\.0\.'))) {
+              throw "$framework 10.0 is missing from the x64 .NET installation at $env:DOTNET_ROOT_X64."
+            }
+          }
+          $env:DOTNET_DISABLE_GUI_ERRORS = '1'
+          ./tests/native-bridge.ps1 -Executable dist/portable-release/slim/Runtime/Bridge/CamoConnector.Bridge.exe
       - uses: actions/upload-artifact@v4
         if: github.ref_type != 'tag'
         with:

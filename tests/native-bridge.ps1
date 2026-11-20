@@ -16,7 +16,7 @@ $client.Timeout = [TimeSpan]::FromSeconds(2)
 $process = $null
 
 function Check-Events($Status, $Headers = @{}, $Route = 'events') {
-    $request = [Net.Http.HttpRequestMessage]::new('GET', "http://127.0.0.1:47150/$Route")
+    $request = [Net.Http.HttpRequestMessage]::new('GET', "$baseUrl/$Route")
     try {
         foreach ($header in $Headers.GetEnumerator()) {
             [void]$request.Headers.TryAddWithoutValidation($header.Key, $header.Value)
@@ -42,16 +42,20 @@ try {
         '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"Signal 50","key":"signal-50:sp-3","count":4,"goal":40}'
     )
     [IO.File]::WriteAllText($eventLog, $event + (($historical -join "`n") + "`n"))
-    $process = Start-Process -FilePath $application -ArgumentList ('"' + $data + '"') -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    $process = Start-Process -FilePath $application -ArgumentList ('"' + $data + '"', '--ephemeral-port') -WindowStyle Hidden -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+    $deadline = [DateTime]::UtcNow.AddSeconds(30)
     do {
-        $ready = Select-String -LiteralPath $stdout -SimpleMatch 'Camo bridge ready'
+        $ready = Select-String -LiteralPath $stdout -Pattern '^Camo bridge ready at (http://127\.0\.0\.1:\d+)$'
         if ($ready -or $process.HasExited) { break }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
     if (!$ready -or $process.HasExited) {
-        throw "Native bridge did not start: $(Get-Content -LiteralPath $stderr -Raw)"
+        $state = if ($process.HasExited) { "exit code $($process.ExitCode)" } else { 'timed out waiting for readiness' }
+        $startupOutput = Get-Content -LiteralPath $stdout -Raw
+        $startupErrors = Get-Content -LiteralPath $stderr -Raw
+        throw "Native bridge did not start ($state).`nExecutable: $application`nstdout:`n$startupOutput`nstderr:`n$startupErrors"
     }
+    $baseUrl = $ready.Matches[0].Groups[1].Value
     Check-Events 401
     Check-Events 403 @{ Origin = 'https://mw4.darkmattersolutions.uk'; Authorization = "Bearer $key" }
     $origin = 'chrome-extension://' + ('a' * 32)
@@ -103,7 +107,7 @@ try {
     $anvil = $catalog.catalog.weapons | Where-Object id -eq 'pm-40-anvil'
     $nightSnow = $anvil.camos | Where-Object id -eq 'sp-1'
     if ($nightSnow.artwork -ne '/local/artwork/night-snow.png') { throw 'Night Snow is missing its catalog artwork.' }
-    $artwork = $client.GetByteArrayAsync("http://127.0.0.1:47150$($nightSnow.artwork)").GetAwaiter().GetResult()
+    $artwork = $client.GetByteArrayAsync("$baseUrl$($nightSnow.artwork)").GetAwaiter().GetResult()
     if ($artwork.Length -lt 8 -or [Convert]::ToHexString($artwork[0..7]) -ne '89504E470D0A1A0A') {
         throw 'Embedded Night Snow artwork did not return a PNG.'
     }
@@ -157,7 +161,7 @@ try {
     if ($tracker.focus -ne 'mojave-357' -or ($tracker.overview.rows | Where-Object id -eq 'sp-3').count -ne 3) {
         throw 'Tracker overview did not match the overlay.'
     }
-    $editUrl = 'http://127.0.0.1:47150/local/edit'
+    $editUrl = "$baseUrl/local/edit"
     foreach ($increment in 1, 5) {
         $body = @{ weapon = 'mojave-357'; camo = 'sp-3'; increment = $increment } | ConvertTo-Json
         $tracker = Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $body
