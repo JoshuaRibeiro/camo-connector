@@ -91,6 +91,8 @@ if ($menu::ReadProgressionWeapon('.50 GS PROGRESSION') -ne '.50 GS' -or
 $progressionReads = @{
     'SIGNAL 5@ PROGRESSION' = 'Signal 50'
     'SIGNAL 58 PROGRESSION' = 'Signal 50'
+    'RPG-8 PROGRESSION | Move' = 'RPG-8'
+    'RPG-8 PROGRESSION =f' = 'RPG-8'
     'PM-4@ ANVIL PROGRESSION MODE MAST' = 'PM-40 Anvil'
     'PM-48 ANVIL PROGRESSION' = 'PM-40 Anvil'
     'TSO NIGHTSHADE PROGRESSION' = 'ISO Nightshade'

@@ -32,6 +32,9 @@ public static class CamoMenuRecognition
 
     public static string? ReadProgressionWeapon(string text)
     {
+        // The short active tab can share a crop with Mode Mastery or stray UI glyphs.
+        var label = Regex.Match(text, @"\bPROGRESSION\b(?=\s*[|=])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (label.Success) text = text[..(label.Index + label.Length)];
         // The tab font can make a zero look like an at sign in OCR.
         var key = Key(text.Replace('@', '0'));
         const string suffix = "progression";
