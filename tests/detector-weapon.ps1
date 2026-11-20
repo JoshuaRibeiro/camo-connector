@@ -168,6 +168,20 @@ $lines[1] = [CamoConnector.Detector.HudLine]::new('19/75', .20)
 if ($tracked::ReadRows($lines, $catalog, [Func[double,byte[]]]{ param($y) return ,$wrongThumbnail })) {
     throw 'Unverified 75-kill progress was attributed by Special artwork alone.'
 }
+$catalog['Signal 50'] = @()
+$signalLobby = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('SIGNAL 58 LA5T U5ED', .04)
+    [CamoConnector.Detector.HudLine]::new('Get 75 Player Kills whi le Pr0ne', .10)
+    [CamoConnector.Detector.HudLine]::new('29 / 75', .21)
+    [CamoConnector.Detector.HudLine]::new('PILA', .30)
+    [CamoConnector.Detector.HudLine]::new('Reach Weapon Level 31', .38)
+    [CamoConnector.Detector.HudLine]::new('29 / 31', .47)
+)
+$rows = $tracked::ReadRows($signalLobby, $catalog, [Func[double,byte[]]]{ param($y) return $null })
+if ($rows.Length -ne 2 -or $rows[0].Weapon -ne 'Signal 50' -or $rows[0].Camo -ne 'Platinum' -or
+    $rows[0].Count -ne 29 -or $rows[0].Goal -ne 75 -or $rows[1].Weapon -ne 'Pila') {
+    throw 'The lobby failed to associate Signal 50 Platinum with its own 29/75 counter.'
+}
 $trackedLines = [CamoConnector.Detector.HudLine[]]@(
     [CamoConnector.Detector.HudLine]::new('Signal 50', .02)
     [CamoConnector.Detector.HudLine]::new('32 / 40', .22)

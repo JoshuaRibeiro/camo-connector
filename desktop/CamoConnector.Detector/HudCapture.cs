@@ -573,7 +573,7 @@ internal sealed class HudCapture : IDisposable
             {
                 (Heading: (.654, .383, .095, .035), Area: (.714, .432, .135, .278), Thumbnail: (.670, .039, .069, .004)),
                 (Heading: (.740, .117, .110, .037), Area: (.792, .159, .172, .335), Thumbnail: (.760, .039, .069, .004)),
-                (Heading: (.067, .114, .110, .038), Area: (.121, .156, .169, .335), Thumbnail: (.084, .039, .069, .004))
+                (Heading: (.067, .114, .110, .038), Area: (.121, .156, .141, .335), Thumbnail: (.084, .039, .069, .004))
             };
         for (var i = 0; i < layouts.Length; i++)
         {
@@ -586,7 +586,7 @@ internal sealed class HudCapture : IDisposable
             byte[]? Thumbnail(double y) => Sample(frame, layout.Area.Item2 + y * layout.Area.Item4, layout.Thumbnail);
             var rows = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail);
             var (x, y, w, h) = layout.Area;
-            var counterArea = (x + w * .54, y, w * .42, h);
+            var counterArea = (x + w * .54, y, w * .46, h);
             var (counterText, counterHeight) = await ReadTextAsync(frame, counterArea, cancel,
                 positioned: true, pageMode: 11, countersOnly: true, trace: trace, regionName: "trackedCounters");
             var counters = TrackedCamoRecognition.ReadTsv(counterText, counterHeight)

@@ -65,8 +65,8 @@ public static class TrackedCamoRecognition
             }
 
             if (!catalog.TryGetValue(name!, out var entries)) continue;
-            if (goal == 75 && Regex.IsMatch(text,
-                @"\b(?:platinum|(?:kills?\s+)?while\s+prone)\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant))
+            if (goal == 75 && (Regex.IsMatch(text, @"\bplatinum\b", RegexOptions.IgnoreCase) ||
+                Regex.IsMatch(Key(text), @"whilepr[o0]ne")))
             {
                 result.Add(new(name!, "Platinum", count, goal, "name"));
                 continue;
@@ -104,6 +104,8 @@ public static class TrackedCamoRecognition
     {
         label = Regex.Replace(label, @"\s*\bLAST\s+USED\b.*$", "", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         var key = Key(label);
+        // The lobby's last-used badge can be joined to the weapon name or misread as LA5T U5ED.
+        if (Regex.IsMatch(key, @"\Asignal5[0o8](?:la[s5]tu[s5]ed)?\z")) return "Signal 50";
         if (key == "rpgb") return "RPG-8";
         if (Regex.IsMatch(key, @"\A(?:(?:krait|karit|crate)p?[g6][8b]|krait)(?:xp)?\z")) return "Krait P68";
         return WeaponRecognition.Read(new[] { label }, false)?.Name;
