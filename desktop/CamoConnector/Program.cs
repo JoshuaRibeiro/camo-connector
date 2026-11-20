@@ -78,7 +78,12 @@ internal sealed partial class ConnectorWindow : Form
         update.Click += async (_, _) => await UpdateAsync();
         AddPages(CreateSetupView(), build);
         Shown += async (_, _) => await RefreshSourcesAsync();
-        Shown += async (_, _) => await StartBridgeAsync();
+        Shown += async (_, _) =>
+        {
+            await StartBridgeAsync();
+            if (!IsDisposed && !closing.IsCancellationRequested && pages.SelectedTab == localTrackerPage)
+                await OpenLocalTrackerAsync();
+        };
     }
 
     private async Task UpdateAsync()

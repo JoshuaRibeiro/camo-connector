@@ -18,26 +18,28 @@ internal sealed partial class ConnectorWindow
         reloadTracker.Click += async (_, _) =>
         {
             if (localTrackerView?.CoreWebView2 is { } core) core.Reload();
-            else await OpenLocalTrackerAsync(trackerMessage);
+            else await OpenLocalTrackerAsync();
         };
         pages.SelectedIndexChanged += async (_, _) =>
         {
-            if (pages.SelectedTab == localTrackerPage && localTrackerView == null)
-                await OpenLocalTrackerAsync(trackerMessage);
+            if (bridgeReady && pages.SelectedTab == localTrackerPage && localTrackerView == null)
+                await OpenLocalTrackerAsync();
         };
     }
 
-    private async Task OpenLocalTrackerAsync(Label message)
+    private async Task OpenLocalTrackerAsync()
     {
-        if (localTrackerLoading || IsDisposed) return;
+        if (localTrackerLoading || localTrackerView != null || IsDisposed || closing.IsCancellationRequested) return;
+        if (!bridgeReady)
+        {
+            trackerMessage.Text = status.Text;
+            return;
+        }
         localTrackerLoading = true;
         WebView2? view = null;
         try
         {
-            message.Text = "Opening local tracker.";
-            for (var attempt = 0; !bridgeReady && attempt < 40; attempt++)
-                await Task.Delay(250, closing.Token);
-            if (!bridgeReady) throw new IOException("The local bridge is unavailable.");
+            trackerMessage.Text = "Opening local tracker.";
 
             var profile = Path.Combine(root, "Data", "TrackerProfile");
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
@@ -58,7 +60,7 @@ internal sealed partial class ConnectorWindow
                     uri.Port != 47150 || uri.AbsolutePath != "/local/tracker";
             };
             core.NewWindowRequested += (_, args) => args.Handled = true;
-            core.NavigationCompleted += (_, args) => message.Text = args.IsSuccess ? "" : "Local tracker could not load.";
+            core.NavigationCompleted += (_, args) => trackerMessage.Text = args.IsSuccess ? "" : "Local tracker could not load.";
             var key = File.ReadAllText(Path.Combine(root, "Data", "bridge-pairing.key")).Trim();
             core.Navigate("http://127.0.0.1:47150/local/tracker#" + key);
             localTrackerView = view;
@@ -66,7 +68,7 @@ internal sealed partial class ConnectorWindow
         catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
         catch (Exception error)
         {
-            if (!IsDisposed) message.Text = "Could not open the local tracker: " + error.Message;
+            if (!IsDisposed) trackerMessage.Text = "Could not open the local tracker: " + error.Message;
         }
         finally
         {
