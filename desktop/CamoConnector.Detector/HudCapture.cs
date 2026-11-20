@@ -478,6 +478,15 @@ internal sealed class HudCapture : IDisposable
                 adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "mojaveCamoTitle");
             title = CamoMenuRecognition.ReadKnownCamoTitle(specialTitle, names);
         }
+        // Some layouts place the selected camo details above the lower menu region.
+        var raisedDetails = false;
+        if (title == null && names.Length > 0)
+        {
+            var (raisedTitle, _) = await ReadTextAsync(frame, (.344, .398, .310, .055), cancel, pageMode: 7,
+                trace: trace, regionName: "raisedCamoTitle");
+            title = CamoMenuRecognition.ReadKnownCamoTitle(raisedTitle, names);
+            raisedDetails = title != null;
+        }
         if (title == null)
         {
             var (wideTitle, _) = await ReadTextAsync(frame, (.312, .614, .472, .064), cancel,
@@ -485,7 +494,8 @@ internal sealed class HudCapture : IDisposable
             title = CamoMenuRecognition.ReadKnownCamoTitle(wideTitle, names) ?? string.Join(" ", Lines(wideTitle));
         }
         if (title.Length == 0) return null;
-        var (objectives, _) = await ReadTextAsync(frame, (.313, .679, .342, .181), cancel,
+        var objectivesArea = raisedDetails ? (.313, .455, .342, .159) : (.313, .679, .342, .181);
+        var (objectives, _) = await ReadTextAsync(frame, objectivesArea, cancel,
             trace: trace, regionName: "camoObjectives");
         if (CamoMenuRecognition.ReadMilitaryLevel(weapon, title, objectives) is { } weaponLevel)
             return weaponLevel;
@@ -508,11 +518,11 @@ internal sealed class HudCapture : IDisposable
             if (candidate != null && candidate.Count == candidate.Goal) return null;
             return CamoMenuRecognition.CheckObjectiveGoal(candidate, catalogGoal, objectives);
         }
-        var isolated = await ReadCounter((.512, .795, .060, .045), PixelAdjustment.Normal, "camoCounter");
+        var isolated = await ReadCounter(raisedDetails ? (.525, .572, .045, .037) : (.512, .795, .060, .045), PixelAdjustment.Normal, "camoCounter");
         if (CamoMenuRecognition.ConfirmCounter(progress, isolated, null) is { } confirmed)
             return Validate(confirmed);
         // A wider counter crop retains digits when the menu is shifted or the counter is longer.
-        var alternate = await ReadCounter((.499, .780, .102, .066), PixelAdjustment.Contrast, "camoCounterContrast");
+        var alternate = await ReadCounter(raisedDetails ? (.520, .563, .062, .053) : (.499, .780, .102, .066), PixelAdjustment.Contrast, "camoCounterContrast");
         if (progress != null)
         {
             if (isolated != null && isolated != progress) return null;
