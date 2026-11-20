@@ -177,13 +177,10 @@ internal sealed partial class ConnectorWindow
         AddSetupRow(help, SetupSection("PC capture", new Label { AutoSize = true, Text = "Select the monitor showing Call of Duty in Auto tracking." }));
         AddSetupRow(help, SetupSection("Console or OBS", new Label { AutoSize = true, Text = "Select your capture card or OBS Virtual Camera in Auto tracking and turn on Auto tracking." }));
         AddSetupRow(help, SetupSection("OBS overlay", new Label { AutoSize = true, Text = "Copy the URL from Camo tracker and paste it into an OBS Browser Source." }));
-        var settings = PageBody(settingsPage, "Settings", "Manage the desktop app and website sync.");
+        var settings = PageBody(settingsPage, "Settings", "Manage desktop updates and tray controls.");
         update.AutoSize = true;
         updateStatus.Text = $"Camo Connector v{build}";
         AddSetupRow(settings, SetupSection("App updates", updateStatus, update));
-        AddSetupRow(settings, SetupSection("Website sync",
-            new Label { Text = "Pair Camo Connector with your online tracker.", AutoSize = true },
-            PageButton("Open website sync", trackerPage)));
         var tray = new Button { Text = "Hide to tray", AutoSize = true };
         tray.Click += (_, _) => HideTrackerToTray();
         AddSetupRow(settings, SetupSection("Desktop",

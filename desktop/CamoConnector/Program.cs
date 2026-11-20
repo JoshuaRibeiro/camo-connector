@@ -101,7 +101,6 @@ internal sealed partial class ConnectorWindow : Form
             using var http = new HttpClient();
             var releases = new GitHubRelease(http);
             updateStatus.Text = "Checking desktop version.";
-            var browserUpdate = UpdateBrowserExtensionsAsync(releases, closing.Token);
             try
             {
                 available = updateKey == null ? null : await releases.CheckAsync(
@@ -114,7 +113,6 @@ internal sealed partial class ConnectorWindow : Form
                 available = null;
                 if (!IsDisposed) updateStatus.Text = error.Message;
             }
-            await browserUpdate;
             if (!IsDisposed && available != null) update.Text = "Update and restart";
         }
         catch (Exception error) { if (!IsDisposed) updateStatus.Text = error.Message; }
@@ -174,7 +172,7 @@ internal sealed partial class ConnectorWindow : Form
     {
         closing.Cancel();
         setupHeadingFont?.Dispose();
-        StopTracker();
+        DisposeTrackerTray();
         diagnosticsTimer.Dispose();
         logFont.Dispose();
         foreach (var font in shellFonts) font.Dispose();

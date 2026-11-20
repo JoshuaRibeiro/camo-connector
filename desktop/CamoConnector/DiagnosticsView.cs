@@ -38,7 +38,6 @@ internal sealed partial class ConnectorWindow
         logsPage.Controls.Add(logs);
         pages.TabPages.AddRange([capturePage, helpPage, settingsPage]);
         AddLocalTrackerPage();
-        AddTrackerPage();
         BuildShell(build);
         BindAutomaticTracking();
         pages.SelectedIndexChanged += (_, _) => RefreshLogs();

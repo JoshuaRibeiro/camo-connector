@@ -17,9 +17,6 @@
     <Compile Include="../GameWindows.cs" Link="GameWindows.cs" />
     <EmbeddedResource Include="CamoConnector.ico" LogicalName="CamoConnector.AppIcon" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
-    <EmbeddedResource Include="../../tracker.js" LogicalName="CamoConnector.Tracker.js" />
-    <EmbeddedResource Include="../../backup.js" LogicalName="CamoConnector.Backup.js" />
-    <EmbeddedResource Include="TrackerHost.js" LogicalName="CamoConnector.TrackerHost.js" />
   </ItemGroup>
   <Target Name="RemoveUnusedWebViewWpfReference" BeforeTargets="ResolveAssemblyReferences">
     <ItemGroup>
