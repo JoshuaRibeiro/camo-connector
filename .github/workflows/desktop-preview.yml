@@ -49,11 +49,29 @@ jobs:
           "CAMO_CAPTURE_DIRECTORY=$capture" >> $env:GITHUB_ENV
       - name: Prepare OCR runtime
         run: |
-          choco install tesseract --yes --no-progress
-          if ($LASTEXITCODE) { throw 'Could not install Tesseract on the build runner.' }
-          $ocr = Join-Path $env:ProgramFiles 'Tesseract-OCR'
-          if (!(Test-Path (Join-Path $ocr 'tesseract.exe')) -or !(Test-Path (Join-Path $ocr 'tessdata/eng.traineddata'))) {
+          # Installer URL and checksum from the tesseract-ocr.tesseract 5.5.3 WinGet manifest.
+          $url = 'https://github.com/tesseract-ocr/tesseract/releases/download/5.5.3/tesseract-ocr-w64-setup-5.5.3.20260724.exe'
+          $sha256 = 'BEE9E3434BD94FD65387D9BE28CD467A41F61B1275383B55B0F59A1331270AE4'
+          $installer = Join-Path $env:RUNNER_TEMP 'tesseract-setup.exe'
+          curl.exe --fail --location --retry 3 --connect-timeout 15 --max-time 120 --output $installer $url
+          if ($LASTEXITCODE) { throw 'Could not download the pinned Windows Tesseract installer.' }
+          if ((Get-FileHash -LiteralPath $installer -Algorithm SHA256).Hash -ne $sha256) {
+            throw 'The Tesseract installer did not match its pinned SHA-256.'
+          }
+
+          $ocr = Join-Path $env:RUNNER_TEMP 'camo-tesseract'
+          # NSIS requires /D to be last, with the destination unquoted.
+          $setup = Start-Process -FilePath $installer -ArgumentList "/S /D=$ocr" -WindowStyle Hidden -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "Tesseract setup failed with exit code $($setup.ExitCode)." }
+          $tesseract = Join-Path $ocr 'tesseract.exe'
+          $models = Join-Path $ocr 'tessdata'
+          if (!(Test-Path -LiteralPath $tesseract -PathType Leaf) -or
+              !(Test-Path -LiteralPath (Join-Path $models 'eng.traineddata') -PathType Leaf)) {
             throw 'Could not find Tesseract and the English OCR model.'
+          }
+          $languages = & $tesseract --tessdata-dir $models --list-langs
+          if ($LASTEXITCODE -or $languages -notcontains 'eng') {
+            throw 'The pinned Tesseract executable cannot load the English model.'
           }
           "CAMO_OCR_DIRECTORY=$ocr" >> $env:GITHUB_ENV
       - run: ./scripts/build-detector-development.ps1 -CaptureDirectory $env:CAMO_CAPTURE_DIRECTORY -OcrDirectory $env:CAMO_OCR_DIRECTORY
