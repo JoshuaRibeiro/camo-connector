@@ -67,7 +67,7 @@ internal sealed partial class ConnectorWindow : Form
     {
         var build = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion.Split('+')[0] ?? desktopVersion.ToString(3);
-        Text = "Camo Connector";
+        Text = $"Camo Connector v{build}";
         Font = ShellFont("Bahnschrift", 10);
         using var iconStream = typeof(Program).Assembly.GetManifestResourceStream("CamoConnector.AppIcon")!;
         using var icon = new Icon(iconStream);
