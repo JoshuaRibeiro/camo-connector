@@ -4,13 +4,15 @@ namespace CamoConnector;
 
 internal sealed partial class ConnectorWindow
 {
+    private const int NativeCaptionStyle = 0x00C00000;
+
     protected override CreateParams CreateParams
     {
         get
         {
             const int thickFrame = 0x00040000, maximizeBox = 0x00010000, systemMenu = 0x00080000;
             var parameters = base.CreateParams;
-            parameters.Style |= thickFrame | maximizeBox | systemMenu;
+            parameters.Style = (parameters.Style & ~NativeCaptionStyle) | thickFrame | maximizeBox | systemMenu;
             return parameters;
         }
     }
@@ -52,11 +54,31 @@ internal sealed partial class ConnectorWindow
 
     protected override void WndProc(ref Message message)
     {
-        const int calculateClient = 0x0083, setCursor = 0x0020;
-        if (message.Msg == calculateClient && message.WParam != 0 &&
-            WindowState != FormWindowState.Maximized)
+        const int calculateClient = 0x0083, setCursor = 0x0020, styleChanging = 0x007C;
+        const int windowStyle = -16;
+        if (message.Msg == styleChanging && message.WParam == windowStyle)
         {
-            // The resize style makes the window eligible for Snap. Keep the custom header in the client area.
+            base.WndProc(ref message);
+            // STYLESTRUCT stores the proposed style after the current style.
+            var proposedStyle = Marshal.ReadInt32(message.LParam, sizeof(int));
+            Marshal.WriteInt32(message.LParam, sizeof(int), proposedStyle & ~NativeCaptionStyle);
+            return;
+        }
+        if (message.Msg == calculateClient)
+        {
+            // With either form of WM_NCCALCSIZE, the first RECT is the proposed window area.
+            // Keep the custom caption and clip the maximized frame's overhang to the work area.
+            if (IsZoomed(message.HWnd))
+            {
+                var proposed = Rectangle.FromLTRB(
+                    Marshal.ReadInt32(message.LParam, 0), Marshal.ReadInt32(message.LParam, 4),
+                    Marshal.ReadInt32(message.LParam, 8), Marshal.ReadInt32(message.LParam, 12));
+                var client = Rectangle.Intersect(proposed, Screen.FromRectangle(proposed).WorkingArea);
+                Marshal.WriteInt32(message.LParam, 0, client.Left);
+                Marshal.WriteInt32(message.LParam, 4, client.Top);
+                Marshal.WriteInt32(message.LParam, 8, client.Right);
+                Marshal.WriteInt32(message.LParam, 12, client.Bottom);
+            }
             message.Result = 0;
             return;
         }
@@ -224,7 +246,6 @@ internal sealed partial class ConnectorWindow
             WindowState = FormWindowState.Normal;
         else
         {
-            MaximizedBounds = Screen.FromControl(this).WorkingArea;
             WindowState = FormWindowState.Maximized;
         }
     }
@@ -234,4 +255,7 @@ internal sealed partial class ConnectorWindow
 
     [DllImport("user32.dll")]
     private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern bool IsZoomed(nint window);
 }
