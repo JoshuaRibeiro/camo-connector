@@ -54,7 +54,24 @@ internal sealed partial class ConnectorWindow
 
     protected override void WndProc(ref Message message)
     {
-        const int calculateClient = 0x0083, setCursor = 0x0020, styleChanging = 0x007C;
+        const int calculateClient = 0x0083, paintFrame = 0x0085, activateFrame = 0x0086;
+        const int setCursor = 0x0020, styleChanging = 0x007C;
+
+        // Keep the resizable style for Snap without painting its native frame.
+        if (message.Msg == paintFrame)
+        {
+            message.Result = 0;
+            return;
+        }
+        if (message.Msg == activateFrame)
+        {
+            // Let Windows process activation without repainting the non-client area.
+            var originalRegion = message.LParam;
+            message.LParam = -1;
+            base.WndProc(ref message);
+            message.LParam = originalRegion;
+            return;
+        }
         const int windowStyle = -16;
         if (message.Msg == styleChanging && message.WParam == windowStyle)
         {
