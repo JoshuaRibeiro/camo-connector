@@ -19,9 +19,10 @@ internal sealed partial class ConnectorWindow
         grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
         var capture = new TableLayoutPanel { Dock = DockStyle.Fill, Padding = new Padding(12), ColumnCount = 1 };
-        var heading = new Label { Text = "Capture setup", AutoSize = true, Font = setupHeadingFont };
+        var heading = new Label { Text = "Auto tracking", AutoSize = true, Font = setupHeadingFont };
         AddSetupRow(capture, heading);
-        var sourceLabel = new Label { Text = "Capture source", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
+        AddSetupRow(capture, automaticTracking);
+        var sourceLabel = new Label { Text = "Select your game window or capture source", AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
         AddSetupRow(capture, sourceLabel);
         var picker = new TableLayoutPanel { Dock = DockStyle.Fill, AutoSize = true, ColumnCount = 2, Margin = Padding.Empty };
         picker.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -42,14 +43,10 @@ internal sealed partial class ConnectorWindow
         detectionSummary = new Label { AutoSize = true };
         var trackerShortcut = new Button { Text = "Open Tracker", AutoSize = true };
         trackerShortcut.Click += (_, _) => pages.SelectedTab = localTrackerPage;
-        var logsShortcut = new Button { Text = "View logs", AutoSize = true };
-        logsShortcut.Click += (_, _) => pages.SelectedTab = logsPage;
-        var syncHelp = new Label { Text = "Use the Tracker tab for camo sync. Detection keeps running when you hide the app to the tray.", AutoSize = true };
+        var syncHelp = new Label { Text = "Choose a window for manual PC tracking, or a capture device for console or OBS.", AutoSize = true };
         var sidebar = new TableLayoutPanel { Dock = DockStyle.Top, AutoSize = true, ColumnCount = 1, Padding = new Padding(8) };
-        AddSetupRow(sidebar, SetupSection("Connection", status, detectionSummary, logsShortcut));
-        AddSetupRow(sidebar, SetupSection("Camo sync", syncHelp, trackerShortcut));
-        AddSetupRow(sidebar, SetupSection("Updates", updateStatus, extensionStatus));
-        updateStatus.Text = "Check for updates from the top-right corner.";
+        AddSetupRow(sidebar, SetupSection("Connection", status, detectionSummary));
+        AddSetupRow(sidebar, SetupSection("Capture sources", syncHelp, trackerShortcut));
         grid.Controls.Add(capture, 0, 0);
         grid.Controls.Add(sidebar, 1, 0);
         viewport.Controls.Add(grid);
@@ -65,7 +62,7 @@ internal sealed partial class ConnectorWindow
             grid.SetCellPosition(sidebar, new TableLayoutPanelCellPosition(wide ? 1 : 0, wide ? 0 : 1));
             var available = width - grid.Padding.Horizontal;
             var sidebarWidth = Math.Max(1, (wide ? available * 32 / 100 : available) - LogicalToDeviceUnits(55));
-            foreach (var label in new[] { status, detectionSummary, syncHelp, updateStatus, extensionStatus })
+            foreach (var label in new[] { status, detectionSummary, syncHelp })
                 label!.MaximumSize = new Size(sidebarWidth, 0);
             var captureWidth = Math.Max(1, (wide ? available * 68 / 100 : available) - LogicalToDeviceUnits(35));
             detectorStatus.MaximumSize = previewStatus.MaximumSize = new Size(captureWidth, 0);
@@ -78,7 +75,7 @@ internal sealed partial class ConnectorWindow
         }
 
         viewport.SizeChanged += (_, _) => FitSetup();
-        foreach (var label in new[] { status, detectionSummary, updateStatus, extensionStatus, detectorStatus, previewStatus })
+        foreach (var label in new[] { status, detectionSummary, detectorStatus, previewStatus })
             label!.TextChanged += (_, _) => FitSetup();
         BindCaptureControls();
         return viewport;

@@ -13,9 +13,8 @@ internal sealed partial class ConnectorWindow
     {
         var controls = new FlowLayoutPanel { Dock = DockStyle.Top, Height = 36, WrapContents = false };
         var reload = new Button { Text = "Reload tracker", AutoSize = true };
-        var hide = new Button { Text = "Hide to tray", AutoSize = true };
         var message = new Label { AutoSize = true, Margin = new Padding(8) };
-        controls.Controls.AddRange([reload, hide, message]);
+        controls.Controls.AddRange([reload, message]);
         localTrackerPage.Controls.Add(controls);
         pages.TabPages.Add(localTrackerPage);
         reload.Click += async (_, _) =>
@@ -23,7 +22,6 @@ internal sealed partial class ConnectorWindow
             if (localTrackerView?.CoreWebView2 is { } core) core.Reload();
             else await OpenLocalTrackerAsync(message);
         };
-        hide.Click += (_, _) => HideTrackerToTray();
         pages.SelectedIndexChanged += async (_, _) =>
         {
             if (pages.SelectedTab == localTrackerPage && localTrackerView == null)

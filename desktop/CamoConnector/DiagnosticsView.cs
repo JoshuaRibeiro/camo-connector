@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using Microsoft.Win32;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -7,7 +6,7 @@ namespace CamoConnector;
 
 internal sealed partial class ConnectorWindow
 {
-    private readonly TabControl pages = new() { Dock = DockStyle.Fill };
+    private readonly PageDeck pages = new() { Dock = DockStyle.Fill };
     private readonly TabPage logsPage = new("Logs");
     private readonly TextBox detectorLog = LogBox(), bridgeLog = LogBox(), captureLog = LogBox();
     private readonly ConcurrentQueue<string> bridgeMessages = new(), captureMessages = new(), detectorMessages = new();
@@ -23,9 +22,8 @@ internal sealed partial class ConnectorWindow
         WordWrap = false, Dock = DockStyle.Fill
     };
 
-    private void AddPages(Control setup)
+    private void AddPages(Control setup, string build)
     {
-        var capturePage = new TabPage("Setup");
         capturePage.Controls.Add(setup);
         var logs = new TableLayoutPanel { Dock = DockStyle.Fill, RowCount = 3, ColumnCount = 1, Padding = new Padding(8) };
         var boxes = new[] { (detectorLog, "Detector"), (bridgeLog, "Bridge"), (captureLog, "Capture") };
@@ -38,44 +36,17 @@ internal sealed partial class ConnectorWindow
             logs.Controls.Add(group, 0, logs.RowStyles.Count - 1);
         }
         logsPage.Controls.Add(logs);
-        pages.TabPages.AddRange([capturePage, logsPage]);
-        pages.DrawItem += DrawTab;
-        var pageHost = new Panel { Dock = DockStyle.Fill };
-        var tabStripBackground = new Panel { TabStop = false };
-        pageHost.Controls.Add(pages);
-        pageHost.Controls.Add(tabStripBackground);
-        pageHost.Controls.Add(update);
-        tabStripBackground.BringToFront();
-        update.BringToFront();
+        pages.TabPages.AddRange([homePage, capturePage, helpPage, settingsPage]);
         AddLocalTrackerPage();
         AddTrackerPage();
-        Controls.Add(pageHost);
-
-        void PositionUpdateButton()
-        {
-            if (!pages.IsHandleCreated) return;
-            var rowHeight = LogicalToDeviceUnits(30);
-            if (pages.ItemSize.Height != rowHeight)
-                pages.ItemSize = new Size(pages.ItemSize.Width, rowHeight);
-            var tab = pages.GetTabRect(0);
-            var padding = LogicalToDeviceUnits(8);
-            var width = TextRenderer.MeasureText(update.Text, update.Font).Width + padding * 2;
-            update.Bounds = new Rectangle(pageHost.ClientSize.Width - padding - width, tab.Top, width, tab.Height);
-            var lastTab = pages.GetTabRect(pages.TabCount - 1);
-            tabStripBackground.Bounds = new Rectangle(lastTab.Right, 0,
-                Math.Max(0, pageHost.ClientSize.Width - lastTab.Right), Math.Max(0, pages.DisplayRectangle.Top - 2));
-        }
-        pages.HandleCreated += (_, _) => PositionUpdateButton();
-        pageHost.SizeChanged += (_, _) => PositionUpdateButton();
-        pages.FontChanged += (_, _) => PositionUpdateButton();
-        update.TextChanged += (_, _) => PositionUpdateButton();
-        DpiChanged += (_, _) => PositionUpdateButton();
-        Shown += (_, _) => PositionUpdateButton();
+        BuildShell(build);
+        BindAutomaticTracking();
         pages.SelectedIndexChanged += (_, _) => RefreshLogs();
         diagnosticsTimer.Tick += (_, _) =>
         {
             RefreshTheme();
             CheckBridge();
+            CheckAutomaticTracking();
             RefreshLogs();
         };
         HandleCreated += (_, _) => { dark = null; RefreshTheme(); };
@@ -163,13 +134,11 @@ internal sealed partial class ConnectorWindow
 
     private void RefreshTheme()
     {
-        var useDark = !SystemInformation.HighContrast && Registry.GetValue(
-            @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
-            "AppsUseLightTheme", 1) is 0;
+        var useDark = !SystemInformation.HighContrast;
         if (dark == useDark) return;
         dark = useDark;
         ApplyTheme(this, useDark);
-        pages.DrawMode = useDark ? TabDrawMode.OwnerDrawFixed : TabDrawMode.Normal;
+        StyleShell();
         var enabled = useDark ? 1 : 0;
         if (IsHandleCreated) DwmSetWindowAttribute(Handle, 20, ref enabled, sizeof(int));
         Invalidate(true);
@@ -178,7 +147,7 @@ internal sealed partial class ConnectorWindow
     private static void ApplyTheme(Control control, bool dark)
     {
         if (control is PictureBox) return;
-        var surface = dark ? Color.FromArgb(30, 32, 36) : SystemColors.Control;
+        var surface = dark ? ShellBackground : SystemColors.Control;
         var ink = dark ? Color.FromArgb(234, 236, 240) : SystemColors.ControlText;
         control.BackColor = surface;
         control.ForeColor = ink;
@@ -190,21 +159,12 @@ internal sealed partial class ConnectorWindow
             button.UseVisualStyleBackColor = !dark;
             if (dark)
             {
-                button.BackColor = Color.FromArgb(48, 51, 57);
-                button.FlatAppearance.BorderColor = Color.FromArgb(90, 95, 104);
+                button.BackColor = ShellPanel;
+                button.FlatAppearance.BorderColor = Color.FromArgb(57, 79, 94);
             }
         }
         if (control is TabPage page) page.UseVisualStyleBackColor = !dark;
         foreach (Control child in control.Controls) ApplyTheme(child, dark);
-    }
-
-    private void DrawTab(object? sender, DrawItemEventArgs e)
-    {
-        if (e.Index < 0 || e.Index >= pages.TabCount) return;
-        using var brush = new SolidBrush(e.Index == pages.SelectedIndex ? Color.FromArgb(48, 51, 57) : BackColor);
-        e.Graphics.FillRectangle(brush, e.Bounds);
-        TextRenderer.DrawText(e.Graphics, pages.TabPages[e.Index].Text, pages.Font, e.Bounds, ForeColor,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
     }
 
     [DllImport("dwmapi.dll")]

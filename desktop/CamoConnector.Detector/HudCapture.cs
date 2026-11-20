@@ -44,9 +44,10 @@ internal sealed class HudCapture : IDisposable
 
     public void Dispose() => persistentOcr?.Dispose();
 
-    public static Bitmap Desktop(Screen screen)
+    public static Bitmap Desktop(Screen screen) => Desktop(screen.Bounds);
+
+    public static Bitmap Desktop(Rectangle bounds)
     {
-        var bounds = screen.Bounds;
         var frame = new Bitmap(bounds.Width, bounds.Height, PixelFormat.Format24bppRgb);
         try
         {

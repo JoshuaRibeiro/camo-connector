@@ -1,3 +1,4 @@
+using CamoConnector.Capture;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text.Json;
@@ -42,7 +43,11 @@ internal sealed partial class ConnectorWindow
         startDetection.Click += async (_, _) => await RunDetectorAsync();
         stopDetection.Click += (_, _) =>
         {
-            try { StopDetector(); }
+            try
+            {
+                automaticTracking.Checked = false;
+                if (!detectorStopRequested) StopDetector();
+            }
             catch (Exception error) { detectorStatus.Text = "Could not stop the detector: " + error.Message; }
         };
         previewTimer.Tick += (_, _) => ReadPreview();
@@ -57,6 +62,7 @@ internal sealed partial class ConnectorWindow
         startDetection.Enabled = bridgeReady && detector == null && !scanning && sources.SelectedItem != null &&
             MissingDetectionComponent == null;
         stopDetection.Enabled = detector != null;
+        RefreshCaptureBanner();
         if (detectionSummary != null)
             detectionSummary.Text = scanning ? "Finding capture sources…" : detector != null ? "Detection running" :
                 startDetection.Enabled ? "Ready to detect" : "Detection stopped";
@@ -64,18 +70,25 @@ internal sealed partial class ConnectorWindow
 
     private async Task RefreshSourcesAsync()
     {
+        if (scanning || detector != null) return;
         scanning = true;
         UpdateCaptureButtons();
         var selected = sources.SelectedItem as Source;
-        var found = Screen.AllScreens.Select((screen, index) =>
+        var found = GameWindows.List().OrderByDescending(window => window.IsCallOfDuty)
+            .Select(window => new Source("--window", window.Input, window.Title)).ToList();
+        found.AddRange(Screen.AllScreens.Select((screen, index) =>
             new Source("--monitor", index.ToString(), $"Monitor {index + 1} ({screen.Bounds.Width} × {screen.Bounds.Height})",
-                screen.DeviceName)).ToList();
+                screen.DeviceName)));
         try
         {
             StopPreview();
             if (selected == null && File.Exists(SourceSettings))
             {
-                try { selected = JsonSerializer.Deserialize<Source>(File.ReadAllText(SourceSettings)); }
+                try
+                {
+                    selected = JsonSerializer.Deserialize<Source>(File.ReadAllText(SourceSettings));
+                    if (selected?.Mode == "--window") selected = null;
+                }
                 catch (JsonException) { }
             }
             detectorStatus.Text = MissingDetectionComponent is { } missing
@@ -114,7 +127,7 @@ internal sealed partial class ConnectorWindow
                 sources.Items.AddRange(found.ToArray());
                 var preferred = found.FindIndex(source => selected != null && source.Mode == selected.Mode &&
                     (selected.MonitorId != null ? source.MonitorId == selected.MonitorId : source.Input == selected.Input));
-                if (found.Count > 0) sources.SelectedIndex = Math.Max(0, preferred);
+                if (preferred >= 0) sources.SelectedIndex = preferred;
                 UpdateCaptureButtons();
             }
         }
@@ -131,9 +144,12 @@ internal sealed partial class ConnectorWindow
         return Process.Start(start) ?? throw new IOException("Could not start the detector.");
     }
 
-    private async Task RunDetectorAsync()
+    private async Task RunDetectorAsync(Source? automaticSource = null)
     {
-        if (!bridgeReady || detector != null || sources.SelectedItem is not Source source) return;
+        var source = automaticSource ?? sources.SelectedItem as Source;
+        if (!bridgeReady || detector != null || source == null || MissingDetectionComponent != null) return;
+        activeCapture = source;
+        captureWasAutomatic = automaticSource != null;
         Process? child = null;
         try
         {
@@ -142,8 +158,11 @@ internal sealed partial class ConnectorWindow
             var staging = SourceSettings + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
-                File.WriteAllText(staging, JsonSerializer.Serialize(source));
-                File.Move(staging, SourceSettings, true);
+                if (automaticSource == null && source.Mode != "--window")
+                {
+                    File.WriteAllText(staging, JsonSerializer.Serialize(source));
+                    File.Move(staging, SourceSettings, true);
+                }
             }
             finally { File.Delete(staging); }
             detectorStopRequested = false;
@@ -203,6 +222,7 @@ internal sealed partial class ConnectorWindow
                     if (detector == child) detector = null;
                 }
             }
+            activeCapture = null;
             if (!IsDisposed && !closing.IsCancellationRequested)
             {
                 UpdateCaptureButtons();
@@ -216,8 +236,8 @@ internal sealed partial class ConnectorWindow
         try
         {
             StopPreview();
-            if (scanning || detector != null || closing.IsCancellationRequested ||
-                sources.SelectedItem is not Source source || !File.Exists(DetectorPath)) return;
+            if (scanning || detector != null || closing.IsCancellationRequested || pages.SelectedTab != capturePage ||
+                sources.SelectedItem is not Source source || source.Mode == "--window" || !File.Exists(DetectorPath)) return;
             var mode = source.Mode == "--device" ? "--preview-device" : "--preview-monitor";
             previewWorker = LaunchDetector(mode, source.MonitorId ?? source.Input);
             _ = StartReadingPreview(previewWorker);

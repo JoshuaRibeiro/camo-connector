@@ -68,15 +68,15 @@ internal sealed partial class ConnectorWindow : Form
     {
         var build = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion.Split('+')[0] ?? desktopVersion.ToString(3);
-        Text = $"Camo Connector v{build}";
+        Text = "Camo Connector";
         using var iconStream = typeof(Program).Assembly.GetManifestResourceStream("CamoConnector.AppIcon")!;
         using var icon = new Icon(iconStream);
         Icon = (Icon)icon.Clone();
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(570, 575);
-        MinimumSize = new Size(500, 300);
+        ClientSize = new Size(1040, 720);
+        MinimumSize = new Size(570, 420);
         update.Click += async (_, _) => await UpdateAsync();
-        AddPages(CreateSetupView());
+        AddPages(CreateSetupView(), build);
         Shown += async (_, _) => await RefreshSourcesAsync();
         Shown += async (_, _) => await StartBridgeAsync();
     }
@@ -174,6 +174,7 @@ internal sealed partial class ConnectorWindow : Form
         StopTracker();
         diagnosticsTimer.Dispose();
         logFont.Dispose();
+        foreach (var font in shellFonts) font.Dispose();
         previewTimer.Dispose();
         try { StopPreview(); }
         catch (Exception error) { MessageBox.Show(error.Message, "Could not stop preview"); }

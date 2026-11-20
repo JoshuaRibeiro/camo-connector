@@ -1,3 +1,4 @@
+using CamoConnector.Capture;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -9,11 +10,11 @@ var previewOnly = args.Length == 2 && args[0] is "--preview-monitor" or "--previ
 var saveMenuCrops = args.Length == 4 && args[2] == "--save-crops";
 var probe = (args.Length == 2 || saveMenuCrops) &&
     args[0] is "--probe-menu-monitor" or "--probe-menu-image" or "--probe-tracked-monitor" or "--probe-tracked-image" or "--probe-unlock-image";
-var publishPreview = args.Length == 4 && args[3] == "--preview" && args[0] is "--monitor" or "--device";
+var publishPreview = args.Length == 4 && args[3] == "--preview" && args[0] is "--monitor" or "--device" or "--window";
 if (!listDevices && !previewOnly && !publishPreview && !probe &&
-    (args.Length != 3 || args[0] is not ("--image" or "--monitor" or "--device" or "--device-frame" or "--video")))
+    (args.Length != 3 || args[0] is not ("--image" or "--monitor" or "--window" or "--device" or "--device-frame" or "--video")))
 {
-    Console.Error.WriteLine("CamoConnector.Detector --list-devices | (--image <capture> | --video <file> | --monitor <index> | --device <input> | --device-frame <input>) <data-directory>");
+    Console.Error.WriteLine("CamoConnector.Detector --list-devices | (--image <capture> | --video <file> | --monitor <index> | --window <handle:pid> | --device <input> | --device-frame <input>) <data-directory>");
     Console.Error.WriteLine("CamoConnector.Detector (--probe-menu-monitor <display> | --probe-menu-image <capture>) [--save-crops <directory>]");
     Console.Error.WriteLine("CamoConnector.Detector (--probe-tracked-monitor <display> | --probe-tracked-image <capture>) [--save-crops <directory>]");
     return 2;
@@ -124,7 +125,8 @@ try
         }));
         return 0;
     }
-    var screen = external == null ? FindMonitor(args[1]) : null;
+    var window = args[0] == "--window" ? GameWindows.Parse(args[1]) : null;
+    var screen = external == null && window == null ? FindMonitor(args[1]) : null;
     using var previewStop = CancellationTokenSource.CreateLinkedTokenSource(stop.Token);
     var acceptedFrames = publishPreview && external == null
         ? Channel.CreateBounded<Bitmap>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest },
@@ -134,7 +136,7 @@ try
     {
         try
         {
-            await CapturePreview.RunAsync(token => external == null
+            await CapturePreview.RunAsync(token => window != null ? CaptureWindowAsync(window, token) : external == null
                 ? Task.FromResult(HudCapture.Desktop(screen!)) : external.NextAsync(token, forPreview: true),
                 previewStop.Token, filterIsolatedFrames: external == null,
                 onAccepted: acceptedFrames == null ? null : frame =>
@@ -152,7 +154,7 @@ try
     }) : null;
     try
     {
-        await DetectLiveAsync(args[2], capture, external, screen, acceptedFrames?.Reader, stop.Token);
+        await DetectLiveAsync(args[2], capture, external, screen, window, acceptedFrames?.Reader, stop.Token);
     }
     finally
     {
@@ -179,7 +181,7 @@ catch (Exception error)
     return 1;
 }
 
-static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, ExternalCapture? external, Screen? screen,
+static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, ExternalCapture? external, Screen? screen, GameWindows.Window? window,
     ChannelReader<Bitmap>? acceptedFrames, CancellationToken cancel)
 {
     Console.Error.WriteLine("OCR engine: " + capture.OcrMode + ".");
@@ -219,7 +221,9 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     while (!cancel.IsCancellationRequested)
     {
         using var captured = acceptedFrames != null ? await acceptedFrames.ReadAsync(cancel) :
+            window != null ? await CaptureWindowAsync(window, cancel) :
             external == null ? HudCapture.Desktop(screen!) : await external.NextAsync(cancel);
+        if (window != null && GameWindows.VisibleClient(window) == null) continue;
         using var viewport = HudCapture.CropPaddedViewport(captured);
         var paddedMenu = viewport == null ? null :
             await capture.ReadCamoMenuWeaponAsync(viewport, cancel, requireHeading: true);
@@ -519,6 +523,22 @@ static async Task<CamoProgress[]> ReadProgressAsync(Bitmap frame, HudCapture cap
 
 static Task AppendAsync(string log, object record, CancellationToken stop) =>
     File.AppendAllTextAsync(log, JsonSerializer.Serialize(record) + "\n", stop);
+
+static async Task<Bitmap> CaptureWindowAsync(GameWindows.Window window, CancellationToken cancel)
+{
+    while (GameWindows.Exists(window))
+    {
+        cancel.ThrowIfCancellationRequested();
+        if (GameWindows.VisibleClient(window) is { } bounds)
+        {
+            var frame = HudCapture.Desktop(bounds);
+            if (GameWindows.VisibleClient(window) == bounds) return frame;
+            frame.Dispose();
+        }
+        await Task.Delay(150, cancel);
+    }
+    throw new IOException("The selected game window closed.");
+}
 
 static Screen FindMonitor(string value)
 {

@@ -14,6 +14,7 @@
     <AllowedReferenceRelatedFileExtensions>.pdb</AllowedReferenceRelatedFileExtensions>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../GameWindows.cs" Link="GameWindows.cs" />
     <EmbeddedResource Include="CamoConnector.ico" LogicalName="CamoConnector.AppIcon" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
     <EmbeddedResource Include="../../tracker.js" LogicalName="CamoConnector.Tracker.js" />
