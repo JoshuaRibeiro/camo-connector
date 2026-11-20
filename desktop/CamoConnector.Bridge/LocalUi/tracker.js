@@ -75,8 +75,8 @@ function renderOverview() {
   const entries = [element('p', heading.join(' · '), 'subtitle')];
   const rules = new Map(weapon.camos.map(rule => [rule.id, rule]));
   for (const row of overview.rows) entries.push(camoRow(rules.get(row.id), weapon.id, row));
-  if (overview.waiting && rules.has(overview.waiting)) {
-    const waiting = rules.get(overview.waiting);
+  if (overview.waiting) {
+    const waiting = overview.waiting;
     const next = element('div', null, 'camo-row');
     const copy = element('div');
     copy.append(element('div', waiting.name, 'camo-name'));

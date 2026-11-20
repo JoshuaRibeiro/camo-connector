@@ -126,9 +126,10 @@ internal sealed class LocalTracker
                         goal = military && levelBased ? camo.UnlockTotal : camo.Goal
                     };
                 }).ToArray();
+            var next = rows.Length == 0 ? remaining.FirstOrDefault() : null;
             return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
                 minimumLevel = knownLevel, rows,
-                waiting = rows.Length == 0 ? remaining.FirstOrDefault()?.Id : null,
+                waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock },
                 complete = remaining.Length == 0 };
         }
     }

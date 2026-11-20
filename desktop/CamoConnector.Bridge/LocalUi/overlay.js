@@ -13,7 +13,13 @@ function render(data) {
   level.textContent = data.level != null ? 'Weapon level ' + data.level :
     'Weapon level ' + data.minimumLevel + '+';
 
-  const rows = (data.rows ?? []).map(row => {
+  const available = data.rows ?? [];
+  const visible = available.length || !data.waiting ? available : [{
+    ...data.waiting, objective: data.waiting.unlock
+      ? 'Waiting to unlock: ' + data.waiting.unlock
+      : 'Waiting to unlock'
+  }];
+  const rows = visible.map(row => {
     const section = document.createElement('section');
     section.className = 'overlay-unlock';
     const title = document.createElement('h2');

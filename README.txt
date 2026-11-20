@@ -7,9 +7,7 @@ GitHub Releases:
 
 - Standard (win-x64-slim.zip): install the x64 .NET 10 Desktop Runtime and
   ASP.NET Core Runtime first from https://dotnet.microsoft.com/download/dotnet/10.0.
-  The app downloads OCR when tracking starts.
-  For a capture card or OBS Virtual Camera, open Auto tracking and choose
-  Download capture support. PC game-window and monitor capture need only OCR.
+  FFmpeg and OCR are bundled for monitors, capture cards, and OBS Virtual Camera.
 - Offline (win-x64.zip): includes .NET, OCR and capture support. Use this for
   an offline setup or if you prefer to skip installing the .NET prerequisites.
 

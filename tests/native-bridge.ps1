@@ -176,6 +176,15 @@ try {
             throw 'Tick and untick did not update the saved progress.'
         }
     }
+    foreach ($id in 'sp-1', 'sp-2', 'sp-3', 'gold') {
+        $body = @{ weapon = 'mojave-357'; camo = $id; count = 0; done = $true } | ConvertTo-Json
+        $tracker = Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $body
+    }
+    $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+    if ($tracker.overview.waiting.id -ne 'platinum' -or $overlay.waiting.id -ne 'platinum' -or
+        $overlay.waiting.name -ne 'Platinum' -or !$overlay.waiting.unlock -or $overlay.rows.Count -ne 0) {
+        throw 'Tracker and overlay must report the same locked Platinum objective.'
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

@@ -78,7 +78,7 @@ try {
         }
     } finally { $verification.Dispose() }
     & (Join-Path $PSScriptRoot 'build-desktop-preview.ps1') -OutputDirectory $assembly -OcrDirectory $OcrDirectory -CaptureDirectory $CaptureDirectory -UpdatePublicKeyFile $UpdatePublicKeyFile
-    & (Join-Path $PSScriptRoot 'build-desktop-preview.ps1') -OutputDirectory $slim -SlimPortable -UpdatePublicKeyFile $UpdatePublicKeyFile
+    & (Join-Path $PSScriptRoot 'build-desktop-preview.ps1') -OutputDirectory $slim -SlimPortable -OcrDirectory $OcrDirectory -CaptureDirectory $CaptureDirectory -UpdatePublicKeyFile $UpdatePublicKeyFile
     if ($CertificateThumbprint) {
         $certificate = Get-Item -LiteralPath "Cert:\CurrentUser\My\$CertificateThumbprint"
         foreach ($directory in @($assembly, $slim)) {
@@ -94,9 +94,8 @@ try {
     $ocrRequired = @('Runtime/Ocr/tesseract.exe', 'Runtime/Ocr/tessdata/eng.traineddata')
     $captureRequired = @('Runtime/Capture/ffmpeg.exe')
     $standard = @(Get-ReleaseFiles $slim)
-    if ($standard.Count -ne $coreFiles.Count) { throw 'The standard ZIP must contain only core application files.' }
 
-    Write-Package $standard $coreFiles 'win-x64-slim' 'portable-slim-update'
+    Write-Package $standard ($coreFiles + $ocrRequired + $captureRequired) 'win-x64-slim' 'portable-slim-update'
     Write-Package $offline ($coreFiles + $ocrRequired + $captureRequired) 'win-x64' 'portable-update'
     Write-Package @($offline | Where-Object Relative -CLike 'Runtime/Ocr/*') $ocrRequired 'win-x64-ocr' 'runtime-ocr'
     Write-Package @($offline | Where-Object Relative -CLike 'Runtime/Capture/*') $captureRequired 'win-x64-capture' 'runtime-capture'

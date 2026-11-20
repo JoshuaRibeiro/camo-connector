@@ -111,7 +111,7 @@ jobs:
           $devices = & "$runtime/Capture/ffmpeg.exe" -hide_banner -devices
           if ($LASTEXITCODE -or !($devices -match '\bdshow\b')) { throw 'Bundled FFmpeg lacks DirectShow support.' }
       - run: ./tests/native-bridge.ps1 -Executable (Join-Path $env:CAMO_CHECK_ROOT 'Runtime/Bridge/CamoConnector.Bridge.exe')
-      - name: Check the standard bridge without bundled runtimes
+      - name: Check the standard bridge with installed .NET
         if: github.ref_type == 'tag'
         run: |
           $dotnet = (Get-Command dotnet -CommandType Application | Select-Object -First 1).Source
@@ -174,9 +174,9 @@ jobs:
           )
           foreach ($asset in $assets) { if (!(Test-Path -LiteralPath $asset)) { throw "Missing $asset" } }
           @"
-          **Standard download:** [$prefix-slim.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix-slim.zip). Requires the x64 .NET 10 Desktop Runtime and ASP.NET Core Runtime. OCR is downloaded when first needed. Use **Download capture support** in Auto tracking for capture cards and OBS Virtual Camera.
+          **Standard download:** [$prefix-slim.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix-slim.zip). Includes FFmpeg and OCR. Requires the installed x64 .NET 10 Desktop Runtime and ASP.NET Core Runtime.
 
-          **Offline download:** [$prefix.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix.zip). Includes the .NET runtimes, OCR and capture support. Use this ZIP when you want everything included.
+          **Offline download:** [$prefix.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix.zip). Includes the .NET runtimes, OCR and capture support. Both editions use Microsoft Edge WebView2 for the built-in tracker.
           "@ | Set-Content release-notes.md
           gh release create $env:GITHUB_REF_NAME @assets --verify-tag --latest --generate-notes --notes-file release-notes.md --title "Camo Connector $env:GITHUB_REF_NAME"
           if ($LASTEXITCODE) { throw 'GitHub Release publishing failed.' }
