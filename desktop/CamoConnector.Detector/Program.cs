@@ -215,9 +215,6 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         var scanStarted = Stopwatch.GetTimestamp();
         var pollProgress = lastMenuWeapon != null || now - lastProgressScan >= TimeSpan.FromMilliseconds(400) ||
             (previousMenuMilitary != null && !seenUnlocks.Contains(previousMenuMilitary));
-        var gameplayWeapon = paddedMenu == null
-            ? ReadSnapshotAsync(frame, copy => capture.DetectAsync(copy, cancel))
-            : null;
         var menuWeapon = paddedMenu ?? (pollProgress ? await capture.ReadCamoMenuWeaponAsync(frame, cancel, requireHeading: true) : null);
         var scanGameplay = menuWeapon == null;
         var scanLobby = scanGameplay && now - lastLobbyScan >= TimeSpan.FromSeconds(1);
@@ -228,7 +225,8 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         var challengeRead = scanChallenge ? ReadSnapshotAsync(frame, copy => capture.DetectChallengeBannerAsync(copy, cancel)) : null;
         var combatRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectCombatAsync(copy, cancel)) :
             Task.FromResult(new CombatRead(false, false, null));
-        var weaponRead = gameplayWeapon ?? Task.FromResult<(WeaponRead? Weapon, bool Replay)>((null, false));
+        var weaponRead = scanGameplay ? ReadSnapshotAsync(frame, copy => capture.DetectAsync(copy, cancel)) :
+            Task.FromResult<(WeaponRead? Weapon, bool Replay)>((null, false));
         await Task.WhenAll(unlockRead, (Task?)lobbyRead ?? Task.CompletedTask,
             (Task?)challengeRead ?? Task.CompletedTask, combatRead, weaponRead);
         var result = scanGameplay ? await weaponRead : (Weapon: (WeaponRead?)null, Replay: false);
@@ -412,6 +410,22 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     context = "camo-menu", at = now
                 }, cancel);
             }
+            var reads = await ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
+            camoReads += reads.Length;
+            foreach (var progress in progressConfirmation.ObserveRows(reads))
+            {
+                var record = JsonSerializer.Serialize(new
+                {
+                    kind = "progress-snapshot", source = "live", mode = "mp", weapon = progress.Weapon,
+                    camo = progress.WeaponLevelObjective == null ? progress.Camo : null,
+                    count = progress.Count, goal = progress.Goal, identity = progress.Identity,
+                    type = progress.WeaponLevelObjective == null ? "camo" : "weapon-level",
+                    objective = progress.WeaponLevelObjective,
+                    key = progress.Weapon == "Signal 50" && progress.Camo.Equals("Sunburn", StringComparison.OrdinalIgnoreCase) &&
+                        progress.Goal == 40 ? "signal-50:sp-3" : null, at = DateTimeOffset.UtcNow
+                });
+                await File.AppendAllTextAsync(log, record + "\n", cancel);
+            }
             var militaryTier = menuWeapon == null ? null : await capture.ReadMilitaryMenuCountAsync(frame, cancel);
             var menuMilitary = menuWeapon != null && militaryTier is int tier && tier > 0
                 ? new MilitaryUnlock(menuWeapon, tier) : null;
@@ -435,7 +449,6 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             var gold = completionistCount >= 1 ? menuWeapon : null;
             var platinum = completionistCount >= 2 ? menuWeapon : null;
             var specials = await capture.DetectSpecialUnlocksAsync(frame, menuWeapon, cancel);
-            var reads = await ReadProgressAsync(frame, capture, menuWeapon, result.Replay, cancel);
             if (gold != null && gold == goldCandidate && goldUnlocked.Add(gold))
                 await AppendAsync(log, new
                 {
@@ -455,21 +468,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     kind = special.Kind, source = "live", mode = "mp",
                     weapon = special.Weapon, challenge = special.Challenge, at = now
                 }, cancel);
-            camoReads += reads.Length;
-            foreach (var progress in progressConfirmation.ObserveRows(reads))
-            {
-                var record = JsonSerializer.Serialize(new
-                {
-                    kind = "progress-snapshot", source = "live", mode = "mp", weapon = progress.Weapon,
-                    camo = progress.WeaponLevelObjective == null ? progress.Camo : null,
-                    count = progress.Count, goal = progress.Goal, identity = progress.Identity,
-                    type = progress.WeaponLevelObjective == null ? "camo" : "weapon-level",
-                    objective = progress.WeaponLevelObjective,
-                    key = progress.Weapon == "Signal 50" && progress.Camo.Equals("Sunburn", StringComparison.OrdinalIgnoreCase) &&
-                        progress.Goal == 40 ? "signal-50:sp-3" : null, at = DateTimeOffset.UtcNow
-                });
-                await File.AppendAllTextAsync(log, record + "\n", cancel);
-            }
+
         }
         totalScanMs += Stopwatch.GetElapsedTime(scanStarted).TotalMilliseconds;
         scans++;
