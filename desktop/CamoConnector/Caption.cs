@@ -15,6 +15,34 @@ internal sealed partial class ConnectorWindow
         }
     }
 
+    protected override void WndProc(ref Message message)
+    {
+        const int calculateClient = 0x0083;
+        const int hitTest = 0x0084;
+        const int client = 1, topEdge = 12;
+        if (message.Msg == calculateClient && message.LParam != 0 && !IsZoomed(message.HWnd))
+        {
+            // The first RECT is the proposed window rectangle on entry.
+            const int topOffset = sizeof(int);
+            var top = Marshal.ReadInt32(message.LParam, topOffset);
+            base.WndProc(ref message);
+            Marshal.WriteInt32(message.LParam, topOffset, top);
+            message.Result = 0;
+            return;
+        }
+
+        base.WndProc(ref message);
+        if (message.Msg == hitTest && message.Result == client && !IsZoomed(message.HWnd))
+        {
+            var packed = message.LParam.ToInt64();
+            var point = PointToClient(new Point(unchecked((short)packed), unchecked((short)(packed >> 16))));
+            if (point.Y >= 0 && point.Y < LogicalToDeviceUnits(5)) message.Result = topEdge;
+        }
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool IsZoomed(nint window);
+
     private enum CaptionAction { Minimize, Maximize, Restore, Close, Download }
 
     private sealed class CaptionControl : Button
