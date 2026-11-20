@@ -39,6 +39,33 @@ internal sealed class HudCapture : IDisposable
                     camo.TryGetProperty("goal", out var goal) && goal.ValueKind == JsonValueKind.Number && goal.TryGetInt32(out var goalNumber) ? goalNumber : null,
                     camo.TryGetProperty("bannerArtworkRGB12", out var banner) && banner.ValueKind == JsonValueKind.String
                     ? Convert.FromBase64String(banner.GetString()!) : null)).ToArray());
+        using var objectivesStream = typeof(HudCapture).Assembly.GetManifestResourceStream("CamoConnector.MultiplayerCatalog")
+            ?? throw new InvalidDataException("The multiplayer objective catalogue is missing.");
+        using var objectives = JsonDocument.Parse(objectivesStream);
+        foreach (var weapon in objectives.RootElement.GetProperty("weapons").EnumerateArray())
+        {
+            var trackerName = weapon.GetProperty("name").GetString()!;
+            var detectorName = catalog.Keys.FirstOrDefault(name => name.Equals(trackerName, StringComparison.OrdinalIgnoreCase))
+                ?? trackerName;
+            var entries = (catalog.GetValueOrDefault(detectorName) ?? []).ToList();
+            foreach (var camo in weapon.GetProperty("camos").EnumerateArray())
+            {
+                if (camo.GetProperty("type").GetString() != "Special") continue;
+                var name = camo.GetProperty("name").GetString()!;
+                var goal = camo.TryGetProperty("goal", out var target) && target.TryGetInt32(out var number)
+                    ? (int?)number : null;
+                var index = entries.FindIndex(entry => entry.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                if (index >= 0)
+                    entries[index] = entries[index] with { Goal = goal ?? entries[index].Goal };
+                else
+                {
+                    var id = camo.GetProperty("id").GetString()!;
+                    var slot = int.TryParse(id.AsSpan(3), out var parsedSlot) ? parsedSlot : 0;
+                    entries.Add(new CamoReference(name, null, slot, goal));
+                }
+            }
+            catalog[detectorName] = entries.ToArray();
+        }
         persistentOcr = PersistentOcr.Open(runtime, models);
     }
 
