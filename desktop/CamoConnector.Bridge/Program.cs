@@ -11,7 +11,9 @@ var data = args.Length == 1 ? Path.GetFullPath(args[0])
 Directory.CreateDirectory(data);
 var secret = BridgeFiles.LoadSecret(data);
 var feed = new ProgressFeed(Path.Combine(AppContext.BaseDirectory, "special-catalog.json"));
-var files = new BridgeFiles(data, feed);
+var tracker = new LocalTracker(data);
+var localRoutes = new LocalTrackerRoutes(tracker, feed, secret);
+var files = new BridgeFiles(data, feed, tracker);
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
     Args = Array.Empty<string>(),
@@ -38,6 +40,11 @@ app.Run(async context =>
     var response = context.Response;
     var origin = request.Headers.Origin.ToString();
     response.Headers.CacheControl = "no-store";
+    if (request.Path.StartsWithSegments("/local"))
+    {
+        await localRoutes.HandleAsync(context, host);
+        return;
+    }
     if (request.Host.Value != host || origin.Length > 0 && !ValidOrigin(origin))
     {
         response.StatusCode = 403;

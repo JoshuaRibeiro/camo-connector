@@ -41,7 +41,7 @@ internal sealed partial class ConnectorWindow
 
         detectionSummary = new Label { AutoSize = true };
         var trackerShortcut = new Button { Text = "Open Tracker", AutoSize = true };
-        trackerShortcut.Click += (_, _) => pages.SelectedTab = trackerPage;
+        trackerShortcut.Click += (_, _) => pages.SelectedTab = localTrackerPage;
         var logsShortcut = new Button { Text = "View logs", AutoSize = true };
         logsShortcut.Click += (_, _) => pages.SelectedTab = logsPage;
         var syncHelp = new Label { Text = "Use the Tracker tab for camo sync. Detection keeps running when you hide the app to the tray.", AutoSize = true };

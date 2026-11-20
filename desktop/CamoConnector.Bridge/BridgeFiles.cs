@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace CamoConnector.Bridge;
 
-internal sealed class BridgeFiles(string data, ProgressFeed feed)
+internal sealed class BridgeFiles(string data, ProgressFeed feed, LocalTracker tracker)
 {
     private readonly string eventLog = Path.Combine(data, "sunburn-events.jsonl");
     private readonly string backup = Path.Combine(data, "mw4-camos.latest.json");
@@ -62,8 +62,18 @@ internal sealed class BridgeFiles(string data, ProgressFeed feed)
                     {
                         if (buffer[i] == (byte)'\n')
                         {
-                            if (!oversized) feed.Accept(Encoding.UTF8.GetString(line.GetBuffer(), 0, (int)line.Length),
-                                historical: offset - size + i < historicalEnd);
+                            if (!oversized)
+                            {
+                                var record = Encoding.UTF8.GetString(line.GetBuffer(), 0, (int)line.Length);
+                                var historical = offset - size + i < historicalEnd;
+                                feed.Accept(record, historical);
+                                if (!historical)
+                                {
+                                    try { tracker.Accept(record); }
+                                    catch (Exception error) when (error is IOException or JsonException)
+                                    { Console.Error.WriteLine("Local tracker: " + error.Message); }
+                                }
+                            }
                             line.SetLength(0);
                             oversized = false;
                         }

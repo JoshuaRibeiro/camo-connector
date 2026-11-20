@@ -1,0 +1,87 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+
+namespace CamoConnector.Bridge;
+
+internal sealed class LocalTrackerRoutes(LocalTracker tracker, ProgressFeed feed, byte[] secret)
+{
+    private readonly string overlayToken = Convert.ToHexStringLower(HMACSHA256.HashData(secret, "camo-local-overlay"u8));
+
+    public async Task HandleAsync(HttpContext context, string host)
+    {
+        var request = context.Request;
+        var response = context.Response;
+        var origin = request.Headers.Origin.ToString();
+        if (request.Host.Value != host || (origin.Length != 0 && origin != "http://" + host))
+        {
+            response.StatusCode = 403;
+            return;
+        }
+
+        response.Headers.ContentSecurityPolicy =
+            "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'";
+        response.Headers.XContentTypeOptions = "nosniff";
+        response.Headers["Referrer-Policy"] = "no-referrer";
+        var path = request.Path.Value;
+        var read = HttpMethods.IsGet(request.Method);
+        var write = HttpMethods.IsPost(request.Method);
+        var asset = path switch
+        {
+            "/local/tracker" => ("tracker.html", "text/html"),
+            "/local/overlay" => ("overlay.html", "text/html"),
+            "/local/tracker.js" => ("tracker.js", "text/javascript"),
+            "/local/overlay.js" => ("overlay.js", "text/javascript"),
+            "/local/style.css" => ("style.css", "text/css"),
+            _ => (null, null)
+        };
+        if (read && asset.Item1 != null)
+        {
+            using var stream = typeof(LocalTrackerRoutes).Assembly.GetManifestResourceStream("CamoConnector.LocalUi." + asset.Item1)!;
+            response.ContentType = asset.Item2 + "; charset=utf-8";
+            await stream.CopyToAsync(response.Body, context.RequestAborted);
+            return;
+        }
+
+        var expected = path == "/local/overlay-state" ? overlayToken : Convert.ToHexStringLower(secret);
+        if (!CryptographicOperations.FixedTimeEquals(
+            Encoding.ASCII.GetBytes(request.Headers.Authorization.ToString()),
+            Encoding.ASCII.GetBytes("Bearer " + expected)))
+        {
+            response.StatusCode = 401;
+            return;
+        }
+
+        if (read && path == "/local/overlay-state")
+            await response.WriteAsJsonAsync(tracker.Overlay());
+        else if (read && path == "/local/catalog")
+            await response.WriteAsJsonAsync(new { catalog = tracker.GetCatalog(),
+                overlayUrl = "http://" + host + "/local/overlay#" + overlayToken });
+        else if (read && path == "/local/state")
+            await response.WriteAsJsonAsync(tracker.Snapshot());
+        else if (write && path == "/local/edit")
+        {
+            LocalTracker.Edit? edit;
+            try { edit = await request.ReadFromJsonAsync<LocalTracker.Edit>(context.RequestAborted); }
+            catch (Exception error) when (error is JsonException or InvalidOperationException)
+            { response.StatusCode = 400; return; }
+            if (edit == null || !tracker.ApplyEdit(edit)) { response.StatusCode = 400; return; }
+            if (edit.Camo == null)
+            {
+                var weapon = tracker.GetCatalog().Weapons.Single(item => item.Id == edit.Weapon);
+                feed.ReportFocus(weapon.Name);
+            }
+            await response.WriteAsJsonAsync(tracker.Snapshot());
+        }
+        else if (write && path == "/local/import")
+        {
+            try
+            {
+                if (!tracker.ImportBackup()) { response.StatusCode = 404; return; }
+            }
+            catch (JsonException) { response.StatusCode = 400; return; }
+            await response.WriteAsJsonAsync(tracker.Snapshot());
+        }
+        else response.StatusCode = 404;
+    }
+}

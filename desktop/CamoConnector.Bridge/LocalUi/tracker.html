@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Camo Connector Tracker</title>
+  <link rel="stylesheet" href="/local/style.css">
+  <script defer src="/local/tracker.js"></script>
+</head>
+<body class="tracker">
+  <header class="toolbar">
+    <div><h1>Camo tracker</h1><p>Multiplayer</p></div>
+    <div class="actions">
+      <button id="import">Import saved progress</button>
+      <button id="overlay">Copy OBS overlay URL</button>
+    </div>
+  </header>
+  <p id="status" role="status"></p>
+  <main>
+    <aside aria-label="Weapon roster">
+      <label for="search">Find a weapon</label>
+      <input id="search" type="search" autocomplete="off">
+      <nav id="roster" aria-label="Weapons"></nav>
+    </aside>
+    <section id="detail" aria-label="Camo progress"></section>
+  </main>
+  <dialog id="overlay-dialog">
+    <form method="dialog">
+      <h2>OBS overlay</h2>
+      <p>Use this URL in an OBS Browser Source. Camo Connector serves the overlay while it’s running.</p>
+      <label for="overlay-url">Browser Source URL</label>
+      <input id="overlay-url" readonly>
+      <button>Close</button>
+    </form>
+  </dialog>
+</body>
+</html>

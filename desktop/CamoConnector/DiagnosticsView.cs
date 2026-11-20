@@ -47,6 +47,7 @@ internal sealed partial class ConnectorWindow
         pageHost.Controls.Add(update);
         tabStripBackground.BringToFront();
         update.BringToFront();
+        AddLocalTrackerPage();
         AddTrackerPage();
         Controls.Add(pageHost);
 

@@ -9,7 +9,7 @@ namespace CamoConnector;
 internal sealed partial class ConnectorWindow
 {
     private static readonly Uri TrackerUri = new("https://mw4.darkmattersolutions.uk/");
-    private readonly TabPage trackerPage = new("Tracker");
+    private readonly TabPage trackerPage = new("Website sync");
     private readonly System.Windows.Forms.Timer trackerTimer = new() { Interval = 350 };
     private WebView2? trackerView;
     private NotifyIcon? trackerTray;
