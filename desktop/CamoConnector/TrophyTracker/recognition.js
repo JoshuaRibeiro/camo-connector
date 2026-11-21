@@ -193,8 +193,7 @@ export function createRecognizer({ draw, context, crop, signatures }) {
       const alternate = lobby
         ? maskPair(lobbyMask(wide, 190, 180), lobbyMask(wide, 200, 195), true)
         : maskPair(lobbyMask(rect, 159, 149), lobbyMask(rect, 160, 150), true);
-      if (!primary && !alternate) return { kind: 'home' };
-      return { kind: 'home', label: png([1030, top, 350, 45], 3), rawTotal: png(wide, 4), primary, alternate };
+      return { kind: 'home', lobbyLine: png([1030, top, icon.x - 1030, 45], 4), label: png([1030, top, 350, 45], 3), rawTotal: png(wide, 4), primary, alternate };
     }
 
     const banner = [1740, 827, 312, 44];
@@ -205,7 +204,11 @@ export function createRecognizer({ draw, context, crop, signatures }) {
       if (!primary && !alternate) return { kind: 'home' };
       return { kind: 'home', label: png(banner, 2), layout: 'wager', primary, alternate };
     }
-    return eventsCard() ?? { kind: 'none' };
+    return eventsCard() ?? {
+      kind: 'home',
+      lobbyLine: png([1030, 1348, 448, 37], 4),
+      rawTotal: png([1378, 1348, 100, 37], 4)
+    };
   }
 
   function eventsCard() {

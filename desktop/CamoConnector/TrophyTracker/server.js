@@ -120,6 +120,15 @@ async function readTotal(pair, mode = 8, retryMode, rawTotal) {
   return Number(digits.replace(/3/g, (digit, index) => pair.closedUpperLoop?.[index] === true ? '9' : digit));
 }
 
+async function readLobbyLine(lineCrop, numberCrop) {
+  if (!lineCrop || !numberCrop) return null;
+  const [line, number] = await Promise.all([
+    readText(lineCrop, 7), readText(numberCrop, 7, true)
+  ]);
+  const labelled = /\bTROPHIES\s+COLLECTED\s+([1-9]\d{0,5}|0)\s*$/i.exec(line);
+  return labelled && labelled[1] === number ? Number(number) : null;
+}
+
 // A short sequence of matching OCR reads can still repeat the same bad crop.
 function isLargeTotalChange(value) {
   return state.current > 0 && Math.abs(value - state.current) > Math.max(25, state.current * .05);
@@ -254,7 +263,16 @@ const server = http.createServer(async (request, response) => {
             value ??= alternate;
           }
         }
-      } else if (body.kind === 'match') {
+      }
+      if (body.kind === 'home' && (value === null || value === state.current || value < state.current)) {
+        const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal);
+        if (lobby !== null) {
+          corroborated = true;
+          value = lobby;
+        }
+        if (value === null && !body.label) body.kind = 'none';
+      }
+      if (body.kind === 'match') {
         if (body.zero === true) value = 0;
         else if (body.digits) {
           let digits = await readText(body.digits, 7, true);

@@ -48,3 +48,19 @@ test('lobby OCR recovers a six when original pixels corroborate a masked read', 
   assert.equal(await context.readTotal(pair, 8, 7, 'original'), 2226);
   assert.equal(await context.readTotal(pair, 8, 7), 2228);
 });
+
+test('lobby fallback requires the visible label and separately read counter to agree', async () => {
+  let labelled = 'TROPHIES COLLECTED 2222';
+  const context = vm.createContext({
+    readText: async (crop) => crop === 'line' ? labelled : '2222'
+  });
+  vm.runInContext(
+    source.slice(source.indexOf('async function readLobbyLine'), source.indexOf('// A short sequence')),
+    context
+  );
+  assert.equal(await context.readLobbyLine('line', 'number'), 2222);
+  labelled = 'TROPHIES COLLECTED 2232';
+  assert.equal(await context.readLobbyLine('line', 'number'), null);
+  labelled = 'DAILY CHALLENGES 2222';
+  assert.equal(await context.readLobbyLine('line', 'number'), null);
+});
