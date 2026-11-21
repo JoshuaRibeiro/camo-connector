@@ -33,7 +33,8 @@ internal sealed partial class ConnectorWindow
                 try { StopDetector(); }
                 catch (Exception error) { detectorStatus.Text = error.Message; }
             }
-            if (detector == null) StartPreview();
+            CheckAutomaticTracking();
+            if (detector == null && !installingRuntime) StartPreview();
             RefreshCaptureBanner();
         };
     }
@@ -41,10 +42,11 @@ internal sealed partial class ConnectorWindow
     private void CheckAutomaticTracking()
     {
         RefreshCaptureBanner();
-        if (!bridgeReady || detector != null || scanning || installingRuntime || !automaticTracking.Checked ||
+        if (closing.IsCancellationRequested || !bridgeReady || detector != null || scanning || installingRuntime || !automaticTracking.Checked ||
             !File.Exists(DetectorPath) || DateTimeOffset.UtcNow < nextAutomaticCheck) return;
+        if (sources.SelectedItem is not Source { Mode.Length: > 0 } source) return;
         nextAutomaticCheck = DateTimeOffset.UtcNow.AddSeconds(3);
-        if (sources.SelectedItem is Source source) _ = RunDetectorAsync(source);
+        _ = RunDetectorAsync(source);
     }
 
     private void RefreshCaptureBanner()

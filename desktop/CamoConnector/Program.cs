@@ -77,7 +77,7 @@ internal sealed partial class ConnectorWindow : Form
         MinimumSize = new Size(570, 420);
         update.Click += async (_, _) => await UpdateAsync();
         AddPages(CreateSetupView(), build);
-        Shown += async (_, _) => await RefreshSourcesAsync();
+        Shown += async (_, _) => await RefreshSourcesAsync(startup: true);
         Shown += async (_, _) =>
         {
             updateTimer.Start();
@@ -128,6 +128,7 @@ internal sealed partial class ConnectorWindow : Form
                             status.Text = "Local bridge ready";
                             bridgeReady = true;
                             UpdateCaptureButtons();
+                            CheckAutomaticTracking();
                             return;
                         }
                     }

@@ -52,7 +52,8 @@ internal sealed partial class ConnectorWindow
                 catch (UnauthorizedAccessException error) { LogLine(captureMessages, error.Message); }
             }
             UpdateCaptureButtons();
-            StartPreview();
+            CheckAutomaticTracking();
+            if (detector == null && !installingRuntime) StartPreview();
         };
         refreshSources.Click += async (_, _) => await RefreshSourcesAsync();
         enableCaptureDevices.Click += async (_, _) =>
@@ -86,7 +87,7 @@ internal sealed partial class ConnectorWindow
                 automaticTracking.Checked ? "Waiting for capture" : "Auto tracking is off";
     }
 
-    private async Task RefreshSourcesAsync()
+    private async Task RefreshSourcesAsync(bool startup = false)
     {
         if (scanning || installingRuntime || detector != null) return;
         scanning = true;
@@ -108,7 +109,9 @@ internal sealed partial class ConnectorWindow
                 catch (JsonException) { }
             }
             detectorStatus.Text = File.Exists(DetectorPath) ? "" : "The bundled detector executable is missing.";
-            if (File.Exists(DetectorPath) && CaptureReady)
+            // Monitor tracking can start as soon as the bridge opens. Device discovery can take seconds.
+            if ((!startup || !automaticTracking.Checked || selected?.Mode == "--device") &&
+                File.Exists(DetectorPath) && CaptureReady)
             {
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);
                 deadline.CancelAfter(TimeSpan.FromSeconds(10));
@@ -147,7 +150,8 @@ internal sealed partial class ConnectorWindow
             if (!IsDisposed && !closing.IsCancellationRequested)
             {
                 UpdateCaptureButtons();
-                StartPreview();
+                CheckAutomaticTracking();
+                if (detector == null && !installingRuntime) StartPreview();
             }
         }
     }
@@ -344,7 +348,8 @@ internal sealed partial class ConnectorWindow
         var frame = Interlocked.Exchange(ref pendingPreview, null);
         if (frame == null)
         {
-            if (!previewRestarted && pages.SelectedTab == capturePage && detector is { HasExited: false } &&
+            if (!previewRestarted && !detectorStopRequested && automaticTracking.Checked &&
+                detector is { HasExited: false } &&
                 Stopwatch.GetElapsedTime(previewLastFrame) >= TimeSpan.FromSeconds(12))
             {
                 previewRestarted = true;
