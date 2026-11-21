@@ -91,13 +91,13 @@ internal sealed class LocalTracker
                 return new { weapon = (string?)null, state.OverlayLayout };
             bool Done(Weapon item, Rule camo) => state.Progress.GetValueOrDefault(item.Id + ":" + camo.Id)?.Done == true;
             bool HasCamo(Weapon item, string id) => item.Camos.Any(camo => camo.Id == id && Done(item, camo));
-            int ConfirmedMilitaryTotal(bool levelBased) => weapon.Camos
-                .Where(camo => camo.Type == "Military" && IsLevelRule(camo) == levelBased && Done(weapon, camo))
+            int ConfirmedRequirement(Func<Rule, bool> matches) => weapon.Camos
+                .Where(camo => matches(camo) && Done(weapon, camo))
                 .Select(camo => camo.UnlockTotal ?? 0).DefaultIfEmpty().Max();
 
             var level = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-level")?.Count;
-            var knownLevel = Math.Max(level ?? 0, ConfirmedMilitaryTotal(true));
-            var unlocks = ConfirmedMilitaryTotal(false);
+            var knownLevel = Math.Max(level ?? 0, ConfirmedRequirement(IsLevelRule));
+            var unlocks = ConfirmedRequirement(camo => camo.Type == "Military" && !IsLevelRule(camo));
             bool IsLaunchWeapon(Weapon item) =>
                 item.Id is not ("cronen-osprey" or "csg-35" or "jak-12" or "zlr-talonhawk");
 

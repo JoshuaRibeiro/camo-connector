@@ -252,6 +252,17 @@ try {
     if ($tracker.progress.'signal-50:weapon-level'.count -ne 24 -or $overlay.level -ne 24) {
         throw 'The manually entered weapon level did not reach the active overlay.'
     }
+    foreach ($edit in @(
+        @{ weapon = 'pila' },
+        @{ weapon = 'pila'; camo = 'weapon-level'; count = 30 },
+        @{ weapon = 'pila'; camo = 'sp-3'; count = 30; done = $true }
+    )) {
+        Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body ($edit | ConvertTo-Json) | Out-Null
+    }
+    $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+    if ($overlay.minimumLevel -ne 46 -or $null -ne $overlay.level) {
+        throw 'A completed level-gated Special camo must establish a minimum above an older exact level.'
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

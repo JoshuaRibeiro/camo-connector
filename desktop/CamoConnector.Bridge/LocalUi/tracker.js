@@ -191,10 +191,11 @@ function render() {
     input.min = '1';
     input.max = '200';
     const recorded = state.progress[weapon.id + ':weapon-level']?.count;
-    input.value = recorded ?? '';
+    const exact = state.focus === weapon.id ? state.overview.level : recorded;
+    input.value = exact ?? '';
     input.placeholder = level ?? '—';
     input.addEventListener('change', () => {
-      if (!input.value || !input.checkValidity()) { input.value = recorded ?? ''; return; }
+      if (!input.value || !input.checkValidity()) { input.value = exact ?? ''; return; }
       void save('edit', { weapon: weapon.id, camo: 'weapon-level', count: input.valueAsNumber });
     });
     label.append(input);
