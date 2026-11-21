@@ -50,7 +50,7 @@ public static class TrackedCamoRecognition
             var level = Regex.Match(text, @"\bReach\s+Weapon\s+Level\s+([0-9]{1,4})\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
             var counterText = counterLines == null ? text :
                 string.Join(" ", counterLines.Where(line => line.Y > y && line.Y < limit).Select(line => line.Text));
-            var counters = Regex.Matches(counterText, @"(?<![0-9/])([0-9]{1,4})\s*[/|]\s*([0-9]{1,4})(?![0-9/])");
+            var counters = Regex.Matches(counterText, @"(?<![0-9/])([0-9]{1,4})(?:\s*[/|]\s*|\s+f\s+)([0-9]{1,4})(?![0-9/])");
             if (counters.Count != 1) continue;
             var count = int.Parse(counters[0].Groups[1].Value, CultureInfo.InvariantCulture);
             var goal = int.Parse(counters[0].Groups[2].Value, CultureInfo.InvariantCulture);
@@ -78,7 +78,7 @@ public static class TrackedCamoRecognition
             if (named.Length > 1) continue;
             var objectiveKey = Key(text);
             // Small lobby text can drop the first letter of "from" and distort "behind".
-            objectiveKey = Regex.Replace(objectiveKey, @"\dplayerkills(?:from|rom)(?:behind|benird|beaird|borind)",
+            objectiveKey = Regex.Replace(objectiveKey, @"\dplayerkills(?:from|rom|rem|tom)(?:behind|benird|beaird|borind|berind)",
                 match => match.Value[0] + "playerkillsfrombehind");
             var objectiveMatches = entries.Where(entry => entry.Goal is int target && count <= target &&
                 (goal == target || (target % 10 == 0 && goal - target is 6 or 8)) &&
@@ -121,6 +121,7 @@ public static class TrackedCamoRecognition
         var key = Key(label);
         // The lobby's last-used badge can be joined to the weapon name or misread as LA5T U5ED.
         if (Regex.IsMatch(key, @"\Asignal[5s][0o8](?:la[s5]tu[s5]ed)?\z")) return "Signal 50";
+        if (key is "sogs" or "ysogs" or "5068") return ".50 GS";
         if (key == "rpgb") return "RPG-8";
         if (key is "sangsmm" or "ypsangsmm" or "ypsang9mm") return "Sang 9mm";
         if (key == "mojave35") return "Mojave .357";

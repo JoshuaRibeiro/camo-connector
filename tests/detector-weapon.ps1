@@ -315,6 +315,21 @@ if ($pinned.Length -ne 1 -or $pinned[0].Weapon -ne 'Mojave .357' -or
     $pinned[0].Camo -ne 'Platinum' -or $pinned[0].Count -ne 7 -or $pinned[0].Goal -ne 20) {
     throw 'Mojave lobby OCR must recover Platinum 7/20.'
 }
+$pinnedCatalog['.50 GS'] = [CamoConnector.Detector.CamoReference[]]@($platinumReference)
+$pistolLobby = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('y SOGS', .06)
+    [CamoConnector.Detector.HudLine]::new('Get 20 Player Kills rem Benird', .11)
+    [CamoConnector.Detector.HudLine]::new('7 f 20', .22)
+    [CamoConnector.Detector.HudLine]::new('MOJAVE 357', .31)
+    [CamoConnector.Detector.HudLine]::new('Get 20 Player Kills Tom Berind', .38)
+    [CamoConnector.Detector.HudLine]::new('13 f 28', .49)
+)
+$pinned = $tracked::ReadRows($pistolLobby, $pinnedCatalog, [Func[double,byte[]]]{ param($y) return $null })
+if ($pinned.Length -ne 2 -or $pinned[0].Weapon -ne '.50 GS' -or
+    $pinned[0].Camo -ne 'Platinum' -or $pinned[0].Count -ne 7 -or $pinned[0].Goal -ne 20 -or
+    $pinned[1].Weapon -ne 'Mojave .357' -or $pinned[1].Count -ne 13 -or $pinned[1].Goal -ne 20) {
+    throw 'Lobby OCR must recover both pistol Platinum counters from their own rows.'
+}
 if ($lobby.Length -ne 2 -or $lobby[0].Camo -ne 'Frosted' -or $lobby[0].Count -ne 19 -or
     $lobby[1].WeaponLevelObjective -ne 'Reach Weapon Level 16' -or $lobby[1].Count -ne 12) {
     throw 'Lobby counters did not distinguish Special camo progress from weapon levels'
