@@ -766,13 +766,13 @@ internal sealed class HudCapture : IDisposable
                     .Select(line => TrackedCamoRecognition.ReadWeapon(line.Text)).FirstOrDefault(name => name != null);
                 if (firstWeapon == null || !merged.Any(row => row.Weapon == firstWeapon))
                 {
-                    // Read the first lobby card in three crops so the badge and XP cannot be merged into its text.
+                    // Isolate each line. Keep the full objective width for longer text such as "from Behind".
                     var (weapon, _) = await ReadTextAsync(frame, (x, .162, .077, .027), cancel, pageMode: 7,
                         trace: trace, regionName: "trackedFirstWeapon");
-                    if (TrackedCamoRecognition.ReadWeapon(weapon) is { } recovered &&
+                    if ((TrackedCamoRecognition.ReadWeapon(weapon) ?? firstWeapon) is { } recovered &&
                         !merged.Any(row => row.Weapon == recovered))
                     {
-                        var (objective, _) = await ReadTextAsync(frame, (x, .188, w * .76, .042), cancel, pageMode: 6,
+                        var (objective, _) = await ReadTextAsync(frame, (x, .183, w, .030), cancel, pageMode: 7,
                             trace: trace, regionName: "trackedFirstObjective");
                         var firstCounterArea = (x + w * .66, .222, w * .34, .026);
                         var (counter, _) = await ReadTextAsync(frame, firstCounterArea, cancel,
