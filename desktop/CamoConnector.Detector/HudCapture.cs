@@ -20,6 +20,7 @@ internal sealed class HudCapture : IDisposable
     private readonly Dictionary<string, CamoReference[]> catalog;
     private readonly Dictionary<string, CamoReference[]> completionist = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CamoReference[]> trackedCatalog = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<string, int>> unlockRequirements = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> pointBlankWeapons = new(StringComparer.OrdinalIgnoreCase);
 
     public HudCapture(string runtime)
@@ -57,6 +58,13 @@ internal sealed class HudCapture : IDisposable
             var trackerName = weapon.GetProperty("name").GetString()!;
             var detectorName = catalog.Keys.FirstOrDefault(name => name.Equals(trackerName, StringComparison.OrdinalIgnoreCase))
                 ?? trackerName;
+            unlockRequirements[detectorName] = weapon.GetProperty("camos").EnumerateArray()
+                .Where(camo => camo.TryGetProperty("unlock", out var unlock) &&
+                    unlock.ValueKind == JsonValueKind.String &&
+                    unlock.GetString()!.Contains("weapon unlock", StringComparison.OrdinalIgnoreCase) &&
+                    camo.TryGetProperty("unlockTotal", out var total) && total.ValueKind == JsonValueKind.Number)
+                .ToDictionary(camo => camo.GetProperty("name").GetString()!,
+                    camo => camo.GetProperty("unlockTotal").GetInt32());
             var category = weapon.GetProperty("category").GetString();
             completionist[detectorName] = completionByCategory[category == "Melee" ? category : category + "s"].ToArray();
             var entries = (catalog.GetValueOrDefault(detectorName) ?? []).ToList();
@@ -552,16 +560,18 @@ internal sealed class HudCapture : IDisposable
         if (weapon == null) return null;
         var references = (catalog.GetValueOrDefault(weapon) ?? [])
             .Concat(completionist.GetValueOrDefault(weapon) ?? []).ToArray();
+        var requirements = unlockRequirements.GetValueOrDefault(weapon);
         var names = references.Select(camo => camo.Name).ToArray();
+        var titles = names.Concat(Enumerable.Range(1, 8).Select(tier => $"Military Camo {tier}")).ToArray();
         var (titleText, _) = await ReadTextAsync(frame, (.344, .628, .310, .041), cancel, pageMode: 7,
             trace: trace, regionName: "camoTitle");
-        var title = CamoMenuRecognition.ReadKnownCamoTitle(titleText, names);
+        var title = CamoMenuRecognition.ReadKnownCamoTitle(titleText, titles);
         if (title == null && names.Length > 0)
         {
             // Leave room for the top of the lettering while excluding the lock icon.
             var (specialTitle, _) = await ReadTextAsync(frame, (.343, .613, .255, .060), cancel, pageMode: 7,
                 adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "tightCamoTitleContrast");
-            title = CamoMenuRecognition.ReadKnownCamoTitle(specialTitle, names);
+            title = CamoMenuRecognition.ReadKnownCamoTitle(specialTitle, titles);
         }
         // Some layouts place the selected camo details above the lower menu region.
         var raisedDetails = false;
@@ -569,14 +579,14 @@ internal sealed class HudCapture : IDisposable
         {
             var (raisedTitle, _) = await ReadTextAsync(frame, (.344, .398, .310, .055), cancel, pageMode: 7,
                 trace: trace, regionName: "raisedCamoTitle");
-            title = CamoMenuRecognition.ReadKnownCamoTitle(raisedTitle, names);
+            title = CamoMenuRecognition.ReadKnownCamoTitle(raisedTitle, titles);
             raisedDetails = title != null;
         }
         if (title == null)
         {
             var (wideTitle, _) = await ReadTextAsync(frame, (.312, .614, .472, .064), cancel,
                 trace: trace, regionName: "wideCamoTitle");
-            title = CamoMenuRecognition.ReadKnownCamoTitle(wideTitle, names) ?? string.Join(" ", Lines(wideTitle));
+            title = CamoMenuRecognition.ReadKnownCamoTitle(wideTitle, titles) ?? string.Join(" ", Lines(wideTitle));
         }
         if (title.Length == 0) return null;
         var objectivesArea = raisedDetails ? (.313, .455, .342, .159) : (.313, .679, .342, .181);
@@ -584,7 +594,23 @@ internal sealed class HudCapture : IDisposable
             trace: trace, regionName: "camoObjectives");
         if (CamoMenuRecognition.ReadMilitaryLevel(weapon, title, objectives) is { } weaponLevel)
             return weaponLevel;
+        if (title.StartsWith("Military Camo ", StringComparison.OrdinalIgnoreCase))
+        {
+            var (detail, _) = await ReadTextAsync(frame, (.344, .712, .250, .033), cancel, pageMode: 7,
+                adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "militaryRequirement");
+            var (counter, _) = await ReadTextAsync(frame, (.524, .744, .050, .035), cancel, pageMode: 7,
+                countersOnly: true, trace: trace, regionName: "militaryLevelCounter");
+            if (CamoMenuRecognition.ReadMilitaryLevel(weapon, title, detail + "\n" + counter) is { } isolatedLevel)
+                return isolatedLevel;
+            if (requirements?.TryGetValue(title, out var threshold) == true &&
+                CamoMenuRecognition.ReadWeaponUnlocks(weapon, title, objectives, threshold) == null)
+                objectives += "\n" + detail;
+        }
         var progress = CamoMenuRecognition.ReadProgress(weapon, title, Lines(objectives), names);
+        if (requirements?.TryGetValue(title, out var unlockTotal) == true &&
+            !System.Text.RegularExpressions.Regex.IsMatch(objectives, @"\d\s*/\s*\d") &&
+            CamoMenuRecognition.ReadWeaponUnlocks(weapon, title, objectives, unlockTotal) is { } weaponUnlocks)
+            return weaponUnlocks;
         if (!names.Contains(title)) return progress;
 
         var catalogGoal = references.FirstOrDefault(camo => camo.Name == title)?.Goal;

@@ -282,6 +282,21 @@ try {
         $overlay.minimumUnlocks -ne 37 -or $overlay.maximumCamoUnlocks -ne 37) {
         throw 'Space Time should establish the confirmed cap of 37 weapon unlocks for Sang 9mm.'
     }
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":".50 GS"}'
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":".50 GS","type":"weapon-unlocks","camo":"Red Tiger","count":17,"goal":36,"remaining":19}'
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":".50 GS","type":"weapon-unlocks","camo":"Military Camo 5","count":16,"goal":20,"remaining":4}'
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":".50 GS","type":"weapon-unlocks","camo":"Red Tiger","count":35,"goal":37,"remaining":2}'
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+        if ($overlay.weapon -eq '.50 GS' -and $overlay.weaponUnlocks -eq 17) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($overlay.weaponUnlocks -ne 17 -or $overlay.minimumUnlocks -ne 17 -or $null -ne $overlay.level) {
+        throw 'Weapon unlocks must use the catalog threshold and stay separate from weapon levels.'
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

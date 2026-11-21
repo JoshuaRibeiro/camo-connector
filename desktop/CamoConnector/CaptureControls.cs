@@ -109,8 +109,11 @@ internal sealed partial class ConnectorWindow
                 catch (JsonException) { }
             }
             detectorStatus.Text = File.Exists(DetectorPath) ? "" : "The bundled detector executable is missing.";
-            // Monitor tracking can start as soon as the bridge opens. Device discovery can take seconds.
-            if ((!startup || !automaticTracking.Checked || selected?.Mode == "--device") &&
+            // A saved device can open directly. Enumerate devices only when discovery is requested
+            // or when startup needs to populate the source picker without a saved source.
+            if (startup && selected is { Mode: "--device", Input.Length: > 0 } && CaptureReady)
+                found.Add(selected);
+            else if ((!startup || (!automaticTracking.Checked && selected == null)) &&
                 File.Exists(DetectorPath) && CaptureReady)
             {
                 using var deadline = CancellationTokenSource.CreateLinkedTokenSource(closing.Token);

@@ -8,6 +8,7 @@ namespace CamoConnector.Detector;
 
 public sealed record CamoProgress(string Weapon, string Camo, int Count, int Goal, string Identity = "name")
 {
+    public int? WeaponUnlocksRemaining { get; init; }
     public string? WeaponLevelObjective { get; init; }
 }
 
@@ -86,6 +87,17 @@ public static class CamoMenuRecognition
     {
         if (counter == null || (context != null && context != counter)) return null;
         return context == counter || alternate == counter ? counter : null;
+    }
+
+    public static CamoProgress? ReadWeaponUnlocks(string weapon, string title, string objectives, int total)
+    {
+        var requirements = Regex.Matches(objectives, @"\bEarn\s+(\d{1,3})\s+more\s+weapon\s+unlocks?\b",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        if (requirements.Count != 1) return null;
+        var remaining = int.Parse(requirements[0].Groups[1].Value);
+        return remaining > 0 && remaining < total
+            ? new(weapon, title, total - remaining, total) { WeaponUnlocksRemaining = remaining }
+            : null;
     }
 
     public static CamoProgress? ReadMilitaryLevel(string weapon, string title, string objectives)

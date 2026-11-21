@@ -18,6 +18,13 @@ if ($militaryLevel.Count -ne 9 -or $militaryLevel.Goal -ne 11 -or
     $menuReader::ReadMilitaryLevel('PM-40 Anvil', 'MILITARY CAMO 2', "Earn 11 weapon unlocks`n9 / 11")) {
     throw 'The Military camo menu did not distinguish weapon levels from unlock totals.'
 }
+$rpgLevel = $menuReader::ReadMilitaryLevel('RPG-8', 'MILITARY CAMO 7', "Reach Weapon Level 36`n33/36")
+$militaryUnlocks = $menuReader::ReadWeaponUnlocks('.50 GS', 'Military Camo 5', 'Earn 4 more weapon unlocks using the .50 GS', 20)
+$specialUnlocks = $menuReader::ReadWeaponUnlocks('.50 GS', 'Red Tiger', 'Earn 19 more weapon unlocks using the .50 GS', 36)
+if ($rpgLevel.Count -ne 33 -or $militaryUnlocks.Count -ne 16 -or $specialUnlocks.Count -ne 17 -or
+    $specialUnlocks.WeaponLevelObjective -or $menuReader::ReadWeaponUnlocks('.50 GS', 'Red Tiger', 'Earn 37 more weapon unlocks', 36)) {
+    throw 'Camo-menu weapon unlocks must use the selected camo threshold and stay separate from levels.'
+}
 $stability = [CamoConnector.Detector.WeaponConfirmation]::new()
 $weapon = $reader::Read(@('SANG 9mm AKIMB0'), $true)
 if ($reader::ReadHud(@('.58 GS'), $false).Name -ne '.50 GS' -or

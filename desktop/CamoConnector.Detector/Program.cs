@@ -263,7 +263,9 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         kind = "progress-snapshot", source = "live", mode = "mp", weapon = progress.Weapon,
         camo = progress.WeaponLevelObjective == null ? progress.Camo : null,
         count = progress.Count, goal = progress.Goal, identity = progress.Identity,
-        type = progress.WeaponLevelObjective == null ? "camo" : "weapon-level",
+        type = progress.WeaponUnlocksRemaining != null ? "weapon-unlocks" :
+            progress.WeaponLevelObjective == null ? "camo" : "weapon-level",
+        remaining = progress.WeaponUnlocksRemaining,
         objective = progress.WeaponLevelObjective,
         key = progress.Weapon == "Signal 50" && progress.Camo.Equals("Sunburn", StringComparison.OrdinalIgnoreCase) &&
             progress.Goal == 40 ? "signal-50:sp-3" : null, at = DateTimeOffset.UtcNow

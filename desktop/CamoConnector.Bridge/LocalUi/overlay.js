@@ -17,7 +17,7 @@ function render(data) {
     data.level != null ? 'Weapon level ' + data.level :
     data.minimumLevel ? 'Weapon level ' + data.minimumLevel + '+' :
     data.minimumUnlocks ? 'Weapon unlocks ' + data.minimumUnlocks +
-      (data.minimumUnlocks === data.maximumCamoUnlocks ? '' : '+') : 'Weapon level —';
+      (data.weaponUnlocks != null || data.minimumUnlocks === data.maximumCamoUnlocks ? '' : '+') : 'Weapon level —';
 
   const available = data.rows ?? [];
   const visible = available.length || !data.waiting ? available : [{
