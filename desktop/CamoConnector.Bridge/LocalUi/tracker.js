@@ -184,7 +184,22 @@ function render() {
   const level = weapon && (state.focus === weapon.id
     ? state.overview.level ?? (state.overview.minimumLevel ? state.overview.minimumLevel + '+' : null)
     : state.progress[weapon.id + ':weapon-level']?.count);
-  if (weapon && level != null) headingMeta.append(element('span', 'Weapon level ' + level, 'subtitle'));
+  if (weapon) {
+    const label = element('label', 'Weapon level ', 'weapon-level-editor');
+    const input = element('input');
+    input.type = 'number';
+    input.min = '1';
+    input.max = '200';
+    const recorded = state.progress[weapon.id + ':weapon-level']?.count;
+    input.value = recorded ?? '';
+    input.placeholder = level ?? '—';
+    input.addEventListener('change', () => {
+      if (!input.value || !input.checkValidity()) { input.value = recorded ?? ''; return; }
+      void save('edit', { weapon: weapon.id, camo: 'weapon-level', count: input.valueAsNumber });
+    });
+    label.append(input);
+    headingMeta.append(label);
+  }
   headingMeta.append(element('span', completedCount(selected, rules) + ' / ' + rules.length, 'weapon-count'));
   detailHeading.append(title, headingMeta);
   const entries = [detailHeading];

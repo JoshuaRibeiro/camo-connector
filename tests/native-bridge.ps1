@@ -246,6 +246,12 @@ try {
         $tracker.focus -ne 'signal-50') {
         throw 'A generic Gold banner should follow the pinned weapon after the equipped weapon changes.'
     }
+    $levelEdit = @{ weapon = 'signal-50'; camo = 'weapon-level'; count = 24 } | ConvertTo-Json
+    $tracker = Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $levelEdit
+    $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+    if ($tracker.progress.'signal-50:weapon-level'.count -ne 24 -or $overlay.level -ne 24) {
+        throw 'The manually entered weapon level did not reach the active overlay.'
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

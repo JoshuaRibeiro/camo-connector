@@ -11,9 +11,9 @@ function render(data) {
   byId('overlay-card').hidden = !data.weapon;
   byId('weapon').textContent = data.weapon ?? '';
   const level = byId('weapon-level');
-  level.hidden = data.level == null && !data.minimumLevel;
+  level.hidden = !data.weapon;
   level.textContent = data.level != null ? 'Weapon level ' + data.level :
-    'Weapon level ' + data.minimumLevel + '+';
+    data.minimumLevel ? 'Weapon level ' + data.minimumLevel + '+' : 'Weapon level —';
 
   const available = data.rows ?? [];
   const visible = available.length || !data.waiting ? available : [{

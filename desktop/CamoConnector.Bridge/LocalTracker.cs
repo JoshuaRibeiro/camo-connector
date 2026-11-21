@@ -175,6 +175,17 @@ internal sealed class LocalTracker
             return true;
         }
         var key = edit.Weapon + ":" + edit.Camo;
+        if (edit.Camo == "weapon-level")
+        {
+            if (!weapons.ContainsKey(edit.Weapon) || edit.Count is not (>= 1 and <= 200) ||
+                edit.Done != null || edit.Increment != null) return false;
+            Change((next, focus) =>
+            {
+                next[key] = new(edit.Count.Value, false);
+                return focus;
+            });
+            return true;
+        }
         if (!rules.TryGetValue(key, out var rule)) return false;
         if (edit.Increment is int increment)
         {

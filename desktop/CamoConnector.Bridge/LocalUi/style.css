@@ -138,6 +138,8 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .tracker nav button { display: flex; align-items: baseline; justify-content: space-between; gap: .35rem; border-radius: .4rem; font-size: .9rem; }
 .weapon-count { color: var(--accent); white-space: nowrap; font-size: .78rem; }
 .weapon-heading-meta { display: flex; flex-wrap: wrap; justify-content: end; align-items: baseline; gap: .3rem .65rem; }
+.weapon-level-editor { color: #9eb3c1; }
+.weapon-level-editor input { width: 4.4rem; padding: .18rem .3rem; }
 .tracker .controls button { padding: .3rem .48rem; }
 @media (max-width: 640px) {
   .mastery-tiles, .overlay-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
