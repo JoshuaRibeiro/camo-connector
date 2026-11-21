@@ -5,8 +5,8 @@ namespace CamoConnector;
 internal sealed partial class ConnectorWindow
 {
     private readonly System.Windows.Forms.Timer turboTimer = new() { Interval = 100 };
-    private MouseHook? turboCallback;
-    private IntPtr turboHook;
+    private IntPtr heldMouse;
+    private bool listening;
     private bool turboArmed, turboHeld, sideHeld;
     private CheckBox? turboEnabled;
 
@@ -28,52 +28,81 @@ internal sealed partial class ConnectorWindow
         speed.ValueChanged += (_, _) => turboTimer.Interval = (int)Math.Round(1000m / speed.Value);
         enable.CheckedChanged += (_, _) => {
             if (!enable.Checked) { StopTurbo(); return; }
-            turboCallback = OnTurboMouse;
-            turboHook = SetWindowsHookEx(14, turboCallback, GetModuleHandle(null), 0);
-            if (turboHook == IntPtr.Zero) {
+            listening = RegisterMouse(0x2100, Handle); // INPUTSINK and DEVNOTIFY
+            if (!listening) {
                 enable.Checked = false;
                 MessageBox.Show(this, "Windows could not start mouse input tracking.");
             }
         };
         turboTimer.Tick += (_, _) => {
-            if (turboHeld && turboArmed) { mouse_event(4, 0, 0, 0, 0); mouse_event(2, 0, 0, 0, 0); }
+            if (turboHeld && turboArmed) { mouse_event(2, 0, 0, 0, 0); mouse_event(4, 0, 0, 0, 0); }
         };
         return [link, panel];
     }
 
-    private IntPtr OnTurboMouse(int code, IntPtr message, IntPtr data)
+    private void ReadTurboInput(Message message)
     {
-        if (code >= 0 && (Marshal.ReadInt32(data, 12) & 1) == 0) {
-            switch (message.ToInt32()) {
-                case 0x20B when (Marshal.ReadInt32(data, 8) >> 16) == 1:
-                    if (!sideHeld) {
-                        turboArmed = !turboArmed;
-                        turboTimer.Stop();
-                        if (turboEnabled != null) turboEnabled.Text = turboArmed ? "Enable turbo clicker (armed)" : "Enable turbo clicker";
-                    }
-                    sideHeld = true;
-                    break;
-                case 0x20C when (Marshal.ReadInt32(data, 8) >> 16) == 1: sideHeld = false; break;
-                case 0x201: turboHeld = true; if (turboArmed) turboTimer.Start(); break;
-                case 0x202: turboHeld = false; turboTimer.Stop(); break;
-            }
+        if (!listening) return;
+        if (message.Msg == 0x00FE && message.WParam == 2) {
+            ResetHold();
+            sideHeld = false;
+            return;
         }
-        return CallNextHookEx(IntPtr.Zero, code, message, data);
+        if (message.Msg != 0x00FF) return;
+        uint size = (uint)Marshal.SizeOf<RawMousePacket>();
+        if (GetRawInputData(message.LParam, 0x10000003, out var packet, ref size,
+            (uint)(8 + 2 * IntPtr.Size)) == uint.MaxValue || packet.Type != 0 || packet.Device == IntPtr.Zero) return;
+        var flags = packet.ButtonFlags;
+        if ((flags & 0x40) != 0 && !sideHeld) {
+            sideHeld = true;
+            turboArmed = !turboArmed;
+            ResetHold();
+            if (turboEnabled != null) turboEnabled.Text = turboArmed ? "Enable turbo clicker (armed)" : "Enable turbo clicker";
+        }
+        if ((flags & 0x80) != 0) sideHeld = false;
+        if ((flags & 1) != 0 && turboArmed) {
+            heldMouse = packet.Device;
+            turboHeld = true;
+            turboTimer.Start();
+        }
+        if ((flags & 2) != 0 && packet.Device == heldMouse) ResetHold();
     }
 
+    private void ResetHold()
+    {
+        turboTimer.Stop();
+        turboHeld = false;
+        heldMouse = IntPtr.Zero;
+    }
     private void StopTurbo()
     {
         turboTimer.Stop();
-        if (turboHook != IntPtr.Zero) UnhookWindowsHookEx(turboHook);
-        turboHook = IntPtr.Zero;
+        if (listening) RegisterMouse(1, IntPtr.Zero);
+        listening = false;
         turboArmed = turboHeld = sideHeld = false;
         if (turboEnabled != null) turboEnabled.Text = "Enable turbo clicker";
     }
 
-    private delegate IntPtr MouseHook(int code, IntPtr message, IntPtr data);
-    [DllImport("user32")] private static extern IntPtr SetWindowsHookEx(int type, MouseHook callback, IntPtr module, uint thread);
-    [DllImport("user32")] private static extern bool UnhookWindowsHookEx(IntPtr hook);
-    [DllImport("user32")] private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
-    [DllImport("kernel32", CharSet = CharSet.Unicode)] private static extern IntPtr GetModuleHandle(string? name);
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RawMousePacket {
+        public uint Type, Size;
+        public IntPtr Device, Parameter;
+        public ushort MouseFlags, Padding, ButtonFlags, ButtonData;
+        public uint RawButtons;
+        public int X, Y;
+        public uint Extra;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct RawDevice {
+        public ushort Page, Usage;
+        public uint Flags;
+        public IntPtr Target;
+    }
+    private static bool RegisterMouse(uint flags, IntPtr target) {
+        var device = new RawDevice { Page = 1, Usage = 2, Flags = flags, Target = target };
+        return RegisterRawInputDevices(ref device, 1, (uint)Marshal.SizeOf<RawDevice>());
+    }
+    [DllImport("user32")] private static extern bool RegisterRawInputDevices(ref RawDevice device, uint count, uint size);
+    [DllImport("user32")] private static extern uint GetRawInputData(IntPtr handle, uint command, out RawMousePacket packet, ref uint size, uint headerSize);
     [DllImport("user32")] private static extern void mouse_event(uint flags, uint x, uint y, uint data, nuint extra);
 }

@@ -56,6 +56,7 @@ internal sealed partial class ConnectorWindow
 
     protected override void WndProc(ref Message message)
     {
+        ReadTurboInput(message);
         const int calculateClient = 0x0083, paintFrame = 0x0085, activateFrame = 0x0086;
         const int setCursor = 0x0020, styleChanging = 0x007C;
 
