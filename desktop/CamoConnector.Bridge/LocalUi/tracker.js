@@ -63,7 +63,7 @@ function renderCollection() {
     const card = element('article', null, 'mastery-tile');
     if (rule.artwork) {
       const image = element('img');
-      image.src = rule.artwork;
+      image.src = '/local/artwork/completionist-card-' + rule.id + '.png';
       image.alt = '';
       card.append(image);
     }
