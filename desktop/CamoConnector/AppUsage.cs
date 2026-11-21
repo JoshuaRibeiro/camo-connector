@@ -7,7 +7,8 @@ internal sealed partial class ConnectorWindow
 {
     private readonly CheckBox showUsage = new() { Text = "Show app usage in sidebar", AutoSize = true };
     private readonly Label usageLabel = new() { Dock = DockStyle.Bottom, TextAlign = ContentAlignment.MiddleCenter };
-    private readonly Dictionary<int, TimeSpan> previousCpu = [];
+    private readonly Dictionary<int, (DateTime Start, TimeSpan Cpu)> previousCpu = [];
+    private static readonly uint LogicalProcessorCount = Math.Max(1u, GetActiveProcessorCount(ushort.MaxValue));
     private long lastUsageSample;
     private nint gpuQuery, gpuCounter;
     private bool gpuQueryAttempted;
@@ -45,46 +46,70 @@ internal sealed partial class ConnectorWindow
 
     private void RefreshUsage()
     {
-        if (!showUsage.Checked || !Visible || WindowState == FormWindowState.Minimized) return;
+        if (!showUsage.Checked) return;
+        if (!Visible || WindowState == FormWindowState.Minimized)
+        {
+            if (lastUsageSample != 0)
+            {
+                previousCpu.Clear();
+                lastUsageSample = 0;
+                ReleaseUsage();
+            }
+            return;
+        }
         var pids = new HashSet<int> { Environment.ProcessId };
-        foreach (var process in new[] { bridge, detector, previewWorker })
+        foreach (var process in new[] { bridge, detector, previewWorker, trophyServer })
         {
             if (process != null) pids.Add(process.Id);
         }
-        if (localTrackerView?.CoreWebView2 is { } view)
+        foreach (var webView in new[] { localTrackerView, trophyView })
         {
-            try { foreach (var process in view.Environment.GetProcessInfos()) pids.Add(process.ProcessId); }
+            try
+            {
+                if (webView?.CoreWebView2 is { } view)
+                    foreach (var process in view.Environment.GetProcessInfos()) pids.Add(process.ProcessId);
+            }
             catch (Exception error) when (error is InvalidOperationException or COMException) { }
         }
 
         IncludeChildProcesses(pids);
         var now = Stopwatch.GetTimestamp();
+        var sampledAt = DateTime.UtcNow;
         var elapsed = lastUsageSample == 0 ? 0 : Stopwatch.GetElapsedTime(lastUsageSample, now).TotalSeconds;
         lastUsageSample = now;
-        var samples = new Dictionary<int, TimeSpan>();
+        var samples = new Dictionary<int, (DateTime Start, TimeSpan Cpu)>();
+        var intervalStart = sampledAt.AddSeconds(-elapsed);
         var cpu = 0d;
-        long bytes = 0;
+        ulong bytes = 0;
+        var ramAvailable = true;
         foreach (var pid in pids)
         {
             try
             {
                 using var process = Process.GetProcessById(pid);
+                var start = process.StartTime.ToUniversalTime();
                 var time = process.TotalProcessorTime;
-                samples[pid] = time;
-                if (previousCpu.TryGetValue(pid, out var previous) && time >= previous) cpu += (time - previous).TotalSeconds;
-                bytes += process.WorkingSet64;
+                samples[pid] = (start, time);
+                if (previousCpu.TryGetValue(pid, out var previous) && previous.Start == start && time >= previous.Cpu)
+                    cpu += (time - previous.Cpu).TotalSeconds;
+                else if (elapsed > 0 && start >= intervalStart)
+                    cpu += time.TotalSeconds;
+
+                var memory = new PrivateMemoryCounters { Size = (uint)Marshal.SizeOf<PrivateMemoryCounters>() };
+                if (GetProcessMemoryInfo(process.Handle, ref memory, memory.Size)) bytes += memory.PrivateWorkingSet;
+                else ramAvailable = false;
             }
             catch (Exception error) when (error is ArgumentException or InvalidOperationException or System.ComponentModel.Win32Exception) { }
         }
         previousCpu.Clear();
         foreach (var (pid, time) in samples) previousCpu.Add(pid, time);
 
-        var cpuText = elapsed > 0 ? $"{Math.Clamp(cpu / elapsed / Environment.ProcessorCount, 0, 1):P0}" : "—";
-        var ramText = bytes >= 1024L * 1024 * 1024 ? $"{bytes / (1024d * 1024 * 1024):0.0}G" : $"{bytes / (1024d * 1024):0}M";
+        var cpuText = elapsed > 0 ? $"{Math.Clamp(cpu / elapsed / LogicalProcessorCount, 0, 1):0.0%}" : "—";
+        var ramText = !ramAvailable ? "-" : bytes >= 1024L * 1024 * 1024 ? $"{bytes / (1024d * 1024 * 1024):0.0}G" : $"{bytes / (1024d * 1024):0}M";
         var gpu = ReadGpuPercent(pids);
-        var gpuText = gpu is double percent ? $"{percent:0}%" : "—";
+        var gpuText = gpu is double percent ? $"{percent:0.0}%" : "—";
         usageLabel.Text = $"CPU\n{cpuText}\nRAM\n{ramText}\nGPU\n{gpuText}";
-        usageLabel.AccessibleName = $"App CPU {cpuText}, RAM {ramText}, GPU {gpuText}";
+        usageLabel.AccessibleName = $"App CPU {cpuText}, private RAM {ramText}, GPU {gpuText}";
     }
 
     private static void IncludeChildProcesses(HashSet<int> pids)
@@ -110,6 +135,22 @@ internal sealed partial class ConnectorWindow
         }
         finally { CloseHandle(snapshot); }
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PrivateMemoryCounters
+    {
+        public uint Size, PageFaultCount;
+        public nuint PeakWorkingSet, WorkingSet, PeakPagedPool, PagedPool, PeakNonPagedPool, NonPagedPool;
+        public nuint PagefileUsage, PeakPagefileUsage, PrivateUsage, PrivateWorkingSet;
+        public ulong SharedCommitUsage;
+    }
+
+    [DllImport("psapi.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetProcessMemoryInfo(nint process, ref PrivateMemoryCounters counters, uint size);
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetActiveProcessorCount(ushort group);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct ProcessEntry

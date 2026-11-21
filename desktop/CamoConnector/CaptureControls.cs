@@ -372,6 +372,7 @@ internal sealed partial class ConnectorWindow
             return;
         }
         previewLastFrame = Stopwatch.GetTimestamp();
+        if (pages.SelectedTab != capturePage || !Visible || WindowState == FormWindowState.Minimized) return;
         try
         {
             using var stream = new MemoryStream(frame, writable: false);
