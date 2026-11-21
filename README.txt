@@ -17,9 +17,10 @@ Microsoft Edge WebView2. In-app updates stay on the edition you installed.
 
 Upgrading from Camo Connector
 
-Use Check for updates in the old app. The signed compatibility download
-updates in place and keeps Data and the existing shortcut. A subsequent update
-installs the renamed executables, and the existing shortcut opens the new app.
+If your old updater cannot find an update, extract a current CoD Streaming
+Tools ZIP into a fresh folder and copy your existing Data folder into it
+before launching. Installs already using the CoD Streaming Tools updater
+can update in place.
 
 Tracking and OBS
 

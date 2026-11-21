@@ -17,7 +17,7 @@ public sealed class ReleaseVerification
         [property: JsonPropertyName("sha256")] string Sha256);
 
     public static Manifest VerifyManifest(byte[] bytes, byte[] signature, string trustedPublicKey,
-        string releaseTag, Version installedVersion, string package = "win-x64", bool legacy = false)
+        string releaseTag, Version installedVersion, string package = "win-x64")
     {
         if (bytes.Length is 0 or > 16384 || signature.Length is 0 or > 1024)
             throw new InvalidDataException("Update manifest or signature has an invalid size.");
@@ -29,7 +29,7 @@ public sealed class ReleaseVerification
             ?? throw new InvalidDataException("Update manifest is empty.");
         if (!Version.TryParse(manifest.Version, out var version) || version.Build < 0 || version.Revision != -1 ||
             manifest.Version != version.ToString(3) || version <= installedVersion || releaseTag != "v" + manifest.Version ||
-            manifest.Asset != (legacy ? "CamoConnector-v" : "CoDStreamingTools-v") + manifest.Version + "-" + package + ".zip" ||
+            manifest.Asset != "CoDStreamingTools-v" + manifest.Version + "-" + package + ".zip" ||
             manifest.Size is <= 0 or > 512L * 1024 * 1024 ||
             manifest.Sha256 is not { Length: 64 } || !manifest.Sha256.All(Uri.IsHexDigit))
             throw new InvalidDataException("Update manifest does not match an eligible Windows release.");

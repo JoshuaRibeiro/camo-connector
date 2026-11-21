@@ -149,11 +149,8 @@ jobs:
           name: CoDStreamingTools-desktop-release
           path: |
             dist/portable-release/CoDStreamingTools-v*-win-x64*.zip
-            dist/portable-release/CamoConnector-v*-win-x64*.zip
             dist/portable-release/streaming-tools-*.json
             dist/portable-release/streaming-tools-*.sig
-            dist/portable-release/portable-*.json
-            dist/portable-release/portable-*.sig
             dist/portable-release/runtime-*.json
             dist/portable-release/runtime-*.sig
           if-no-files-found: error
@@ -175,14 +172,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           $prefix = "CoDStreamingTools-$env:GITHUB_REF_NAME-win-x64"
-          $legacyPrefix = "CamoConnector-$env:GITHUB_REF_NAME-win-x64"
           $assets = @(
             "release/$prefix-slim.zip", "release/$prefix.zip", "release/$prefix-ocr.zip", "release/$prefix-capture.zip", "release/$prefix-node.zip",
-            "release/$legacyPrefix.zip", "release/$legacyPrefix-slim.zip",
             'release/streaming-tools-update.json', 'release/streaming-tools-update.sig',
             'release/streaming-tools-slim-update.json', 'release/streaming-tools-slim-update.sig',
-            'release/portable-update.json', 'release/portable-update.sig',
-            'release/portable-slim-update.json', 'release/portable-slim-update.sig',
             'release/runtime-ocr.json', 'release/runtime-ocr.sig', 'release/runtime-capture.json', 'release/runtime-capture.sig',
             'release/runtime-node.json', 'release/runtime-node.sig'
           )
