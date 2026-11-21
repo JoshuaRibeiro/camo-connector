@@ -142,3 +142,20 @@ test('foreground digits can resolve conflicting 2906 and 2006 lobby reads', asyn
   assert.equal(result.value, 2556);
   assert.equal(result.corroborated, true);
 });
+
+test('repeated 2044 reads cannot overwrite a nearby trusted 25xx total', () => {
+  const context = vm.createContext({ state: { current: 2536, match: null, source: 'Lobby' } });
+  vm.runInContext(
+    'function save(change) { Object.assign(state, change); }\n' +
+    source.slice(source.indexOf('function isLargeTotalChange'), source.indexOf('const files =')),
+    context
+  );
+  for (const time of [100, 300, 500, 700]) context.observe('home', 2044, 'capture', time, true, 'lobby');
+  assert.equal(context.state.current, 2536);
+  context.observe('home', 2544, 'capture', 900, true, 'lobby');
+  assert.equal(context.state.current, 2544);
+
+  context.state.current = 2044;
+  for (const time of [1100, 1300, 1500]) context.observe('home', 2544, 'capture', time, true, 'lobby');
+  assert.equal(context.state.current, 2544);
+});

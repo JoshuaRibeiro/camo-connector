@@ -117,18 +117,33 @@ async function readTotal(pair, mode = 8, retryMode, rawTotal) {
   return Number(digits.replace(/3/g, (digit, index) => pair.closedUpperLoop?.[index] === true ? '9' : digit));
 }
 
-async function readLobbyLine(lineCrop, numberCrop) {
+async function readLobbyLine(lineCrop, numberCrop, foregroundCrop) {
   if (!lineCrop || !numberCrop) return null;
   const [line, number] = await Promise.all([
     readText(lineCrop, 7), readText(numberCrop, 7, true)
   ]);
   const labelled = /\bTROPHIES\s+COLLECTED\s+([1-9]\d{0,5}|0)\s*$/i.exec(line);
-  return labelled && labelled[1] === number ? Number(number) : null;
+  if (!labelled) return null;
+  if (labelled[1] === number) return Number(number);
+  if (foregroundCrop && labelled[1] === await readText(foregroundCrop, 7, true))
+    return Number(labelled[1]);
+  return null;
 }
 
 // A short sequence of matching OCR reads can still repeat the same bad crop.
 function isLargeTotalChange(value) {
   return state.current > 0 && Math.abs(value - state.current) > Math.max(25, state.current * .05);
+}
+
+function isSuspectedFiveDrop(value) {
+  if (value >= state.current || !isLargeTotalChange(value)) return false;
+  const last = String(state.current);
+  const read = String(value);
+  if (last.length !== read.length) return false;
+  // Reject a false drop if a missing stroke would leave the total near the last
+  // accepted reading. Never publish the inferred number.
+  return [...read].some((digit, index) => digit === '0' && last[index] === '5' &&
+    Math.abs(Number(read.slice(0, index) + '5' + read.slice(index + 1)) - state.current) <= 25);
 }
 
 let candidate = null;
@@ -156,7 +171,7 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
   if (kind === 'home') {
     // Large corrections need two independently cropped reads across three frames.
     // Only the lobby total can correct a decrease, since other screens can be stale.
-    if (value < state.current && layout !== 'lobby') return;
+    if (value < state.current && layout !== 'lobby' || isSuspectedFiveDrop(value)) return;
     if (isLargeTotalChange(value) && (frames < 3 || strongReads < 2)) return;
     if (value < state.current && !isLargeTotalChange(value) && frames < 3) return;
     skippedMatchValue = null;
@@ -186,7 +201,7 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
 
 async function readHomeTotal(body) {
   // The lobby line and the isolated number can confirm the total with just two OCR jobs.
-  const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal);
+  const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal, body.foregroundTotal);
   if (lobby !== null && !isLargeTotalChange(lobby)) return { value: lobby, corroborated: true };
   if (!body.label) return { value: lobby, corroborated: lobby !== null };
 
