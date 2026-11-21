@@ -155,6 +155,8 @@ internal sealed partial class ConnectorWindow : Form
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
+        StopTurbo();
+        turboTimer.Dispose();
         closing.Cancel();
         StopTrophyTracker();
         updateTimer.Dispose();

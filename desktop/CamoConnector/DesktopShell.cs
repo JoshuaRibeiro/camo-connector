@@ -206,7 +206,7 @@ internal sealed partial class ConnectorWindow
         AddCaption();
 
         var help = PageBody(helpPage, "How it works", "CoD Streaming Tools reads your game capture and saves progress on this PC.");
-        AddSetupRow(help, SetupSection("PC capture", new Label { AutoSize = true, Text = "Select the monitor showing Call of Duty in Auto tracking." }));
+        AddSetupRow(help, SetupSection("PC capture", CreateTurboControls()));
         AddSetupRow(help, SetupSection("Console or OBS", new Label { AutoSize = true, Text = "Select your capture card or OBS Virtual Camera in Auto tracking and turn on Auto tracking." }));
         AddSetupRow(help, SetupSection("OBS overlay", new Label { AutoSize = true, Text = "Copy the URL from Overlays and paste it into an OBS Browser Source." }));
         var settings = PageBody(settingsPage, "Settings", "Manage tracker data, updates and tray controls.");
