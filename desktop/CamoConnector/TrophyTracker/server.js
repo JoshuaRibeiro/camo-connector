@@ -64,8 +64,11 @@ function save(change) {
   state = updated;
 }
 
+const cropReads = new Map();
 function readText(png, mode, digits = false) {
-  return new Promise((resolve, reject) => {
+  const key = createHash('sha256').update(`${mode}:${digits}:`).update(png).digest('hex');
+  if (cropReads.has(key)) return cropReads.get(key);
+  const reading = new Promise((resolve, reject) => {
     const args = ['stdin', 'stdout', '--psm', String(mode)];
     if (digits) args.push('-c', 'tessedit_char_whitelist=0123456789');
     const process = spawn(tesseract, args, { windowsHide: true, timeout: 3500 });
@@ -80,6 +83,10 @@ function readText(png, mode, digits = false) {
     });
     process.stdin.end(Buffer.from(png, 'base64'));
   });
+  if (cropReads.size >= 64) cropReads.delete(cropReads.keys().next().value);
+  cropReads.set(key, reading);
+  void reading.catch(() => { if (cropReads.get(key) === reading) cropReads.delete(key); });
+  return reading;
 }
 
 async function readTotal(pair, mode = 8, retryMode) {
@@ -107,28 +114,35 @@ async function readTotal(pair, mode = 8, retryMode) {
   return Number(digits.replace(/3/g, (digit, index) => pair.closedUpperLoop?.[index] === true ? '9' : digit));
 }
 
+// A short sequence of matching OCR reads can still repeat the same bad crop.
+function isLargeTotalChange(value) {
+  return state.current > 0 && Math.abs(value - state.current) > Math.max(25, state.current * .05);
+}
+
 let candidate = null;
 let skippedMatchValue = null;
-function observe(kind, value, session, frameTime) {
+function observe(kind, value, session, frameTime, corroborated = false, layout = null) {
   if (value === null) {
     const sameSession = candidate?.session === session;
     const gap = sameSession ? frameTime - candidate.time : Infinity;
-    const missedHomeRead = kind === 'home' && candidate?.kind === 'home' && gap < 2500;
+    const missedHomeRead = kind === 'home' && candidate?.kind === 'home' && gap < 5000;
     const missedMatchRead = (kind === 'match' || kind === 'none') && candidate?.kind === 'match' && gap < 750;
     if (!missedHomeRead && !missedMatchRead) candidate = null;
     return;
   }
   const repeat = candidate && candidate.kind === kind && candidate.value === value &&
-    candidate.session === session && frameTime > candidate.time && frameTime - candidate.time < 2500;
+    candidate.session === session && candidate.layout === layout && frameTime > candidate.time && frameTime - candidate.time < (kind === 'home' ? 5000 : 2500);
   const frames = repeat ? candidate.frames + 1 : 1;
   const firstTime = repeat ? candidate.firstTime : frameTime;
-  candidate = { kind, value, session, time: frameTime, firstTime, frames };
+  const strongReads = (repeat ? candidate.strongReads : 0) + (corroborated ? 1 : 0);
+  candidate = { kind, value, session, time: frameTime, firstTime, frames, strongReads, layout };
   if (frames < 2) return;
   if (kind === 'home') {
-    // A clipped OCR read often drops whole digits. Require longer agreement
-    // before accepting a shorter total, while still allowing a real decrease.
-    if (String(value).length < String(state.current).length &&
-        (frames < 4 || frameTime - firstTime < 5000)) return;
+    // Large corrections need two independently cropped reads across three frames.
+    // Only the lobby total can correct a decrease, since other screens can be stale.
+    if (value < state.current && layout !== 'lobby') return;
+    if (isLargeTotalChange(value) && (frames < 3 || strongReads < 2)) return;
+    if (value < state.current && !isLargeTotalChange(value) && frames < 3) return;
     skippedMatchValue = null;
     if (state.current !== value || state.match !== null || state.source !== 'Lobby') {
       save({ current: value, match: null, source: 'Lobby' });
@@ -218,6 +232,7 @@ const server = http.createServer(async (request, response) => {
     ocrInProgress = true;
     try {
       let value = null;
+      let corroborated = false;
       if (body.kind === 'home' && body.label) {
         const pair = body.primary ?? body;
         const retryMode = !body.layout && pair.glyphs >= 4 ? 7 : undefined;
@@ -225,7 +240,14 @@ const server = http.createServer(async (request, response) => {
         const labelPattern = body.layout === 'events' ? /\bEVENTS\b/i
           : body.layout === 'wager' ? /TROPHIES\s+COLLECTE[DO]\b/i
           : /TROPHIES\s+COLLE[CG]TE[DS]\b/i;
-        if (labelPattern.test(label)) value = primary ?? await readTotal(body.alternate, body.layout === 'wager' ? 8 : 7);
+        if (labelPattern.test(label)) {
+          value = primary;
+          if (value === null || isLargeTotalChange(value)) {
+            const alternate = await readTotal(body.alternate, body.layout === 'wager' ? 8 : 7);
+            corroborated = value !== null && value === alternate;
+            value ??= alternate;
+          }
+        }
       } else if (body.kind === 'match') {
         if (body.zero === true) value = 0;
         else if (body.digits) {
@@ -234,7 +256,8 @@ const server = http.createServer(async (request, response) => {
           if (/^[1-9]\d{0,2}$/.test(digits)) value = Number(digits);
         }
       }
-      observe(body.kind, value, body.session, body.frameTime);
+      observe(body.kind, value, body.session, body.frameTime, corroborated,
+        body.kind === 'home' ? body.layout ?? 'lobby' : null);
       const source = body.layout === 'events' ? 'Events' : body.kind === 'home' ? 'Lobby' : 'Match';
       return json({ state: publicState(), reading: value === null ? 'Looking for the trophy counter' : `${source} read: ${value}` });
     } finally {

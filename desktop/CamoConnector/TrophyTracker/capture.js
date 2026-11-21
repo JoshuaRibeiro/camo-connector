@@ -56,12 +56,13 @@ function show(state) {
 
 let busy = false;
 let lastFrameAt = 0;
+let lastResponseAt = 0;
 let session = crypto.randomUUID();
 window.chrome?.webview?.addEventListener('message', async ({ data }) => {
   if (busy || typeof data !== 'string') return;
   busy = true;
   const now = performance.now();
-  if (now - lastFrameAt > 2000) session = crypto.randomUUID();
+  if (now - lastResponseAt > 2500) session = crypto.randomUUID();
   lastFrameAt = now;
   try {
     if (!recognize || now >= nextVersionCheck) await updateRecognition();
@@ -77,6 +78,7 @@ window.chrome?.webview?.addEventListener('message', async ({ data }) => {
     const result = await api('/api/sample', {
       ...reading, session: session + ':' + recognitionVersion, frameTime: now
     });
+    lastResponseAt = performance.now();
     show(result.state);
     get('status').textContent = result.reading;
   } catch (error) {
