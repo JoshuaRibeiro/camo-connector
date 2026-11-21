@@ -25,6 +25,12 @@ if ($rpgLevel.Count -ne 33 -or $militaryUnlocks.Count -ne 16 -or $specialUnlocks
     $specialUnlocks.WeaponLevelObjective -or $menuReader::ReadWeaponUnlocks('.50 GS', 'Red Tiger', 'Earn 37 more weapon unlocks', 36)) {
     throw 'Camo-menu weapon unlocks must use the selected camo threshold and stay separate from levels.'
 }
+$pilaLevel = $menuReader::ConfirmMilitaryLevel('Pila', 36, '34/36', '34 | 36')
+if ($pilaLevel.Count -ne 34 -or $pilaLevel.Goal -ne 36 -or
+    $menuReader::ConfirmMilitaryLevel('Pila', 36, '34/36', '31/36') -or
+    $menuReader::ConfirmMilitaryLevel('Pila', 36, '34/38', '34/38')) {
+    throw 'Military menu fallback must verify both the level and its catalog target.'
+}
 $stability = [CamoConnector.Detector.WeaponConfirmation]::new()
 $weapon = $reader::Read(@('SANG 9mm AKIMB0'), $true)
 if ($reader::ReadHud(@('.58 GS'), $false).Name -ne '.50 GS' -or

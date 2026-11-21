@@ -20,6 +20,7 @@ internal sealed class HudCapture : IDisposable
     private readonly Dictionary<string, CamoReference[]> catalog;
     private readonly Dictionary<string, CamoReference[]> completionist = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, CamoReference[]> trackedCatalog = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, Dictionary<string, int>> levelRequirements = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, Dictionary<string, int>> unlockRequirements = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> pointBlankWeapons = new(StringComparer.OrdinalIgnoreCase);
 
@@ -58,6 +59,13 @@ internal sealed class HudCapture : IDisposable
             var trackerName = weapon.GetProperty("name").GetString()!;
             var detectorName = catalog.Keys.FirstOrDefault(name => name.Equals(trackerName, StringComparison.OrdinalIgnoreCase))
                 ?? trackerName;
+            levelRequirements[detectorName] = weapon.GetProperty("camos").EnumerateArray()
+                .Where(camo => camo.GetProperty("type").GetString() == "Military" &&
+                    camo.TryGetProperty("unlock", out var unlock) && unlock.ValueKind == JsonValueKind.String &&
+                    unlock.GetString()!.StartsWith("Reach Weapon Level ", StringComparison.OrdinalIgnoreCase) &&
+                    camo.TryGetProperty("unlockTotal", out var total) && total.ValueKind == JsonValueKind.Number)
+                .ToDictionary(camo => camo.GetProperty("name").GetString()!,
+                    camo => camo.GetProperty("unlockTotal").GetInt32());
             unlockRequirements[detectorName] = weapon.GetProperty("camos").EnumerateArray()
                 .Where(camo => camo.TryGetProperty("unlock", out var unlock) &&
                     unlock.ValueKind == JsonValueKind.String &&
@@ -602,6 +610,13 @@ internal sealed class HudCapture : IDisposable
                 countersOnly: true, trace: trace, regionName: "militaryLevelCounter");
             if (CamoMenuRecognition.ReadMilitaryLevel(weapon, title, detail + "\n" + counter) is { } isolatedLevel)
                 return isolatedLevel;
+            if (levelRequirements.GetValueOrDefault(weapon)?.TryGetValue(title, out var levelGoal) == true)
+            {
+                var (alternateCounter, _) = await ReadTextAsync(frame, (.527, .748, .035, .027), cancel, pageMode: 7,
+                    countersOnly: true, adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "militaryLevelCounterContrast");
+                if (CamoMenuRecognition.ConfirmMilitaryLevel(weapon, levelGoal, counter, alternateCounter) is { } confirmedLevel)
+                    return confirmedLevel;
+            }
             if (requirements?.TryGetValue(title, out var threshold) == true &&
                 CamoMenuRecognition.ReadWeaponUnlocks(weapon, title, objectives, threshold) == null)
                 objectives += "\n" + detail;

@@ -108,6 +108,22 @@ public static class CamoMenuRecognition
             : null;
     }
 
+    public static CamoProgress? ConfirmMilitaryLevel(string weapon, int goal, string first, string second)
+    {
+        int? Read(string text)
+        {
+            var match = Regex.Match(text.Trim(), @"\A([0-9]{1,3})\s*[/|]\s*([0-9]{1,3})\z");
+            if (!match.Success || int.Parse(match.Groups[2].Value) != goal) return null;
+            var count = int.Parse(match.Groups[1].Value);
+            return count >= 1 && count <= goal ? count : null;
+        }
+
+        var level = Read(first);
+        if (level is not int count || Read(second) != count) return null;
+        var objective = $"Reach Weapon Level {goal}";
+        return new(weapon, objective, count, goal) { WeaponLevelObjective = objective };
+    }
+
     public static CamoProgress? ReadMilitaryLevel(string weapon, string title, string objectives)
     {
         if (!Regex.IsMatch(Key(title), @"\Amilitarycam[o0][1-8]\z")) return null;
