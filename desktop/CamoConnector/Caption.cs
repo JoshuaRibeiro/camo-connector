@@ -28,8 +28,10 @@ internal sealed partial class ConnectorWindow
         Resize += (_, _) => UpdateResizePadding();
         HandleCreated += (_, _) =>
         {
-            const int borderColor = 34;
+            const int cornerPreference = 33, borderColor = 34;
+            var rounded = 2;
             var noBorder = unchecked((int)0xFFFFFFFE);
+            DwmSetWindowAttribute(Handle, cornerPreference, ref rounded, sizeof(int));
             DwmSetWindowAttribute(Handle, borderColor, ref noBorder, sizeof(int));
         };
     }
