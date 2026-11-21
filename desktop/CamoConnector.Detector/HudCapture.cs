@@ -613,7 +613,8 @@ internal sealed class HudCapture : IDisposable
             return weaponUnlocks;
         if (!names.Contains(title)) return progress;
 
-        var catalogGoal = references.FirstOrDefault(camo => camo.Name == title)?.Goal;
+        var reference = references.FirstOrDefault(camo => camo.Name == title);
+        var catalogGoal = reference?.Goal;
         progress = CamoMenuRecognition.CheckObjectiveGoal(progress, catalogGoal, objectives);
 
         // Check the isolated counter even when the wider objective OCR returns a plausible value.
@@ -643,9 +644,22 @@ internal sealed class HudCapture : IDisposable
             if (isolated != null && isolated != progress) return null;
             return Validate(CamoMenuRecognition.ConfirmCounter(progress, alternate, null));
         }
-        // If the objective crop contains a rejected fraction, avoid substituting another row's count.
-        if (System.Text.RegularExpressions.Regex.IsMatch(objectives, @"\d\s*/\s*\d")) return null;
-        return Validate(CamoMenuRecognition.ConfirmCounter(null, isolated, alternate));
+        if (!System.Text.RegularExpressions.Regex.IsMatch(objectives, @"\d\s*/\s*\d") &&
+            Validate(CamoMenuRecognition.ConfirmCounter(null, isolated, alternate)) is { } paired)
+            return paired;
+
+        // A crossed-out prerequisite can confuse the multiline OCR. Read the challenge
+        // and its meter separately before accepting progress from this menu layout.
+        if (raisedDetails || reference?.Objective is not { } expectedObjective) return null;
+        var (challenge, _) = await ReadTextAsync(frame, (.341, .774, .280, .033), cancel, pageMode: 7,
+            adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "camoChallengeLine");
+        if (!CamoMenuRecognition.MatchesCamoObjective(challenge, expectedObjective)) return null;
+        var tight = await ReadCounter((.534, .810, .032, .027), PixelAdjustment.Normal, "camoTightCounter");
+        if (tight == null || (isolated != null && isolated != tight) || (alternate != null && alternate != tight))
+            return null;
+        var corroborating = isolated ?? alternate ??
+            await ReadCounter((.533, .807, .038, .033), PixelAdjustment.Contrast, "camoTightCounterContrast");
+        return Validate(CamoMenuRecognition.ConfirmCounter(null, tight, corroborating));
     }
 
     public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null, bool requireHeading = false)

@@ -83,6 +83,14 @@ public static class CamoMenuRecognition
         return progress with { Goal = goal };
     }
 
+    public static bool MatchesCamoObjective(string text, string? objective)
+    {
+        if (string.IsNullOrWhiteSpace(objective)) return false;
+        var expected = Key(objective);
+        if (expected.StartsWith("get", StringComparison.Ordinal)) expected = expected[3..];
+        return Key(text).Contains(expected, StringComparison.Ordinal);
+    }
+
     public static CamoProgress? ConfirmCounter(CamoProgress? context, CamoProgress? counter, CamoProgress? alternate)
     {
         if (counter == null || (context != null && context != counter)) return null;
