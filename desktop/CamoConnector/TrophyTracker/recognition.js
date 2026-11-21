@@ -209,7 +209,7 @@ export function createRecognizer({ draw, context, crop, signatures }) {
     return { image: crop.toDataURL('image/png').split(',')[1], glyphs: glyphs.length, closedUpperLoop, templateTotal };
   }
 
-  function lobbyTemplateTotal(rect) {
+  function lobbyTemplateTotal(rect, minimumRedBlueDifference) {
     const scale = 4;
     const width = rect[2] * scale, height = rect[3] * scale;
     draw(...rect, width, height);
@@ -217,7 +217,8 @@ export function createRecognizer({ draw, context, crop, signatures }) {
     const read = floor => {
       const isInk = (x, y) => {
         const i = (y * width + x) * 4;
-        return Math.min(data[i], data[i + 1]) >= floor && data[i] - data[i + 2] >= 12;
+        return Math.min(data[i], data[i + 1]) >= floor &&
+          data[i] - data[i + 2] >= minimumRedBlueDifference;
       };
       const columns = new Uint16Array(width);
       for (let y = 6 * scale; y < 39 * scale; y++) {
@@ -282,8 +283,9 @@ export function createRecognizer({ draw, context, crop, signatures }) {
         ? maskPair(lobbyMask(wide, 190, 180), lobbyMask(wide, 200, 195), true)
         : maskPair(lobbyMask(rect, 159, 149), lobbyMask(rect, 160, 150), true);
       // The wider crop protects against accepting a total with a clipped leading digit.
-      const templateTotal = lobby ? lobbyTemplateTotal(wide) : null;
-      return { kind: 'home', lobbyLine: png([1030, top, icon.x - 1030, 45], 2), label: png([1030, top, 350, 45], 3), foregroundTotal: png(wide, 4, true), rawTotal: png(wide, 4), primary, alternate, templateTotal };
+      const goldTotal = lobby ? lobbyTemplateTotal(wide, 12) : null;
+      const templateTotal = goldTotal ?? (lobby ? lobbyTemplateTotal(wide, -10) : null);
+      return { kind: 'home', lobbyLine: png([1030, top, icon.x - 1030, 45], 2), label: png([1030, top, 350, 45], 3), foregroundTotal: png(wide, 4, true), rawTotal: png(wide, 4), primary, alternate, templateTotal, templateNeedsLine: goldTotal === null };
     }
 
     const banner = [1740, 827, 312, 44];

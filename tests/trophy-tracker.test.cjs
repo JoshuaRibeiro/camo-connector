@@ -110,6 +110,15 @@ test('interleaved lobby OCR errors do not erase a supported correction', () => {
   });
 });
 
+test('the full lobby line corroborates the shape read despite a noisy number crop', async () => {
+  const context = vm.createContext({
+    readText: async crop => crop === 'line' ? 'TROPHIES COLLECTED 2538)' : '29368'
+  });
+  vm.runInContext(source.slice(source.indexOf('async function readLobbyLine'), source.indexOf('// A short sequence')), context);
+  assert.equal(await context.readLobbyLine('line', 'digits', null, 2538), 2538);
+  assert.equal(await context.readLobbyLine('line', 'digits', null, 2938), null);
+});
+
 test('lobby OCR recovers a six when original pixels corroborate a masked read', async () => {
   const context = vm.createContext({
     readText: async (crop, mode) => crop === 'original' || (crop === 'mask' && mode === 7) ? '2226' : '2228'

@@ -117,13 +117,15 @@ async function readTotal(pair, mode = 8, retryMode, rawTotal) {
   return Number(digits.replace(/3/g, (digit, index) => pair.closedUpperLoop?.[index] === true ? '9' : digit));
 }
 
-async function readLobbyLine(lineCrop, numberCrop, foregroundCrop) {
+async function readLobbyLine(lineCrop, numberCrop, foregroundCrop, templateTotal) {
   if (!lineCrop || !numberCrop) return null;
   const [line, number] = await Promise.all([
     readText(lineCrop, 7), readText(numberCrop, 7, true)
   ]);
-  const labelled = /\bTROPHIES\s+COLLECTED\s+([1-9]\d{0,5}|0)\s*$/i.exec(line);
+  // The icon's antialiased edge can appear as punctuation after the total.
+  const labelled = /\bTROPHIES\s+COLLECTED\s+([1-9]\d{0,5}|0)\s*[:)\]]?\s*$/i.exec(line);
   if (!labelled) return null;
+  if (Number(labelled[1]) === templateTotal) return templateTotal;
   if (labelled[1] === number) return Number(number);
   if (foregroundCrop && labelled[1] === await readText(foregroundCrop, 7, true))
     return Number(labelled[1]);
@@ -228,13 +230,13 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
 async function readHomeTotal(body) {
   const templateTotal = Number.isInteger(body.templateTotal) && body.templateTotal >= 0 &&
     body.templateTotal <= 99999 ? body.templateTotal : null;
-  if (templateTotal !== null && !body.layout && body.label &&
+  if (templateTotal !== null && !body.templateNeedsLine && !body.layout && body.label &&
       !isLargeTotalChange(templateTotal) &&
       /\bTROPHIES\s+COLLE[CG]TE[DS]\b/i.test(await readText(body.label, 7))) {
     return { value: templateTotal, corroborated: true };
   }
   // The lobby line and the isolated number can confirm the total with just two OCR jobs.
-  const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal, body.foregroundTotal);
+  const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal, body.foregroundTotal, templateTotal);
   if (lobby !== null && (lobby === templateTotal || !isLargeTotalChange(lobby))) {
     return { value: lobby, corroborated: true };
   }
@@ -251,7 +253,7 @@ async function readHomeTotal(body) {
   if (!labelPattern.test(label)) return { value: lobby, corroborated: lobby !== null };
   // A large lobby change needs agreement between the shape match and numeric OCR
   // before it can outrank the ordinary lobby reading.
-  if (!body.layout && templateTotal !== null && templateTotal === primary) {
+  if (!body.layout && !body.templateNeedsLine && templateTotal !== null && templateTotal === primary) {
     return { value: primary, corroborated: true };
   }
   if (!body.layout && (lobby !== null || primary === null || isLargeTotalChange(primary))) {
