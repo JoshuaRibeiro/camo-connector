@@ -20,6 +20,11 @@ jobs:
           dotnet-version: '10.0.x'
       - run: ./tests/portable-replacement.ps1
       - run: ./tests/detector-weapon.ps1
+      - uses: actions/setup-node@v4
+        if: github.ref_type == 'tag'
+        with:
+          node-version: '24'
+          architecture: x64
       - name: Prepare DirectShow capture runtime
         run: |
           # Archive URL and checksum from the Gyan.FFmpeg 8.1.2 WinGet manifest.
@@ -102,7 +107,7 @@ jobs:
           }
           $key = Join-Path $env:RUNNER_TEMP 'camo-update-public.pem'
           [IO.File]::WriteAllText($key, $env:CAMO_UPDATE_PUBLIC_KEY)
-          ./scripts/build-portable-release.ps1 -OutputDirectory dist/portable-release -CaptureDirectory $env:CAMO_CAPTURE_DIRECTORY -OcrDirectory $env:CAMO_OCR_DIRECTORY -UpdatePublicKeyFile $key
+          ./scripts/build-portable-release.ps1 -OutputDirectory dist/portable-release -NodeDirectory (Split-Path (Get-Command node.exe).Source) -CaptureDirectory $env:CAMO_CAPTURE_DIRECTORY -OcrDirectory $env:CAMO_OCR_DIRECTORY -UpdatePublicKeyFile $key
           'CAMO_CHECK_ROOT=dist/portable-release/app' >> $env:GITHUB_ENV
       - name: Check bundled capture and OCR runtimes
         run: |
@@ -172,13 +177,14 @@ jobs:
           $prefix = "CoDStreamingTools-$env:GITHUB_REF_NAME-win-x64"
           $legacyPrefix = "CamoConnector-$env:GITHUB_REF_NAME-win-x64"
           $assets = @(
-            "release/$prefix-slim.zip", "release/$prefix.zip", "release/$prefix-ocr.zip", "release/$prefix-capture.zip",
+            "release/$prefix-slim.zip", "release/$prefix.zip", "release/$prefix-ocr.zip", "release/$prefix-capture.zip", "release/$prefix-node.zip",
             "release/$legacyPrefix.zip", "release/$legacyPrefix-slim.zip",
             'release/streaming-tools-update.json', 'release/streaming-tools-update.sig',
             'release/streaming-tools-slim-update.json', 'release/streaming-tools-slim-update.sig',
             'release/portable-update.json', 'release/portable-update.sig',
             'release/portable-slim-update.json', 'release/portable-slim-update.sig',
-            'release/runtime-ocr.json', 'release/runtime-ocr.sig', 'release/runtime-capture.json', 'release/runtime-capture.sig'
+            'release/runtime-ocr.json', 'release/runtime-ocr.sig', 'release/runtime-capture.json', 'release/runtime-capture.sig',
+            'release/runtime-node.json', 'release/runtime-node.sig'
           )
           foreach ($asset in $assets) { if (!(Test-Path -LiteralPath $asset)) { throw "Missing $asset" } }
           @"

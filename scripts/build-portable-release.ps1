@@ -3,6 +3,7 @@ param(
     [Parameter(Mandatory)][string]$CaptureDirectory,
     [Parameter(Mandatory)][string]$UpdatePublicKeyFile,
     [Parameter(Mandatory)][string]$OutputDirectory,
+    [Parameter(Mandatory)][string]$NodeDirectory,
     [string]$CertificateThumbprint,
     [string]$TimestampServer
 )
@@ -92,6 +93,13 @@ try {
             }
         }
     } else { Write-Warning 'Windows executables are unsigned. Only the update manifests are signed.' }
+    $nodePack = Join-Path $output 'node-pack/Runtime/Node'
+    [IO.Directory]::CreateDirectory($nodePack) | Out-Null
+    foreach ($file in 'node.exe', 'LICENSE') {
+        Copy-Item -LiteralPath (Join-Path $NodeDirectory $file) -Destination $nodePack
+    }
+    $nodeRequired = @('Runtime/Node/node.exe', 'Runtime/Node/LICENSE')
+    Write-Package @(Get-ReleaseFiles (Join-Path $output 'node-pack')) $nodeRequired 'win-x64-node' 'runtime-node'
     $offline = @(Get-ReleaseFiles $assembly)
     $ocrRequired = @('Runtime/Ocr/tesseract.exe', 'Runtime/Ocr/tessdata/eng.traineddata')
     $captureRequired = @('Runtime/Capture/ffmpeg.exe')

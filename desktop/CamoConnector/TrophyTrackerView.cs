@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using CamoConnector.Update;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
 
@@ -72,8 +73,11 @@ internal sealed partial class ConnectorWindow
                 input.CopyTo(output);
             }
 
+            var node = await EnsureTrophyNodeAsync(token);
+            token.ThrowIfCancellationRequested();
+            trophyStatus.Text = "Starting Trophy Tracker.";
             var instance = Guid.NewGuid().ToString("N");
-            var start = new ProcessStartInfo("node.exe") { WorkingDirectory = assets, UseShellExecute = false, CreateNoWindow = true };
+            var start = new ProcessStartInfo(node) { WorkingDirectory = assets, UseShellExecute = false, CreateNoWindow = true };
             start.ArgumentList.Add(Path.Combine(assets, "server.js"));
             start.Environment["TROPHY_INSTANCE"] = instance;
             start.Environment["TROPHY_TESSERACT"] = Path.Combine(root, "Runtime", "Ocr", "tesseract.exe");
@@ -119,11 +123,44 @@ internal sealed partial class ConnectorWindow
         catch (Exception error) when (!token.IsCancellationRequested)
         {
             StopTrophyTracker();
-            trophyStatus.Text = error is System.ComponentModel.Win32Exception { NativeErrorCode: 2 }
-                ? "Trophy Tracker requires Node.js on this PC. Reopen the app after installing it."
-                : error.Message;
+            trophyStatus.Text = error.Message + " Turn Trophy Tracker off and back on to retry.";
         }
         catch (Exception) when (token.IsCancellationRequested) { }
+    }
+
+    private async Task<string> EnsureTrophyNodeAsync(CancellationToken cancel)
+    {
+        var portable = Path.Combine(root, "Runtime", "Node", "node.exe");
+        if (File.Exists(portable)) return portable;
+        var installed = (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator)
+            .Where(Path.IsPathFullyQualified)
+            .Select(directory => Path.Combine(directory, "node.exe"))
+            .FirstOrDefault(File.Exists);
+        if (installed != null) return installed;
+        if (updateKey == null)
+            throw new IOException("This build has no release verification key for the Trophy Tracker runtime.");
+
+        trophyStatus.Text = "Downloading Trophy Tracker support…";
+        using var http = new HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+        deadline.CancelAfter(TimeSpan.FromMinutes(5));
+        var release = new GitHubRelease(http);
+        var version = new Version(desktopVersion.Major, desktopVersion.Minor, desktopVersion.Build);
+        try
+        {
+            var manifest = await release.RuntimeAsync(version, "node", updateKey, deadline.Token);
+            var path = Path.Combine(Path.GetTempPath(), $"CoDStreamingTools-node-{Guid.NewGuid():N}.zip");
+            await using var archive = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
+                65536, FileOptions.DeleteOnClose);
+            await release.DownloadArchiveAsync(manifest, archive, deadline.Token);
+            deadline.Token.ThrowIfCancellationRequested();
+            PortableReplacement.InstallRuntime(archive, manifest, root, "Node");
+            return portable;
+        }
+        catch (OperationCanceledException) when (!cancel.IsCancellationRequested)
+        {
+            throw new IOException("The Trophy Tracker runtime download timed out.");
+        }
     }
 
     private void StopTrophyTracker()

@@ -128,6 +128,7 @@ public sealed class PortableReplacement
         var required = component switch
         {
             "Ocr" => new[] { "Runtime/Ocr/tesseract.exe", "Runtime/Ocr/tessdata/eng.traineddata" },
+            "Node" => new[] { "Runtime/Node/node.exe", "Runtime/Node/LICENSE" },
             "Capture" => new[] { "Runtime/Capture/ffmpeg.exe" },
             _ => throw new ArgumentOutOfRangeException(nameof(component))
         };
@@ -194,6 +195,7 @@ public sealed class PortableReplacement
     private static bool Allowed(string? path)
     {
         if (path == null) return false;
+        if (path is "Runtime/Node/node.exe" or "Runtime/Node/LICENSE") return true;
         if (Managed.Contains(path, StringComparer.Ordinal) || path == "Runtime/Ocr/tessdata/eng.traineddata") return true;
         if (!Regex.IsMatch(path, @"\ARuntime/(?:Ocr|Capture)/(?:tesseract\.exe|ffmpeg\.exe|[A-Za-z0-9_+\-]+(?:\.[A-Za-z0-9_+\-]+)*\.dll|(?:LICENSE|COPYING|NOTICE)[A-Za-z0-9_.-]*)\z", RegexOptions.CultureInvariant))
             return false;

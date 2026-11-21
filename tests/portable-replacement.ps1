@@ -68,31 +68,37 @@ try {
         throw 'The standard update removed an installed runtime.'
     }
 
-    foreach ($includeUnmanaged in $true, $false) {
-        $archive = [IO.MemoryStream]::new()
-        try {
-            $zip = [IO.Compression.ZipArchive]::new($archive, 'Create', $true)
+    foreach ($component in 'Capture', 'Node') {
+        foreach ($includeUnmanaged in $true, $false) {
+            $archive = [IO.MemoryStream]::new()
             try {
-                $paths = @('Runtime/Capture/ffmpeg.exe')
-                if ($includeUnmanaged) { $paths += 'CoDStreamingTools.exe' }
-                foreach ($path in $paths) {
-                    $writer = [IO.StreamWriter]::new($zip.CreateEntry($path).Open())
-                    try { $writer.Write('downloaded runtime') } finally { $writer.Dispose() }
+                $zip = [IO.Compression.ZipArchive]::new($archive, 'Create', $true)
+                try {
+                    $paths = if ($component -eq 'Node') { @('Runtime/Node/node.exe', 'Runtime/Node/LICENSE') } else { @('Runtime/Capture/ffmpeg.exe') }
+                    if ($includeUnmanaged) { $paths += 'CoDStreamingTools.exe' }
+                    foreach ($path in $paths) {
+                        $writer = [IO.StreamWriter]::new($zip.CreateEntry($path).Open())
+                        try { $writer.Write('downloaded runtime') } finally { $writer.Dispose() }
+                    }
+                } finally { $zip.Dispose() }
+                $sha = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($archive.ToArray()))
+                $manifest = [CamoConnector.Update.ReleaseVerification+Manifest]::new('2.0.0','test.zip',$archive.Length,$sha)
+                try {
+                    [CamoConnector.Update.PortableReplacement]::InstallRuntime($archive, $manifest, $root, $component)
+                    if ($includeUnmanaged) { throw 'A runtime pack could replace a program file.' }
+                } catch {
+                    if (!$includeUnmanaged -or $_.Exception.ToString() -notmatch 'duplicate or unmanaged path') { throw }
                 }
-            } finally { $zip.Dispose() }
-            $sha = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($archive.ToArray()))
-            $manifest = [CamoConnector.Update.ReleaseVerification+Manifest]::new('2.0.0','test.zip',$archive.Length,$sha)
-            try {
-                [CamoConnector.Update.PortableReplacement]::InstallRuntime($archive, $manifest, $root, 'Capture')
-                if ($includeUnmanaged) { throw 'A runtime pack could replace a program file.' }
-            } catch {
-                if (!$includeUnmanaged -or $_.Exception.ToString() -notmatch 'duplicate or unmanaged path') { throw }
-            }
-            $expected = if ($includeUnmanaged) { 'installed capture support' } else { 'downloaded runtime' }
-            if ([IO.File]::ReadAllText((Join-Path $root 'Runtime/Capture/ffmpeg.exe')) -ne $expected) {
-                throw 'The runtime install did not leave the expected files in place.'
-            }
-        } finally { $archive.Dispose() }
+                $expected = if ($includeUnmanaged) { 'installed capture support' } else { 'downloaded runtime' }
+                $runtime = if ($component -eq 'Node') { 'Runtime/Node/node.exe' } else { 'Runtime/Capture/ffmpeg.exe' }
+                $installed = Join-Path $root $runtime
+                if ($component -eq 'Node' -and $includeUnmanaged) {
+                    if (Test-Path -LiteralPath $installed) { throw 'An invalid Node pack was installed.' }
+                } elseif ([IO.File]::ReadAllText($installed) -ne $expected) {
+                    throw 'The runtime install did not leave the expected files in place.'
+                }
+            } finally { $archive.Dispose() }
+        }
     }
     $pending = [IO.Directory]::CreateDirectory((Join-Path $root 'Data/PendingUpdate')).FullName
     $archivePath = Join-Path $pending 'update.zip'

@@ -59,7 +59,7 @@ public sealed class GitHubRelease(HttpClient http)
 
     public async Task<ReleaseVerification.Manifest> RuntimeAsync(Version version, string component, string publicKey, CancellationToken cancel)
     {
-        if (component is not ("ocr" or "capture")) throw new ArgumentOutOfRangeException(nameof(component));
+        if (component is not ("ocr" or "capture" or "node")) throw new ArgumentOutOfRangeException(nameof(component));
         var tag = "v" + version.ToString(3);
         var prefix = AssetPrefix + tag + "/runtime-" + component;
         using var manifest = new MemoryStream();
