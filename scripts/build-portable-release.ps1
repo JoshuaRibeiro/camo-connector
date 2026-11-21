@@ -28,16 +28,18 @@ function Get-ReleaseFiles($directory) {
     }
 }
 
-function Write-Package($files, $required, $flavor, $manifestName) {
+function Write-Package($files, $required, $flavor, $manifestName, [switch]$Legacy) {
     foreach ($file in $required) {
         if ($file -cnotin $files.Relative) { throw "Missing release file: $file" }
     }
-    $asset = "CoDStreamingTools-v$version-$flavor.zip"
+    $brand = if ($Legacy) { "CamoConnector" } else { "CoDStreamingTools" }
+    $asset = "$brand-v$version-$flavor.zip"
     $archive = Join-Path $output $asset
     $zip = [IO.Compression.ZipFile]::Open($archive, 'Create')
     try {
         foreach ($file in ($files | Sort-Object Relative)) {
-            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file.FullName, $file.Relative)
+            $entry = if ($Legacy) { $file.Relative.Replace('CoDStreamingTools', 'CamoConnector') } else { $file.Relative }
+            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $file.FullName, $entry)
         }
     } finally { $zip.Dispose() }
 
@@ -51,7 +53,7 @@ function Write-Package($files, $required, $flavor, $manifestName) {
     $signature = $key.SignData($body, [Security.Cryptography.HashAlgorithmName]::SHA256,
         [Security.Cryptography.RSASignaturePadding]::Pss)
     $signed = [CamoConnector.Update.ReleaseVerification]::VerifyManifest($body, $signature, $public,
-        "v$version", [version]'0.0.0', $flavor)
+        "v$version", [version]'0.0.0', $flavor, $Legacy.IsPresent)
     $inputStream = [IO.File]::OpenRead($archive)
     try { [CamoConnector.Update.ReleaseVerification]::VerifyArchive($inputStream, $signed) }
     finally { $inputStream.Dispose() }
@@ -95,8 +97,10 @@ try {
     $captureRequired = @('Runtime/Capture/ffmpeg.exe')
     $standard = @(Get-ReleaseFiles $slim)
 
-    Write-Package $standard ($coreFiles + $ocrRequired + $captureRequired) 'win-x64-slim' 'portable-slim-update'
-    Write-Package $offline ($coreFiles + $ocrRequired + $captureRequired) 'win-x64' 'portable-update'
+    Write-Package $standard ($coreFiles + $ocrRequired + $captureRequired) 'win-x64-slim' 'streaming-tools-slim-update'
+    Write-Package $offline ($coreFiles + $ocrRequired + $captureRequired) 'win-x64' 'streaming-tools-update'
+    Write-Package $standard ($coreFiles + $ocrRequired + $captureRequired) 'win-x64-slim' 'portable-slim-update' -Legacy
+    Write-Package $offline ($coreFiles + $ocrRequired + $captureRequired) 'win-x64' 'portable-update' -Legacy
     Write-Package @($offline | Where-Object Relative -CLike 'Runtime/Ocr/*') $ocrRequired 'win-x64-ocr' 'runtime-ocr'
     Write-Package @($offline | Where-Object Relative -CLike 'Runtime/Capture/*') $captureRequired 'win-x64-capture' 'runtime-capture'
 } finally {

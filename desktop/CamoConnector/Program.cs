@@ -14,6 +14,14 @@ internal static class Program
         var root = AppContext.BaseDirectory;
         try
         {
+            var renamed = Path.Combine(root, "CoDStreamingTools.exe");
+            if (Path.GetFileName(Environment.ProcessPath) == "CamoConnector.exe" && File.Exists(renamed))
+            {
+                var launch = new ProcessStartInfo(renamed) { WorkingDirectory = root };
+                foreach (var argument in args) launch.ArgumentList.Add(argument);
+                Process.Start(launch);
+                return;
+            }
             using var lease = UpdateEnvironment.Lock(root);
             if (Directory.Exists(Path.Combine(root, ".camo-update")))
             {
@@ -31,7 +39,8 @@ internal static class Program
     {
         var fullPath = Path.GetFullPath(path);
         var name = Path.GetFileNameWithoutExtension(fullPath);
-        const string prefix = "CoDStreamingTools.Updater-";
+        var prefix = name.StartsWith("CamoConnector.Updater-", StringComparison.Ordinal)
+            ? "CamoConnector.Updater-" : "CoDStreamingTools.Updater-";
         if (!string.Equals(Path.GetDirectoryName(fullPath), Path.TrimEndingDirectorySeparator(Path.GetTempPath()),
             StringComparison.OrdinalIgnoreCase) || Path.GetExtension(fullPath) != ".exe" ||
             !name.StartsWith(prefix, StringComparison.Ordinal) ||
@@ -99,7 +108,7 @@ internal sealed partial class ConnectorWindow : Form
         try
         {
             var data = Directory.CreateDirectory(Path.Combine(root, "Data")).FullName;
-            var executable = Path.Combine(root, "Runtime", "Bridge", "CoDStreamingTools.Bridge.exe");
+            var executable = UpdateEnvironment.InstalledExecutable(root, "Runtime/Bridge/CoDStreamingTools.Bridge.exe");
             var start = new ProcessStartInfo(executable)
             {
                 UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = root,

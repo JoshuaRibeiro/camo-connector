@@ -16,10 +16,10 @@ public sealed class GitHubRelease(HttpClient http)
 
 #if SLIM_PORTABLE
     private const string UpdatePackage = "win-x64-slim";
-    private const string UpdateManifest = "portable-slim-update";
+    private const string UpdateManifest = "streaming-tools-slim-update";
 #else
     private const string UpdatePackage = "win-x64";
-    private const string UpdateManifest = "portable-update";
+    private const string UpdateManifest = "streaming-tools-update";
 #endif
 
     public sealed record SignedRelease(ReleaseVerification.Manifest Manifest, byte[] Metadata, byte[] Signature);

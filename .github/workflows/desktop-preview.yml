@@ -144,6 +144,9 @@ jobs:
           name: CoDStreamingTools-desktop-release
           path: |
             dist/portable-release/CoDStreamingTools-v*-win-x64*.zip
+            dist/portable-release/CamoConnector-v*-win-x64*.zip
+            dist/portable-release/streaming-tools-*.json
+            dist/portable-release/streaming-tools-*.sig
             dist/portable-release/portable-*.json
             dist/portable-release/portable-*.sig
             dist/portable-release/runtime-*.json
@@ -167,8 +170,12 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           $prefix = "CoDStreamingTools-$env:GITHUB_REF_NAME-win-x64"
+          $legacyPrefix = "CamoConnector-$env:GITHUB_REF_NAME-win-x64"
           $assets = @(
             "release/$prefix-slim.zip", "release/$prefix.zip", "release/$prefix-ocr.zip", "release/$prefix-capture.zip",
+            "release/$legacyPrefix.zip", "release/$legacyPrefix-slim.zip",
+            'release/streaming-tools-update.json', 'release/streaming-tools-update.sig',
+            'release/streaming-tools-slim-update.json', 'release/streaming-tools-slim-update.sig',
             'release/portable-update.json', 'release/portable-update.sig',
             'release/portable-slim-update.json', 'release/portable-slim-update.sig',
             'release/runtime-ocr.json', 'release/runtime-ocr.sig', 'release/runtime-capture.json', 'release/runtime-capture.sig'
@@ -178,7 +185,6 @@ jobs:
           **Standard download:** [$prefix-slim.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix-slim.zip). Includes FFmpeg and OCR. Requires the installed x64 .NET 10 Desktop Runtime and ASP.NET Core Runtime.
 
           **Offline download:** [$prefix.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix.zip). Includes the .NET runtimes, OCR and capture support. Both editions use Microsoft Edge WebView2 for the built-in tracker.
-          **Upgrading from an older executable name?** Close the old app, extract this ZIP into a fresh folder, and copy your existing Data folder there before opening CoDStreamingTools.exe.
           "@ | Set-Content release-notes.md
           gh release create $env:GITHUB_REF_NAME @assets --verify-tag --latest --generate-notes --notes-file release-notes.md --title "CoD Streaming Tools $env:GITHUB_REF_NAME"
           if ($LASTEXITCODE) { throw 'GitHub Release publishing failed.' }

@@ -19,10 +19,17 @@ public static class UpdateEnvironment
     public static FileStream Lock(string root) =>
         new(Path.Combine(root, ".camo-lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
 
+    public static string InstalledExecutable(string root, string relativePath)
+    {
+        var preferred = Path.Combine(root, relativePath);
+        return File.Exists(preferred) ? preferred :
+            Path.Combine(root, relativePath.Replace("CoDStreamingTools", "CamoConnector", StringComparison.Ordinal));
+    }
+
     public static void HandOff(string root, string operation)
     {
         var copy = Path.Combine(Path.GetTempPath(), "CoDStreamingTools.Updater-" + Guid.NewGuid().ToString("N") + ".exe");
-        File.Copy(Path.Combine(root, "CoDStreamingTools.Updater.exe"), copy);
+        File.Copy(InstalledExecutable(root, "CoDStreamingTools.Updater.exe"), copy);
         try
         {
             var launch = new ProcessStartInfo(copy) { UseShellExecute = false, WorkingDirectory = root };
