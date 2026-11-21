@@ -77,3 +77,18 @@ test('request reader accepts a multi-crop lobby sample and bounds oversized inpu
   assert.equal((await context.readBody(request({ lobbyLine }))).lobbyLine.length, lobbyLine.length);
   await assert.rejects(context.readBody(request({ lobbyLine: 'A'.repeat(4 * 1024 * 1024) })), /too large/);
 });
+
+test('corroborated lobby totals skip the slower masked OCR path', async () => {
+  const context = vm.createContext({
+    readLobbyLine: async () => 2345,
+    readText: async () => assert.fail('masked label read should be skipped'),
+    readTotal: async () => assert.fail('masked total read should be skipped')
+  });
+  vm.runInContext(
+    source.slice(source.indexOf('async function readHomeTotal'), source.indexOf('const files =')),
+    context
+  );
+  const read = await context.readHomeTotal({ label: 'label', lobbyLine: 'full line', rawTotal: 'number' });
+  assert.equal(read.value, 2345);
+  assert.equal(read.corroborated, true);
+});

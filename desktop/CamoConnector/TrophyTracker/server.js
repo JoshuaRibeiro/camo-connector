@@ -183,6 +183,27 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
   }
 }
 
+async function readHomeTotal(body) {
+  // The lobby line and the isolated number can confirm the total with just two OCR jobs.
+  const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal);
+  if (lobby !== null) return { value: lobby, corroborated: true };
+  if (!body.label) return { value: null, corroborated: false };
+
+  const pair = body.primary ?? body;
+  const retryMode = !body.layout && pair.glyphs >= 4 ? 7 : undefined;
+  const [label, primary] = await Promise.all([
+    readText(body.label, 7), readTotal(pair, 8, retryMode, body.rawTotal)
+  ]);
+  const labelPattern = body.layout === 'events' ? /\bEVENTS\b/i
+    : body.layout === 'wager' ? /TROPHIES\s+COLLECTE[DO]\b/i
+    : /TROPHIES\s+COLLE[CG]TE[DS]\b/i;
+  if (!labelPattern.test(label)) return { value: null, corroborated: false };
+  if (primary !== null && !isLargeTotalChange(primary)) return { value: primary, corroborated: false };
+
+  const alternate = await readTotal(body.alternate, body.layout === 'wager' ? 8 : 7, retryMode);
+  return { value: primary ?? alternate, corroborated: primary !== null && primary === alternate };
+}
+
 const files = {
   '/': ['control.html', 'text/html; charset=utf-8'],
   '/capture.js': ['capture.js', 'text/javascript; charset=utf-8'],
@@ -249,28 +270,8 @@ const server = http.createServer(async (request, response) => {
     try {
       let value = null;
       let corroborated = false;
-      if (body.kind === 'home' && body.label) {
-        const pair = body.primary ?? body;
-        const retryMode = !body.layout && pair.glyphs >= 4 ? 7 : undefined;
-        const [label, primary] = await Promise.all([readText(body.label, 7), readTotal(pair, 8, retryMode, body.rawTotal)]);
-        const labelPattern = body.layout === 'events' ? /\bEVENTS\b/i
-          : body.layout === 'wager' ? /TROPHIES\s+COLLECTE[DO]\b/i
-          : /TROPHIES\s+COLLE[CG]TE[DS]\b/i;
-        if (labelPattern.test(label)) {
-          value = primary;
-          if (value === null || isLargeTotalChange(value)) {
-            const alternate = await readTotal(body.alternate, body.layout === 'wager' ? 8 : 7, retryMode);
-            corroborated = value !== null && value === alternate;
-            value ??= alternate;
-          }
-        }
-      }
-      if (body.kind === 'home' && (value === null || value === state.current || value < state.current)) {
-        const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal);
-        if (lobby !== null) {
-          corroborated = true;
-          value = lobby;
-        }
+      if (body.kind === 'home') {
+        ({ value, corroborated } = await readHomeTotal(body));
         if (value === null && !body.label) body.kind = 'none';
       }
       if (body.kind === 'match') {
