@@ -126,6 +126,9 @@ async function readLobbyLine(lineCrop, numberCrop, foregroundCrop, templateTotal
   const labelled = /\bTROPHIES\s+COLLECTED\s+([1-9]\d{0,5}|0)\s*[:)\]]?\s*$/i.exec(line);
   if (!labelled) return null;
   if (Number(labelled[1]) === templateTotal) return templateTotal;
+  // A contradictory shape read cannot be corroborated by another OCR crop
+  // from the same frame.
+  if (templateTotal != null) return null;
   if (labelled[1] === number) return Number(number);
   if (foregroundCrop && labelled[1] === await readText(foregroundCrop, 7, true))
     return Number(labelled[1]);
@@ -348,6 +351,16 @@ const server = http.createServer(async (request, response) => {
       save({ target: body.target, targetOverrideDay: day >= firstScheduledDay ? day : null });
       return json(publicState(day));
     }
+    if (request.url === '/api/current') {
+      if (!Number.isSafeInteger(body.current) || body.current < 0 || body.current > 99999) {
+        return json({ error: 'Enter a trophy total from 0 to 99999.' }, 400);
+      }
+      candidate = null;
+      lobbyReads = [];
+      skippedMatchValue = null;
+      save({ current: body.current, match: null, source: 'Manual correction' });
+      return json(publicState());
+    }
     if (request.url !== '/api/sample') return json({ error: 'Page missing.' }, 404);
     if (ocrInProgress) return json({ state: publicState(), reading: 'OCR busy' });
     ocrInProgress = true;
@@ -356,6 +369,10 @@ const server = http.createServer(async (request, response) => {
       let corroborated = false;
       if (body.kind === 'home') {
         ({ value, corroborated } = await readHomeTotal(body));
+        if (!body.layout && value !== null && isLargeTotalChange(value) &&
+            value !== body.templateTotal) {
+          corroborated = false;
+        }
         if (value === null && !body.label) body.kind = 'none';
       }
       if (body.kind === 'match') {

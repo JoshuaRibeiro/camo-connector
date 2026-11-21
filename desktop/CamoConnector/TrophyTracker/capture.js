@@ -102,6 +102,17 @@ get('settings').onsubmit = async event => {
   }
 };
 
+get('correction').onsubmit = async event => {
+  event.preventDefault();
+  try {
+    show(await api('/api/current', { current: get('correct-total').valueAsNumber }));
+    get('correct-total').value = '';
+    get('correction-status').textContent = 'Total saved';
+  } catch (error) {
+    get('correction-status').textContent = error.message;
+  }
+};
+
 get('copy').onclick = async () => {
   try {
     await navigator.clipboard.writeText(get('url').value);
