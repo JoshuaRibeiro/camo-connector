@@ -279,7 +279,7 @@ try {
         throw 'Sang 9mm Platinum progress must appear as 2/20 even before every Gold is recorded locally.'
     }
     if ($null -ne $overlay.level -or $overlay.minimumLevel -ne 0 -or
-        $overlay.minimumUnlocks -ne 37 -or $overlay.maximumUnlocks -ne 37) {
+        $overlay.minimumUnlocks -ne 37 -or $overlay.maximumCamoUnlocks -ne 37) {
         throw 'Space Time should establish the confirmed cap of 37 weapon unlocks for Sang 9mm.'
     }
     Write-Output 'Native bridge authentication and progress checks passed.'

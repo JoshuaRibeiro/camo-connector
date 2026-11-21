@@ -12,10 +12,12 @@ function render(data) {
   byId('weapon').textContent = data.weapon ?? '';
   const level = byId('weapon-level');
   level.hidden = !data.weapon;
-  level.textContent = data.level != null ? 'Weapon level ' + data.level :
+  level.textContent = data.maximumCamoLevel > 0 && data.minimumLevel >= data.maximumCamoLevel
+    ? 'Weapon level ' + (data.level ?? data.minimumLevel) + ' (Camo max)' :
+    data.level != null ? 'Weapon level ' + data.level :
     data.minimumLevel ? 'Weapon level ' + data.minimumLevel + '+' :
     data.minimumUnlocks ? 'Weapon unlocks ' + data.minimumUnlocks +
-      (data.minimumUnlocks === data.maximumUnlocks ? ' (Max)' : '+') : 'Weapon level —';
+      (data.minimumUnlocks === data.maximumCamoUnlocks ? ' (Camo max)' : '+') : 'Weapon level —';
 
   const available = data.rows ?? [];
   const visible = available.length || !data.waiting ? available : [{

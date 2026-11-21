@@ -121,11 +121,13 @@ function renderOverview() {
   const overview = state.overview;
   const heading = element('div', null, 'detail-heading');
   heading.append(element('h3', weapon.name));
-  if (overview.level != null || overview.minimumLevel)
+  if (overview.maximumCamoLevel > 0 && overview.minimumLevel >= overview.maximumCamoLevel)
+    heading.append(element('span', 'Weapon level ' + (overview.level ?? overview.minimumLevel) + ' (Camo max)', 'subtitle'));
+  else if (overview.level != null || overview.minimumLevel)
     heading.append(element('span', 'Weapon level ' + (overview.level ?? overview.minimumLevel + '+'), 'subtitle'));
   else if (overview.minimumUnlocks)
     heading.append(element('span', 'Weapon unlocks ' + overview.minimumUnlocks +
-      (overview.minimumUnlocks === overview.maximumUnlocks ? ' (Max)' : '+'), 'subtitle'));
+      (overview.minimumUnlocks === overview.maximumCamoUnlocks ? ' (Camo max)' : '+'), 'subtitle'));
   const entries = [heading];
   const rules = new Map(weapon.camos.map(rule => [rule.id, rule]));
   for (const row of overview.rows) entries.push(camoRow(rules.get(row.id), weapon.id, row));

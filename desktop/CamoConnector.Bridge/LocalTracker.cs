@@ -21,7 +21,7 @@ internal sealed class LocalTracker
     {
         public string? Artwork { get; init; }
     }
-    internal sealed record Weapon(string Id, string Name, string Category, Rule[] Camos, int? MaximumUnlocks = null);
+    internal sealed record Weapon(string Id, string Name, string Category, Rule[] Camos);
     internal sealed record Catalog(Weapon[] Weapons, Rule[] Shared);
     internal sealed record Entry(int Count, bool Done);
     internal sealed record State(string? Focus, Dictionary<string, Entry> Progress, string? OverlayLayout = null,
@@ -98,8 +98,11 @@ internal sealed class LocalTracker
             var level = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-level")?.Count;
             var knownLevel = Math.Max(level ?? 0, ConfirmedRequirement(IsLevelRule));
             var unlocks = ConfirmedRequirement(camo => camo.Type == "Military" && !IsLevelRule(camo));
-            var minimumUnlocks = Math.Max(unlocks, ConfirmedRequirement(camo =>
-                camo.Type == "Special" && camo.Unlock?.StartsWith("Earn ", StringComparison.OrdinalIgnoreCase) == true));
+            var minimumUnlocks = ConfirmedRequirement(IsWeaponUnlockRule);
+            var maximumCamoLevel = weapon.Camos.Where(IsLevelRule)
+                .Select(camo => camo.UnlockTotal ?? 0).DefaultIfEmpty().Max();
+            var maximumCamoUnlocks = weapon.Camos.Where(IsWeaponUnlockRule)
+                .Select(camo => camo.UnlockTotal ?? 0).DefaultIfEmpty().Max();
             bool IsLaunchWeapon(Weapon item) =>
                 item.Id is not ("cronen-osprey" or "csg-35" or "jak-12" or "zlr-talonhawk");
 
@@ -157,7 +160,7 @@ internal sealed class LocalTracker
             var next = rows.Length == 0 ? remaining.FirstOrDefault() : null;
             var prerequisite = next == null ? null : CompletionGate(next);
             return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
-                minimumLevel = knownLevel, minimumUnlocks, weapon.MaximumUnlocks, rows, state.OverlayLayout,
+                minimumLevel = knownLevel, minimumUnlocks, maximumCamoLevel, maximumCamoUnlocks, rows, state.OverlayLayout,
                 waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock, count = prerequisite?.Count, goal = prerequisite?.Goal },
                 complete = remaining.Length == 0 };
         }
@@ -383,6 +386,9 @@ internal sealed class LocalTracker
 
     private static bool IsLevelRule(Rule camo) =>
         camo.Unlock?.StartsWith("Reach Weapon Level ", StringComparison.OrdinalIgnoreCase) == true;
+
+    private static bool IsWeaponUnlockRule(Rule camo) =>
+        camo.Unlock?.Contains("weapon unlock", StringComparison.OrdinalIgnoreCase) == true;
 
     private static string Key(string text) => Regex.Replace(text.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
 }
