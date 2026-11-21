@@ -5,7 +5,10 @@ namespace CamoConnector;
 internal sealed partial class ConnectorWindow
 {
     private readonly System.Windows.Forms.Timer turboTimer = new() { Interval = 100 };
-    private IntPtr heldMouse;
+    private IntPtr heldMouse, releaseHook;
+    private MouseHook? releaseCallback;
+    private bool physicalLeftDown, discardRepeat;
+    private const uint RepeatMarker = 0x434F4454;
     private bool listening;
     private bool turboArmed, turboHeld, sideHeld;
     private CheckBox? turboEnabled;
@@ -29,13 +32,20 @@ internal sealed partial class ConnectorWindow
         enable.CheckedChanged += (_, _) => {
             if (!enable.Checked) { StopTurbo(); return; }
             listening = RegisterMouse(0x2100, Handle); // INPUTSINK and DEVNOTIFY
-            if (!listening) {
+            if (listening) {
+                releaseCallback = FilterRepeat;
+                releaseHook = SetWindowsHookExW(14, releaseCallback, GetModuleHandleW(null), 0);
+            }
+            if (!listening || releaseHook == IntPtr.Zero) {
                 enable.Checked = false;
                 MessageBox.Show(this, "Windows could not start mouse input tracking.");
             }
         };
         turboTimer.Tick += (_, _) => {
-            if (turboHeld && turboArmed) { mouse_event(2, 0, 0, 0, 0); mouse_event(4, 0, 0, 0, 0); }
+            if (turboHeld && turboArmed && physicalLeftDown) {
+                mouse_event(2, 0, 0, 0, RepeatMarker);
+                mouse_event(4, 0, 0, 0, RepeatMarker);
+            }
         };
         return [link, panel];
     }
@@ -68,6 +78,28 @@ internal sealed partial class ConnectorWindow
         if ((flags & 2) != 0 && packet.Device == heldMouse) ResetHold();
     }
 
+    // Raw input identifies the holding device. At delivery time the hook also
+    // sees whether a physical release overtook a repeat already in the queue.
+    private IntPtr FilterRepeat(int code, IntPtr message, IntPtr data)
+    {
+        if (code >= 0 && (message == 0x201 || message == 0x202)) {
+            bool down = message == 0x201;
+            if ((Marshal.ReadInt32(data, 12) & 1) == 0) {
+                physicalLeftDown = down;
+            } else if (Marshal.ReadIntPtr(data, IntPtr.Size == 8 ? 24 : 20) == (IntPtr)RepeatMarker) {
+                if (down) discardRepeat = !physicalLeftDown || !turboHeld || !turboArmed;
+                if (discardRepeat) return (IntPtr)1;
+            }
+        }
+        return CallNextHookEx(IntPtr.Zero, code, message, data);
+    }
+
+    private delegate IntPtr MouseHook(int code, IntPtr message, IntPtr data);
+    [DllImport("user32")] private static extern IntPtr SetWindowsHookExW(int type, MouseHook callback, IntPtr module, uint thread);
+    [DllImport("user32")] private static extern bool UnhookWindowsHookEx(IntPtr hook);
+    [DllImport("user32")] private static extern IntPtr CallNextHookEx(IntPtr hook, int code, IntPtr message, IntPtr data);
+    [DllImport("kernel32", ExactSpelling = true, CharSet = CharSet.Unicode)] private static extern IntPtr GetModuleHandleW(string? name);
+
     private void ResetHold()
     {
         turboTimer.Stop();
@@ -78,6 +110,9 @@ internal sealed partial class ConnectorWindow
     {
         turboTimer.Stop();
         if (listening) RegisterMouse(1, IntPtr.Zero);
+        if (releaseHook != IntPtr.Zero) UnhookWindowsHookEx(releaseHook);
+        releaseHook = IntPtr.Zero;
+        physicalLeftDown = discardRepeat = false;
         listening = false;
         turboArmed = turboHeld = sideHeld = false;
         if (turboEnabled != null) turboEnabled.Text = "Enable turbo clicker";
