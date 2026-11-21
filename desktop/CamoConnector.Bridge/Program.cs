@@ -193,7 +193,7 @@ static bool ValidOrigin(string origin) =>
     Regex.IsMatch(origin, @"\A(?:chrome-extension://[a-p]{32}|moz-extension://[0-9a-f-]{36})\z");
 
 static string ClientToken(byte[] secret, string origin) =>
-    Convert.ToHexStringLower(HMACSHA256.HashData(secret, Encoding.UTF8.GetBytes("Camo Connector browser v1:" + origin)));
+    Convert.ToHexStringLower(HMACSHA256.HashData(secret, Encoding.UTF8.GetBytes("CoD Streaming Tools browser v1:" + origin)));
 
 static Task<bool> ApproveBrowserAsync(string origin)
 {
@@ -203,8 +203,8 @@ static Task<bool> ApproveBrowserAsync(string origin)
         try
         {
             approval.SetResult(MessageBox.Show(
-                $"Allow this browser extension to access your local Camo Connector session?\n\n{origin}\n\nApprove only if you just clicked Connect in Camo Connector.",
-                "Camo Connector browser connection", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+                $"Allow this browser extension to access your local CoD Streaming Tools session?\n\n{origin}\n\nApprove only if you just clicked Connect in CoD Streaming Tools.",
+                "CoD Streaming Tools browser connection", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
                 MessageBoxDefaultButton.Button2) == DialogResult.Yes);
         }
         catch (Exception error) { approval.TrySetException(error); }

@@ -253,12 +253,12 @@ internal sealed partial class ConnectorWindow
         try
         {
             StopPreview();
-            if (scanning || detector != null || closing.IsCancellationRequested || pages.SelectedTab != capturePage ||
+            if (scanning || detector != null || closing.IsCancellationRequested || (pages.SelectedTab != capturePage && trophyView == null) ||
                 sources.SelectedItem is not Source source || !File.Exists(DetectorPath)) return;
             // Tracking supplies its own preview. Avoid opening the capture device a second time at startup.
             if (automaticTracking.Checked && bridgeReady && DateTimeOffset.UtcNow >= nextAutomaticCheck) return;
             var mode = source.Mode == "--device" ? "--preview-device" : "--preview-monitor";
-            previewWorker = LaunchDetector(mode, source.MonitorId ?? source.Input);
+            previewWorker = LaunchDetector(mode, source.MonitorId ?? source.Input, DataDirectory);
             _ = StartReadingPreview(previewWorker);
             previewStatus.Text = "Waiting for a frame from " + source.Name;
             LogLine(captureMessages, previewStatus.Text);
@@ -304,6 +304,7 @@ internal sealed partial class ConnectorWindow
         previewRead?.Dispose();
         previewRead = null;
         Interlocked.Exchange(ref pendingPreview, null);
+        Interlocked.Exchange(ref pendingTrophyFrame, null);
     }
 
     private Task StartReadingPreview(Process process)
@@ -322,11 +323,13 @@ internal sealed partial class ConnectorWindow
             {
                 await input.ReadExactlyAsync(header, cancel).ConfigureAwait(false);
                 var length = BinaryPrimitives.ReadInt32LittleEndian(header);
-                if (length is <= 0 or > 1024 * 1024)
+                if (length is 0 or < -16 * 1024 * 1024 or > 1024 * 1024)
                     throw new IOException("Invalid preview frame length.");
-                var frame = new byte[length];
+                var frame = new byte[Math.Abs(length)];
                 await input.ReadExactlyAsync(frame, cancel).ConfigureAwait(false);
-                if (!cancel.IsCancellationRequested) Interlocked.Exchange(ref pendingPreview, frame);
+                if (cancel.IsCancellationRequested) return;
+                if (length < 0) Interlocked.Exchange(ref pendingTrophyFrame, frame);
+                else Interlocked.Exchange(ref pendingPreview, frame);
             }
         }
         catch (EndOfStreamException) { }
@@ -336,6 +339,7 @@ internal sealed partial class ConnectorWindow
 
     private void ReadPreview()
     {
+        SendTrophyFrame();
         if (previewWorker is { HasExited: true })
         {
             previewStatus.Text = previewErrors is { IsCompletedSuccessfully: true } && previewErrors.Result.Length > 0

@@ -7,7 +7,7 @@ using CamoConnector.Detector;
 
 Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
 var listDevices = args.Length == 1 && args[0] == "--list-devices";
-var previewOnly = args.Length == 2 && args[0] is "--preview-monitor" or "--preview-device";
+var previewOnly = args.Length is 2 or 3 && args[0] is "--preview-monitor" or "--preview-device";
 var saveMenuCrops = args.Length == 4 && args[2] == "--save-crops";
 var probe = (args.Length == 2 || saveMenuCrops) &&
     args[0] is "--probe-menu-monitor" or "--probe-menu-image" or "--probe-tracked-monitor" or "--probe-tracked-image" or "--probe-unlock-image";
@@ -46,7 +46,7 @@ try
         var monitor = source == null ? FindMonitor(args[1]) : null;
         await CapturePreview.RunAsync(token => source == null
             ? Task.FromResult(HudCapture.Desktop(monitor!)) : source.NextAsync(token), stop.Token,
-            filterIsolatedFrames: source == null);
+            filterIsolatedFrames: source == null, trophyPreference: args.Length == 3 ? Path.Combine(args[2], "trophy-tracking.txt") : null);
         return 0;
     }
     var runtime = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Ocr"));
@@ -136,7 +136,7 @@ try
         {
             await CapturePreview.RunAsync(token => window != null ? CaptureWindowAsync(window, token) : external == null
                 ? Task.FromResult(HudCapture.Desktop(screen!)) : external.NextAsync(token, forPreview: true),
-                previewStop.Token, filterIsolatedFrames: false);
+                previewStop.Token, filterIsolatedFrames: false, trophyPreference: Path.Combine(args[2], "trophy-tracking.txt"));
         }
         catch (IOException error) when (!previewStop.IsCancellationRequested)
         {

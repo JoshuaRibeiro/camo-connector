@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trophy Tracker</title>
+<style>
+  :root { color-scheme: dark; font: 16px system-ui, sans-serif; background: #121517; color: #f1f2eb; }
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  main { max-width: 710px; margin: 8vh auto; padding: 0 24px; }
+  h1 { font-size: 24px; margin: 0 0 22px; }
+  section { background: #1b2023; border: 1px solid #343b40; border-radius: 12px; margin-bottom: 15px; padding: 22px; }
+  .count { font-size: clamp(40px, 10vw, 72px); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.06em; line-height: 1; }
+  .count span + span { color: #c9ceb9; }
+  .count b { color: #9ca38f; margin: 0 .08em; }
+  p { color: #c3cacd; margin: 0; }
+  #source { margin-top: 8px; margin-bottom: 18px; }
+  label, h2 { display: block; margin: 0 0 8px; font-size: 15px; font-weight: 650; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input, button { font: inherit; border-radius: 7px; border: 1px solid #535c61; padding: 8px 12px; }
+  input { background: #111517; min-width: 0; }
+  input[type=number] { width: 125px; }
+  #url { flex: 1; font: 13px ui-monospace, monospace; }
+  button { background: #2c3337; color: inherit; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  #start { color: #171b12; background: #d9e9a3; border-color: #d9e9a3; font-weight: 700; }
+  #status { margin-top: 12px; }
+  video { display: block; width: 100%; margin-top: 10px; border-radius: 5px; }
+  summary { cursor: pointer; margin-top: 12px; }
+</style>
+<main>
+  <h1>Trophy Tracker</h1>
+  <section aria-label="Live trophy count">
+    <div class="count"><span id="current">0</span><b>/</b><span id="goal">10000</span></div>
+    <p id="source">Starting total</p>
+    <p id="status" role="status">Waiting for the selected capture source</p>
+  </section>
+  <section aria-label="Target settings">
+    <form id="settings">
+      <label for="target">Trophy target</label>
+      <div class="row">
+        <input id="target" type="number" required min="1" step="1" value="10000">
+        <button>Save target</button>
+        <p id="save-status" role="status"></p>
+      </div>
+    </form>
+  </section>
+  <section>
+    <label for="url">OBS Browser Source URL</label>
+    <div class="row">
+      <input id="url" readonly value="http://127.0.0.1:47851/overlay">
+      <button id="copy">Copy URL</button>
+    </div>
+  </section>
+</main>
+<script src="/capture.js" defer></script>
+</html>

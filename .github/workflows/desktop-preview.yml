@@ -179,7 +179,7 @@ jobs:
 
           **Offline download:** [$prefix.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix.zip). Includes the .NET runtimes, OCR and capture support. Both editions use Microsoft Edge WebView2 for the built-in tracker.
           "@ | Set-Content release-notes.md
-          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --latest --generate-notes --notes-file release-notes.md --title "Camo Connector $env:GITHUB_REF_NAME"
+          gh release create $env:GITHUB_REF_NAME @assets --verify-tag --latest --generate-notes --notes-file release-notes.md --title "CoD Streaming Tools $env:GITHUB_REF_NAME"
           if ($LASTEXITCODE) { throw 'GitHub Release publishing failed.' }
       - name: Notify running clients
         env:

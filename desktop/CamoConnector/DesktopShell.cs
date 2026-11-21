@@ -87,11 +87,11 @@ internal sealed partial class ConnectorWindow
         var toggle = navigationToggle = new Button { Height = 38, AccessibleName = "Expand navigation", Margin = new Padding(0, 0, 0, 8) };
         menu.Controls.Add(toggle);
         var entries = new[] { (localTrackerPage, ""), (overlayPage, ""), (capturePage, "\uE7F8"),
-            (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
+            (trophyPage, "\uE734"), (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
         var icons = ShellFont("Segoe MDL2 Assets", 14);
         var hints = new ToolTip();
         Disposed += (_, _) => { hints.Dispose(); logsPage.Dispose(); };
-        hints.SetToolTip(version, "Camo Connector version");
+        hints.SetToolTip(version, "CoD Streaming Tools version");
         var iconSize = LogicalToDeviceUnits(20);
         using var navigationIcon = new Icon(Icon!, iconSize, iconSize);
         using var appBitmap = navigationIcon.ToBitmap();
@@ -190,13 +190,13 @@ internal sealed partial class ConnectorWindow
         Controls.Add(rail);
         AddCaption();
 
-        var help = PageBody(helpPage, "How it works", "Camo Connector reads your game capture and saves progress on this PC.");
+        var help = PageBody(helpPage, "How it works", "CoD Streaming Tools reads your game capture and saves progress on this PC.");
         AddSetupRow(help, SetupSection("PC capture", new Label { AutoSize = true, Text = "Select the monitor showing Call of Duty in Auto tracking." }));
         AddSetupRow(help, SetupSection("Console or OBS", new Label { AutoSize = true, Text = "Select your capture card or OBS Virtual Camera in Auto tracking and turn on Auto tracking." }));
         AddSetupRow(help, SetupSection("OBS overlay", new Label { AutoSize = true, Text = "Copy the URL from Overlays and paste it into an OBS Browser Source." }));
         var settings = PageBody(settingsPage, "Settings", "Manage tracker data, updates and tray controls.");
         update.AutoSize = true;
-        updateStatus.Text = $"Camo Connector v{build}";
+        updateStatus.Text = $"CoD Streaming Tools v{build}";
         AddSetupRow(settings, SetupSection("App updates", updateStatus, update));
         AddSetupRow(settings, CreateTrackerImportSettings());
         BindUsage();
@@ -204,13 +204,13 @@ internal sealed partial class ConnectorWindow
         var tray = new Button { Text = "Hide to tray", AutoSize = true };
         tray.Click += (_, _) => HideTrackerToTray();
         AddSetupRow(settings, SetupSection("Desktop",
-            new Label { Text = "Keep Camo Connector running in the notification area.", AutoSize = true }, tray));
+            new Label { Text = "Keep CoD Streaming Tools running in the notification area.", AutoSize = true }, tray));
         pages.SelectedIndexChanged += (_, _) =>
         {
             reloadTracker.Visible = pages.SelectedTab == localTrackerPage;
             StyleShell();
-            if (pages.SelectedTab == capturePage) StartPreview();
-            else if (detector == null) StopPreview();
+            if (pages.SelectedTab == capturePage && previewWorker == null) StartPreview();
+            else if (pages.SelectedTab != capturePage && detector == null && trophyView == null) StopPreview();
         };
         pages.SelectedTab = localTrackerPage;
         UpdateRail();

@@ -12,7 +12,7 @@ internal sealed class UpdateWindow : Form
 
     public UpdateWindow(Version? expected, bool recovery)
     {
-        Text = recovery ? "Recovering Camo Connector" : $"Updating Camo Connector to v{expected}";
+        Text = recovery ? "Recovering CoD Streaming Tools" : $"Updating CoD Streaming Tools to v{expected}";
         Font = bodyFont;
         AutoScaleMode = AutoScaleMode.Dpi;
         StartPosition = FormStartPosition.CenterScreen;
@@ -31,7 +31,7 @@ internal sealed class UpdateWindow : Form
         status = new Label
         {
             Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter, Margin = Padding.Empty,
-            Text = "Waiting for Camo Connector to close…"
+            Text = "Waiting for CoD Streaming Tools to close…"
         };
         layout.Controls.Add(status, 0, 1);
         Controls.Add(layout);
@@ -66,7 +66,7 @@ internal sealed class UpdateWindow : Form
         public AnimatedLogo(bool contrast)
         {
             DoubleBuffered = true;
-            AccessibleName = "Camo Connector logo";
+            AccessibleName = "CoD Streaming Tools logo";
             AccessibleRole = AccessibleRole.Graphic;
             accent = contrast ? SystemColors.ControlText : Color.FromArgb(141, 215, 206);
             using var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream("CamoConnector.AppIcon")!;

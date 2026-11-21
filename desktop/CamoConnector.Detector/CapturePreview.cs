@@ -8,7 +8,7 @@ namespace CamoConnector.Detector;
 internal static class CapturePreview
 {
     public static async Task RunAsync(Func<CancellationToken, Task<Bitmap>> next, CancellationToken cancel,
-        bool filterIsolatedFrames = false, Action<Bitmap>? onAccepted = null)
+        bool filterIsolatedFrames = false, Action<Bitmap>? onAccepted = null, string? trophyPreference = null)
     {
         using var output = Console.OpenStandardOutput();
         using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(33));
@@ -19,6 +19,7 @@ internal static class CapturePreview
         var suppressed = 0;
         var lastReport = Stopwatch.GetTimestamp();
         Bitmap? pendingFrame = null;
+        var lastTrophySample = Stopwatch.GetTimestamp();
         try
         {
             do
@@ -36,6 +37,17 @@ internal static class CapturePreview
                 reduced.Save(encoded, ImageFormat.Jpeg);
                 var bytes = encoded.GetBuffer().AsMemory(0, (int)encoded.Length);
                 await SendAsync(bytes);
+                if (trophyPreference != null && Stopwatch.GetElapsedTime(lastTrophySample) >= TimeSpan.FromMilliseconds(150))
+                {
+                    lastTrophySample = Stopwatch.GetTimestamp();
+                    if (TrophyTrackingEnabled(trophyPreference))
+                    {
+                        encoded.SetLength(0);
+                        frame.Save(encoded, ImageFormat.Jpeg);
+                        if (encoded.Length <= 16 * 1024 * 1024)
+                            await SendAsync(encoded.GetBuffer().AsMemory(0, (int)encoded.Length), trophy: true);
+                    }
+                }
                 if (!filterIsolatedFrames) continue;
 
                 // Stabilize the frames used by OCR without holding back the live preview.
@@ -63,9 +75,9 @@ internal static class CapturePreview
         }
         finally { pendingFrame?.Dispose(); }
 
-        async Task SendAsync(ReadOnlyMemory<byte> bytes)
+        async Task SendAsync(ReadOnlyMemory<byte> bytes, bool trophy = false)
         {
-            BinaryPrimitives.WriteInt32LittleEndian(header, bytes.Length);
+            BinaryPrimitives.WriteInt32LittleEndian(header, trophy ? -bytes.Length : bytes.Length);
             await output.WriteAsync(header, cancel);
             await output.WriteAsync(bytes, cancel);
             if (!sentFirstFrame)
@@ -76,6 +88,13 @@ internal static class CapturePreview
                     : "Capture preview: first frame delivered.");
             }
         }
+    }
+
+    private static bool TrophyTrackingEnabled(string preference)
+    {
+        try { return File.Exists(preference) && File.ReadAllText(preference).Trim() == "on"; }
+        catch (IOException) { return false; }
+        catch (UnauthorizedAccessException) { return false; }
     }
 
     private static Color[] Sample(Bitmap frame)

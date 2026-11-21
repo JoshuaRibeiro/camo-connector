@@ -36,7 +36,7 @@ internal sealed partial class ConnectorWindow
             logs.Controls.Add(group, 0, logs.RowStyles.Count - 1);
         }
         logsPage.Controls.Add(logs);
-        pages.TabPages.AddRange([capturePage, helpPage, settingsPage]);
+        pages.TabPages.AddRange([capturePage, trophyPage, helpPage, settingsPage]);
         AddLocalTrackerPage();
         BuildShell(build);
         BindAutomaticTracking();
@@ -57,7 +57,7 @@ internal sealed partial class ConnectorWindow
     {
         if (!bridgeReady || bridge is not { HasExited: true }) return;
         bridgeReady = false;
-        status.Text = "Local bridge stopped. Reopen Camo Connector to reconnect.";
+        status.Text = "Local bridge stopped. Reopen CoD Streaming Tools to reconnect.";
         LogLine(bridgeMessages, status.Text);
         try { StopDetector(); }
         catch (Exception error) { LogLine(detectorMessages, error.Message); }

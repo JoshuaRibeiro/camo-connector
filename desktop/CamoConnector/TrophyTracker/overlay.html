@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trophy count</title>
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; }
+  output {
+    display: block; text-align: center; padding: 6px;
+    color: #fff; font: 800 clamp(12px, min(8.5vw, 50vh), 68px)/1.1 system-ui, sans-serif;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+    -webkit-text-stroke: 1px #101113;
+    paint-order: stroke fill;
+    text-shadow: 0 2px 5px #000, 0 0 12px #000;
+  }
+  progress {
+    display: block;
+    width: 76%;
+    height: clamp(4px, 8vh, 9px);
+    margin: 1px auto 0;
+    appearance: none;
+    border: 1px solid #ffffff42;
+    border-radius: 999px;
+    overflow: hidden;
+    box-shadow: 0 1px 5px #0009;
+  }
+  progress[hidden] { display: none; }
+  progress::-webkit-progress-bar { background: #151915d9; }
+  progress::-webkit-progress-value { background: #d9e9a3; border-radius: 999px; }
+</style>
+<output id="count"></output>
+<progress id="progress" aria-label="Progress toward the trophy goal" hidden></progress>
+<script>
+  const count = document.getElementById('count');
+  const progress = document.getElementById('progress');
+  const overlayVersion = '__OVERLAY_VERSION__';
+  async function checkVersion() {
+    try {
+      const response = await fetch('/api/version', { cache: 'no-store' });
+      if (response.ok) {
+        const { overlay } = await response.json();
+        if (overlayVersion !== overlay) {
+          location.replace('/overlay?v=' + encodeURIComponent(overlay));
+          return;
+        }
+      }
+    } catch {
+      // Retry when the local server returns.
+    }
+    setTimeout(checkVersion, 2000);
+  }
+  async function update() {
+    try {
+      const response = await fetch('/api/state', { cache: 'no-store' });
+      if (response.ok) {
+        const { current, target } = await response.json();
+        count.textContent = 'Trophy Goal: ' + current + ' / ' + target;
+        progress.max = target;
+        progress.value = Math.min(current, target);
+        progress.hidden = false;
+      }
+    } catch {
+      count.textContent = '';
+      progress.hidden = true;
+    }
+    setTimeout(update, 350);
+  }
+  update();
+  checkVersion();
+</script>
+</html>

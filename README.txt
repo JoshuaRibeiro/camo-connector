@@ -1,4 +1,4 @@
-MW4 Sunburn Connector
+CoD Streaming Tools
 
 Windows app
 
@@ -23,6 +23,12 @@ uncropped 16:9 game feed for OCR.
 
 Open Tracker to view or edit your Multiplayer camo progress. To show your
 progress on stream, copy the overlay URL from Tracker into an OBS Browser Source.
+
+Open Trophy Tracker and enable it to track trophies with the same capture
+source. The toggle and trophy progress are saved in Data. This feature uses
+Node.js from PATH and the app's bundled OCR. Close the standalone Trophy Tracker
+before enabling it here. Its OBS Browser Source URL is still
+http://127.0.0.1:47851/overlay.
 
 For desktop updates, open Settings and select Check for updates. Your local
 progress and preferences are kept in the app's Data folder.

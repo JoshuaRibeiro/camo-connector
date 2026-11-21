@@ -47,7 +47,7 @@ internal static class Program
         {
             using var parent = FindProcess(parentId);
             if (parent != null && !parent.WaitForExit(20000))
-                throw new IOException("Camo Connector did not exit. Close it and try again.");
+                throw new IOException("CoD Streaming Tools did not exit. Close it and try again.");
             using var lease = UpdateEnvironment.Lock(root);
             var transaction = new PortableReplacement(root);
             report("Checking for an interrupted update…");
@@ -97,13 +97,13 @@ internal static class Program
         }
         catch (Exception error)
         {
-            showError(error.Message, "Camo Connector update failed");
+            showError(error.Message, "CoD Streaming Tools update failed");
         }
         if (restart && !Directory.Exists(Path.Combine(root, ".camo-update")))
         {
             try
             {
-                report("Restarting Camo Connector…");
+                report("Restarting CoD Streaming Tools…");
                 var launch = new ProcessStartInfo(Path.Combine(root, "CamoConnector.exe")) { WorkingDirectory = root };
                 var copy = Environment.ProcessPath;
                 if (copy != null && Path.GetDirectoryName(copy) == Path.TrimEndingDirectorySeparator(Path.GetTempPath()) &&
@@ -115,7 +115,7 @@ internal static class Program
                 }
                 Process.Start(launch);
             }
-            catch (Exception error) { showError(error.Message, "Could not restart Camo Connector"); }
+            catch (Exception error) { showError(error.Message, "Could not restart CoD Streaming Tools"); }
         }
     }
 

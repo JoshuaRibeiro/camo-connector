@@ -24,7 +24,7 @@ internal static class Program
                 CleanupUpdater(args[1], pid);
             Application.Run(new ConnectorWindow());
         }
-        catch (Exception error) { MessageBox.Show(error.Message, "Camo Connector"); }
+        catch (Exception error) { MessageBox.Show(error.Message, "CoD Streaming Tools"); }
     }
 
     private static void CleanupUpdater(string path, int pid)
@@ -66,7 +66,7 @@ internal sealed partial class ConnectorWindow : Form
     {
         var build = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
             .InformationalVersion.Split('+')[0] ?? desktopVersion.ToString(3);
-        Text = $"Camo Connector v{build}";
+        Text = $"CoD Streaming Tools v{build}";
         Font = ShellFont("Bahnschrift", 10);
         using var iconStream = typeof(Program).Assembly.GetManifestResourceStream("CamoConnector.AppIcon")!;
         using var icon = new Icon(iconStream);
@@ -77,6 +77,7 @@ internal sealed partial class ConnectorWindow : Form
         MinimumSize = new Size(570, 420);
         update.Click += async (_, _) => await UpdateAsync();
         AddPages(CreateSetupView(), build);
+        BindTrophyTracker();
         Shown += async (_, _) => await RefreshSourcesAsync(startup: true);
         Shown += async (_, _) =>
         {
@@ -137,7 +138,7 @@ internal sealed partial class ConnectorWindow : Form
                 catch (OperationCanceledException) when (!readyTimeout.IsCancellationRequested) { }
                 await Task.Delay(200, readyTimeout.Token);
             }
-            status.Text = "The local bridge stopped. Close any other Camo Connector instance and retry.";
+            status.Text = "The local bridge stopped. Close any other CoD Streaming Tools instance and retry.";
         }
         catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
         catch (Exception error) { if (!IsDisposed) status.Text = "Could not start the local bridge: " + error.Message; }
@@ -146,6 +147,7 @@ internal sealed partial class ConnectorWindow : Form
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
         closing.Cancel();
+        StopTrophyTracker();
         updateTimer.Dispose();
         setupHeadingFont?.Dispose();
         DisposeTrackerTray();

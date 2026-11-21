@@ -2,6 +2,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <OutputType>WinExe</OutputType>
+    <Product>CoD Streaming Tools</Product>
+    <ApplicationTitle>CoD Streaming Tools</ApplicationTitle>
     <ApplicationIcon>CamoConnector.ico</ApplicationIcon>
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
@@ -15,6 +17,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../GameWindows.cs" Link="GameWindows.cs" />
+    <EmbeddedResource Include="TrophyTracker/*" LogicalName="TrophyTracker.%(Filename)%(Extension)" />
     <EmbeddedResource Include="CamoConnector.ico" LogicalName="CamoConnector.AppIcon" />
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
   </ItemGroup>

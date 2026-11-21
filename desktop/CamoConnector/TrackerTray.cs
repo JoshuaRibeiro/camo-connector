@@ -9,9 +9,9 @@ internal sealed partial class ConnectorWindow
         if (trackerTray == null)
         {
             var menu = new ContextMenuStrip();
-            menu.Items.Add("Open Camo Connector", null, (_, _) => RestoreTracker());
+            menu.Items.Add("Open CoD Streaming Tools", null, (_, _) => RestoreTracker());
             menu.Items.Add("Exit", null, (_, _) => Close());
-            trackerTray = new NotifyIcon { Icon = Icon, Text = "Camo Connector", ContextMenuStrip = menu };
+            trackerTray = new NotifyIcon { Icon = Icon, Text = "CoD Streaming Tools", ContextMenuStrip = menu };
             trackerTray.DoubleClick += (_, _) => RestoreTracker();
         }
         trackerTray.Visible = true;
