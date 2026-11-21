@@ -150,6 +150,13 @@ public sealed class CamoProgressConfirmation
     private Dictionary<(string Weapon, string Camo), CamoProgress> previous = new();
     private readonly Dictionary<(string Weapon, string Camo), CamoProgress> published = new();
 
+    public void Forget(string weapon, string camo)
+    {
+        var key = (weapon, camo.ToLowerInvariant());
+        previous.Remove(key);
+        published.Remove(key);
+    }
+
     public CamoProgress? Observe(CamoProgress? read)
         => ObserveRows(read == null ? [] : [read]).SingleOrDefault();
 

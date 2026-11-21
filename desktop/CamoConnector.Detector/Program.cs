@@ -261,11 +261,11 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     Task AppendAsync(object record) =>
         WriteLineAsync(JsonSerializer.Serialize(record));
 
-    Task PublishProgressAsync(CamoProgress progress) => AppendAsync(new
+    Task PublishProgressAsync(CamoProgress progress, string? context = null) => AppendAsync(new
     {
         kind = "progress-snapshot", source = "live", mode = "mp", weapon = progress.Weapon,
         camo = progress.WeaponLevelObjective == null ? progress.Camo : null,
-        count = progress.Count, goal = progress.Goal, identity = progress.Identity,
+        count = progress.Count, goal = progress.Goal, identity = progress.Identity, context,
         type = progress.WeaponUnlocksRemaining != null ? "weapon-unlocks" :
             progress.WeaponLevelObjective == null ? "camo" : "weapon-level",
         remaining = progress.WeaponUnlocksRemaining,
@@ -427,13 +427,14 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     if (!longshotCounted)
                     {
                         longshotCounted = true;
+                        progressConfirmation.Forget("Signal 50", "Sunburn");
                         await AppendAsync(new
                         {
                             key = "signal-50:sp-3", delta = 1, weapon = "Signal 50", source = "live", mode = "mp", at = now
                         });
                     }
                 }
-                else if (result.Weapon?.Name == "Signal 50" && now - lastLongshot >= TimeSpan.FromMilliseconds(650))
+                else if (result.Weapon?.Name == "Signal 50" && now - lastLongshot >= TimeSpan.FromSeconds(2))
                     longshotCounted = false;
                 if (result.Weapon is { Name: var medalWeapon } && capture.TracksPointBlank(medalWeapon) &&
                     await capture.DetectPointBlankAsync(frame, cancel))
@@ -521,7 +522,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 var hovered = result.Replay ? null : await capture.DetectCamoProgressAsync(frame, menuWeapon, cancel);
                 CamoProgress[] reads = hovered == null ? [] : [hovered];
                 camoReads += reads.Length;
-                foreach (var progress in progressConfirmation.ObserveRows(reads)) await PublishProgressAsync(progress);
+                foreach (var progress in progressConfirmation.ObserveRows(reads)) await PublishProgressAsync(progress, "camo-menu");
                 var militaryTier = menuWeapon == null ? null : await capture.ReadMilitaryMenuCountAsync(frame, cancel);
                 var menuMilitary = menuWeapon != null && militaryTier is int tier && tier > 0
                     ? new MilitaryUnlock(menuWeapon, tier) : null;

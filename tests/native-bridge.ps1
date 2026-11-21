@@ -297,6 +297,22 @@ try {
     if ($overlay.weaponUnlocks -ne 17 -or $overlay.minimumUnlocks -ne 17 -or $null -ne $overlay.level) {
         throw 'Weapon unlocks must use the catalog threshold and stay separate from weapon levels.'
     }
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"military-unlock","source":"live","mode":"mp","weapon":"Signal 50","tier":8}'
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":"Signal 50"}'
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"Signal 50","type":"camo","camo":"Sunburn","count":6,"goal":40}'
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"Signal 50","type":"camo","camo":"Sunburn","count":3,"goal":40,"context":"camo-menu"}'
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+        $sunburn = $overlay.rows | Where-Object name -eq Sunburn
+        if ($overlay.weapon -eq 'Signal 50' -and $sunburn.count -eq 3) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($overlay.weapon -ne 'Signal 50' -or $sunburn.count -ne 3) {
+        throw 'The confirmed Sunburn menu count did not correct the overlay to 3/40.'
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

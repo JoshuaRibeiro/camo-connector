@@ -336,7 +336,12 @@ internal sealed class LocalTracker
                 ProgressFeed.Number(item, "goal") != rule.Goal || rule.Goal == null || count > rule.Goal)) return;
             Change((next, focus) =>
             {
-                ApplyProgress(next, weapon.Id + ":" + rule.Id, count ?? 0, kind != "progress-snapshot");
+                var key = weapon.Id + ":" + rule.Id;
+                if (key == "signal-50:sp-3" && kind == "progress-snapshot" &&
+                    ProgressFeed.Text(item, "context") == "camo-menu" && count is int menuCount && menuCount < rule.Goal)
+                    next[key] = new(menuCount, false);
+                else
+                    ApplyProgress(next, key, count ?? 0, kind != "progress-snapshot");
                 return focus;
             });
         }
