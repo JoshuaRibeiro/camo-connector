@@ -307,6 +307,16 @@ test('dim Events card can confirm a large correction without a second mask pair'
   assert.equal(context.state.current, 2695);
   context.observe('home', 2685, 'capture', 1100, true, 'events');
   assert.equal(context.state.current, 2685);
+  context.state.current = 2665;
+  context.readText = async () => 'TROPHIES COLLECTED';
+  context.readTotal = async pair => pair ? 2655 : null;
+  for (const time of [1300, 1500, 1700]) {
+    const read = await context.readHomeTotal({ layout: 'wager', label: 'banner', primary: { glyphs: 4 }, alternate: { glyphs: 4 } });
+    context.observe('home', read.value, 'capture', time, read.corroborated, 'wager');
+  }
+  assert.equal(context.state.current, 2655);
+  context.readText = async crop => crop === 'label' ? 'EVENTS' : digits;
+  context.readTotal = async pair => pair ? 2551 : null;
   context.state.current = 2051;
   digits = '2051';
   assert.equal((await context.readHomeTotal(body)).corroborated, false);

@@ -208,9 +208,9 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
   if (frames < 2 && !quickIncrease && !lobbyConfirmed) return;
   if (kind === 'home') {
     // Large corrections need two independently cropped reads across three frames.
-    // Events can correct a decrease after three frames with two corroborated reads.
-    const confirmedEvents = layout === 'events' && !isLargeTotalChange(value) && frames >= 3 && strongReads >= 2;
-    if (value < state.current && layout !== 'lobby' && !confirmedEvents) return;
+    // Menu totals can correct a decrease after three frames with two corroborated reads.
+    const confirmedMenu = (layout === 'events' || layout === 'wager') && !isLargeTotalChange(value) && frames >= 3 && strongReads >= 2;
+    if (value < state.current && layout !== 'lobby' && !confirmedMenu) return;
     if (isSuspectedFiveDrop(value)) return;
     if (isLargeTotalChange(value) &&
         (layout === 'lobby' ? !lobbyConfirmed : frames < 3 || strongReads < 2)) return;
@@ -292,7 +292,7 @@ async function readHomeTotal(body) {
       (value === clean || (value === alternate && (value === primary || value === lobby)) ||
         (value === primary && value === lobby)) };
   }
-  if (primary !== null && (primary === templateTotal || !isLargeTotalChange(primary))) {
+  if (primary !== null && (primary === templateTotal || (primary >= state.current && !isLargeTotalChange(primary)))) {
     return { value: primary, corroborated: primary === templateTotal };
   }
 
@@ -407,7 +407,7 @@ const server = http.createServer(async (request, response) => {
       if (revision !== correctionRevision) return json({ state: publicState(), reading: 'Total corrected' });
       observe(body.kind, value, body.session, body.frameTime, corroborated,
         body.kind === 'home' ? body.layout ?? 'lobby' : null, labelledCrop);
-      const source = body.layout === 'events' ? 'Events' : body.kind === 'home' ? 'Lobby' : 'Match';
+      const source = body.layout === 'wager' ? 'Wager' : body.layout === 'events' ? 'Events' : body.kind === 'home' ? 'Lobby' : 'Match';
       const pending = body.kind === 'home' && value !== null && value !== state.current;
       return json({ state: publicState(), reading: value === null ? 'Looking for the trophy counter' :
         pending ? `Checking ${source.toLowerCase()} total: ${value}` : `${source} read: ${value}` });
