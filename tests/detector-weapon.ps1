@@ -287,6 +287,17 @@ if ($pinned.Length -ne 2 -or $pinned[0].Camo -ne 'Platinum' -or
     $pinned[0].Count -ne 5 -or $pinned[0].Goal -ne 20 -or $pinned[1].Count -ne 1) {
     throw 'Right CAMOS panel must match Sang Platinum from its objective and keep JOKR separate.'
 }
+$leftPanel = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('yp SANG SMM', .30)
+    [CamoConnector.Detector.HudLine]::new('Bat 20 Player Kills rom Benird', .36)
+    [CamoConnector.Detector.HudLine]::new('14 / 26', .46)
+    [CamoConnector.Detector.HudLine]::new('CRONEN OSPREY', .56)
+)
+$pinned = $tracked::ReadRows($leftPanel, $pinnedCatalog, [Func[double,byte[]]]{ param($y) return $null })
+if ($pinned.Length -ne 1 -or $pinned[0].Weapon -ne 'Sang 9mm' -or
+    $pinned[0].Camo -ne 'Platinum' -or $pinned[0].Count -ne 14 -or $pinned[0].Goal -ne 20) {
+    throw 'Left CAMOS panel must recover Sang 9mm Platinum 14/20 from the corroborating objective.'
+}
 if ($lobby.Length -ne 2 -or $lobby[0].Camo -ne 'Frosted' -or $lobby[0].Count -ne 19 -or
     $lobby[1].WeaponLevelObjective -ne 'Reach Weapon Level 16' -or $lobby[1].Count -ne 12) {
     throw 'Lobby counters did not distinguish Special camo progress from weapon levels'

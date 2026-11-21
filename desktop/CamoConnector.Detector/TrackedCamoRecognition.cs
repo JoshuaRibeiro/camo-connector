@@ -77,11 +77,19 @@ public static class TrackedCamoRecognition
             var named = entries.Select(entry => entry.Name).Where(camo => names.Contains(Key(camo))).Distinct().ToArray();
             if (named.Length > 1) continue;
             var objectiveKey = Key(text);
-            var objectiveMatches = entries.Where(entry => entry.Goal == goal &&
+            // Small lobby text can lose the first letter of "from" and read "behind" as "Benird".
+            objectiveKey = Regex.Replace(objectiveKey, @"\dplayerkills(?:from|rom)(?:behind|benird)",
+                match => match.Value[0] + "playerkillsfrombehind");
+            var objectiveMatches = entries.Where(entry => entry.Goal is int target && count <= target &&
+                (goal == target || (target % 10 == 0 && goal - target is 6 or 8)) &&
                 entry.Objective is { Length: > 0 } objective &&
-                objectiveKey.Contains(Key(objective), StringComparison.Ordinal))
-                .Select(entry => entry.Name).Distinct().Take(2).ToArray();
-            var objectiveCamo = objectiveMatches.Length == 1 ? objectiveMatches[0] : (name, goal, objectiveKey) switch
+                objectiveKey.Contains(Key(objective.StartsWith("Get ", StringComparison.OrdinalIgnoreCase)
+                    ? objective[4..] : objective), StringComparison.Ordinal))
+                .DistinctBy(entry => entry.Name).Take(2).ToArray();
+            var objectiveMatch = objectiveMatches.Length == 1 ? objectiveMatches[0] : null;
+            if (objectiveMatch?.Goal is int confirmedGoal &&
+                (named.Length == 0 || named[0] == objectiveMatch.Name)) goal = confirmedGoal;
+            var objectiveCamo = objectiveMatch?.Name ?? (name, goal, objectiveKey) switch
             {
                 (".50 GS", 20, var objective) when objective.Contains("get20headshotkills", StringComparison.Ordinal) => "Frosted",
                 (".50 GS", 30, var objective) when objective.Contains("get30pointblankkills", StringComparison.Ordinal) => "Red Tiger",
@@ -114,6 +122,7 @@ public static class TrackedCamoRecognition
         // The lobby's last-used badge can be joined to the weapon name or misread as LA5T U5ED.
         if (Regex.IsMatch(key, @"\Asignal[5s][0o8](?:la[s5]tu[s5]ed)?\z")) return "Signal 50";
         if (key == "rpgb") return "RPG-8";
+        if (key is "sangsmm" or "ypsangsmm" or "ypsang9mm") return "Sang 9mm";
         if (Regex.IsMatch(key, @"\A(?:(?:krait|karit|crate)p?[g6][8b]|krait)(?:xp)?\z")) return "Krait P68";
         return WeaponRecognition.Read(new[] { label }, false)?.Name;
     }
