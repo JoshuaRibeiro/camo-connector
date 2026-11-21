@@ -18,8 +18,7 @@ async function request(path, body) {
     options.body = JSON.stringify(body);
   }
   const response = await fetch('/local/' + path, options);
-  if (!response.ok) throw new Error(path === 'import' && response.status === 404
-    ? 'No compatible Multiplayer backup found.' : 'Local tracker request failed (' + response.status + ').');
+  if (!response.ok) throw new Error('Local tracker request failed (' + response.status + ').');
   return response.json();
 }
 
@@ -120,9 +119,11 @@ function renderOverview() {
   }
 
   const overview = state.overview;
-  const heading = [weapon.name];
-  if (overview.minimumLevel) heading.push('Weapon level ' + (overview.level ?? overview.minimumLevel + '+'));
-  const entries = [element('p', heading.join(' · '), 'subtitle')];
+  const heading = element('div', null, 'detail-heading');
+  heading.append(element('h3', weapon.name));
+  if (overview.level != null || overview.minimumLevel)
+    heading.append(element('span', 'Weapon level ' + (overview.level ?? overview.minimumLevel + '+'), 'subtitle'));
+  const entries = [heading];
   const rules = new Map(weapon.camos.map(rule => [rule.id, rule]));
   for (const row of overview.rows) entries.push(camoRow(rules.get(row.id), weapon.id, row));
   if (overview.waiting) {
@@ -282,10 +283,8 @@ async function poll() {
 }
 
 byId('search').addEventListener('input', renderRoster);
-byId('import').addEventListener('click', () => void save('import', {}, 'Saved progress merged.'));
 function showSection(page) {
   const overlays = page === 'overlays';
-  byId('tracker-toolbar').hidden = overlays;
   byId('tracker-content').hidden = overlays;
   byId('overlay-settings').hidden = !overlays;
 }

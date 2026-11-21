@@ -35,6 +35,41 @@ internal sealed partial class ConnectorWindow
         };
     }
 
+    private Control CreateTrackerImportSettings()
+    {
+        var import = new Button { Text = "Import saved progress", AutoSize = true };
+        var feedback = new Label { AutoSize = true };
+        import.Click += async (_, _) =>
+        {
+            if (!bridgeReady)
+            {
+                feedback.Text = "The local tracker is not ready yet.";
+                return;
+            }
+
+            import.Enabled = false;
+            feedback.Text = "Importing saved progress…";
+            try
+            {
+                var keyPath = Path.Combine(root, "Data", "bridge-pairing.key");
+                var key = (await File.ReadAllTextAsync(keyPath, closing.Token)).Trim();
+                using var request = new HttpRequestMessage(HttpMethod.Post, "http://127.0.0.1:47150/local/import");
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", key);
+                using var response = await client.SendAsync(request, closing.Token);
+                feedback.Text = response.StatusCode == System.Net.HttpStatusCode.NotFound
+                    ? "No compatible Multiplayer backup found."
+                    : response.IsSuccessStatusCode ? "Saved progress merged." : "Could not import saved progress.";
+            }
+            catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
+            catch (Exception error) when (error is IOException or HttpRequestException or OperationCanceledException)
+            {
+                if (!feedback.IsDisposed) feedback.Text = "Could not import saved progress.";
+            }
+            finally { if (!import.IsDisposed) import.Enabled = true; }
+        };
+        return SetupSection("Tracker data", import, feedback);
+    }
+
     private void ShowTrackerSection()
     {
         if (TrackerHost is not { } host || localTrackerView is not { } view) return;

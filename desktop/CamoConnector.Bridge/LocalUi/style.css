@@ -7,14 +7,8 @@ body { margin: 0; }
   background: var(--tracker-background);
   scrollbar-color: #527b80 var(--tracker-background);
 }
-.toolbar {
-  display: flex; gap: 1rem; justify-content: space-between; align-items: center;
-  padding: 1.2rem clamp(.85rem, 3vw, 2rem); border-bottom: 1px solid #304044; background: #172226;
-}
 h1, h2, h3, p { margin: 0; }
-.tracker .toolbar { background: #1a2027; border-color: #324654; }
-.toolbar h1 { font-size: clamp(1.55rem, 3vw, 2rem); font-weight: 800; }
-.toolbar p, aside label, .subtitle { color: #9eb3c1; }
+aside label, .subtitle { color: #9eb3c1; }
 .actions { display: flex; flex-wrap: wrap; gap: .45rem; justify-content: end; }
 button, input {
   font: inherit; color: inherit; border-radius: .42rem; border: 1px solid #405156;
@@ -37,7 +31,8 @@ button:disabled { opacity: .5; cursor: default; }
 .overview-meter progress { width: 6rem; }
 .overview-completed { margin-top: .65rem; }
 .overview-completed summary { cursor: pointer; color: #9eb3c1; }
-main { display: grid; grid-template-columns: minmax(10rem, 15rem) 1fr; min-height: 65vh; }
+#tracker-content:not([hidden]) { display: grid; grid-template-columns: minmax(9rem, 24%) minmax(0, 1fr); min-height: 100vh; }
+.tracker-panels { min-width: 0; }
 aside { padding: 1rem; border-right: 1px solid #304044; }
 aside input { width: 100%; margin: .35rem 0 .6rem; }
 nav h2 { font-size: .75rem; text-transform: uppercase; color: #adbcc0; margin: 1rem 0 .28rem; }
@@ -91,18 +86,14 @@ dialog form { display: grid; gap: .7rem; }
 .layout-11annah #weapon-level { text-align: right; }
 .layout-11annah .overlay-unlock { gap: .75em; }
 .layout-11annah .overlay-unlock h2 { margin-top: 0; }
-.layout-11annah .camo-artwork { width: 3.6em; height: 3.6em; }
+.layout-11annah .camo-artwork { width: 4.4em; height: 4.4em; }
 progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 @media (max-width: 640px) {
-  main { grid-template-columns: minmax(7rem, 32%) 1fr; }
+  #tracker-content:not([hidden]) { grid-template-columns: minmax(7rem, 29%) minmax(0, 1fr); }
   aside { padding: .65rem; }
   .camo-row { align-items: start; flex-direction: column; }
-  .toolbar { align-items: start; }
 }
 
-.tracker .toolbar { padding-block: .95rem; background: #141b22; }
-.tracker .toolbar[hidden] { display: none; }
-.tracker .toolbar h1 { letter-spacing: -.045em; }
 .collection, #overlay-settings {
   margin: 1rem clamp(.85rem, 3vw, 2rem); padding: 1rem;
   border: 1px solid #31434c; border-radius: .9rem;
@@ -143,7 +134,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .tracker .overview { margin: 1rem clamp(.85rem, 3vw, 2rem); padding: .8rem 1rem; border: 1px solid #31434c; border-radius: .8rem; }
 .tracker .camo-row { padding: .42rem .5rem; border-color: #283943; }
 .tracker .camo-complete { border-color: #3b5d53; }
-.tracker .camo-artwork { width: 3.1em; height: 3.1em; }
+.tracker .camo-artwork { width: 3.8em; height: 3.8em; }
 .tracker .overview-meter progress { flex: 0 1 6rem; height: .45rem; }
 .tracker nav button { display: flex; align-items: baseline; justify-content: space-between; gap: .35rem; border-radius: .4rem; font-size: .9rem; }
 .weapon-count { color: var(--accent); white-space: nowrap; font-size: .78rem; }

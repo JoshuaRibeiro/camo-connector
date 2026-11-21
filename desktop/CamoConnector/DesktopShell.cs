@@ -86,7 +86,7 @@ internal sealed partial class ConnectorWindow
         footer.Controls.Add(version);
         var toggle = navigationToggle = new Button { Height = 38, AccessibleName = "Expand navigation", Margin = new Padding(0, 0, 0, 8) };
         menu.Controls.Add(toggle);
-        var entries = new[] { (localTrackerPage, ""), (overlayPage, "\uE7B3"), (capturePage, "\uE7F8"),
+        var entries = new[] { (localTrackerPage, ""), (overlayPage, ""), (capturePage, "\uE7F8"),
             (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
         var icons = ShellFont("Segoe MDL2 Assets", 14);
         var hints = new ToolTip();
@@ -106,6 +106,19 @@ internal sealed partial class ConnectorWindow
                 if (page == localTrackerPage)
                     args.Graphics.DrawImageUnscaled(trackerIcon,
                         (iconArea.Width - trackerIcon.Width) / 2, (iconArea.Height - trackerIcon.Height) / 2);
+                else if (page == overlayPage)
+                {
+                    var unit = LogicalToDeviceUnits(1);
+                    var x = (iconArea.Width - 19 * unit) / 2;
+                    var y = (iconArea.Height - 16 * unit) / 2;
+                    using var pen = new Pen(button.ForeColor, unit);
+                    args.Graphics.DrawRectangle(pen, x, y, 15 * unit, 11 * unit);
+                    args.Graphics.DrawLines(pen, [
+                        new Point(x + 18 * unit, y + 4 * unit),
+                        new Point(x + 18 * unit, y + 15 * unit),
+                        new Point(x + 4 * unit, y + 15 * unit)
+                    ]);
+                }
                 else
                     TextRenderer.DrawText(args.Graphics, glyph, icons, iconArea, button.ForeColor,
                         TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
@@ -180,11 +193,12 @@ internal sealed partial class ConnectorWindow
         var help = PageBody(helpPage, "How it works", "Camo Connector reads your game capture and saves progress on this PC.");
         AddSetupRow(help, SetupSection("PC capture", new Label { AutoSize = true, Text = "Select the monitor showing Call of Duty in Auto tracking." }));
         AddSetupRow(help, SetupSection("Console or OBS", new Label { AutoSize = true, Text = "Select your capture card or OBS Virtual Camera in Auto tracking and turn on Auto tracking." }));
-        AddSetupRow(help, SetupSection("OBS overlay", new Label { AutoSize = true, Text = "Copy the URL from Camo tracker and paste it into an OBS Browser Source." }));
-        var settings = PageBody(settingsPage, "Settings", "Manage desktop updates and tray controls.");
+        AddSetupRow(help, SetupSection("OBS overlay", new Label { AutoSize = true, Text = "Copy the URL from Overlays and paste it into an OBS Browser Source." }));
+        var settings = PageBody(settingsPage, "Settings", "Manage tracker data, updates and tray controls.");
         update.AutoSize = true;
         updateStatus.Text = $"Camo Connector v{build}";
         AddSetupRow(settings, SetupSection("App updates", updateStatus, update));
+        AddSetupRow(settings, CreateTrackerImportSettings());
         BindUsage();
         AddSetupRow(settings, SetupSection("Performance", showUsage));
         var tray = new Button { Text = "Hide to tray", AutoSize = true };
