@@ -194,7 +194,7 @@ export function createRecognizer({ draw, context, crop, signatures }) {
         ? maskPair(lobbyMask(wide, 190, 180), lobbyMask(wide, 200, 195), true)
         : maskPair(lobbyMask(rect, 159, 149), lobbyMask(rect, 160, 150), true);
       if (!primary && !alternate) return { kind: 'home' };
-      return { kind: 'home', label: png([1030, top, 350, 45], 3), primary, alternate };
+      return { kind: 'home', label: png([1030, top, 350, 45], 3), rawTotal: png(wide, 4), primary, alternate };
     }
 
     const banner = [1740, 827, 312, 44];

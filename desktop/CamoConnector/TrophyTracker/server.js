@@ -89,23 +89,29 @@ function readText(png, mode, digits = false) {
   return reading;
 }
 
-async function readTotal(pair, mode = 8, retryMode) {
+async function readTotal(pair, mode = 8, retryMode, rawTotal) {
   if (!pair?.digits || !pair.mask) return null;
   let [digits, cleanDigits] = await Promise.all([
     readText(pair.digits, mode, true), readText(pair.mask, mode, true)
   ]);
   const complete = text => /^(0|[1-9]\d{0,5})$/.test(text) && text.length === pair.glyphs;
-  if (retryMode && (!complete(digits) || !complete(cleanDigits) || /8/.test(digits + cleanDigits))) {
+  if (retryMode && (!complete(digits) || digits !== cleanDigits || /[68]/.test(digits + cleanDigits))) {
     const completeFirstReads = [digits, cleanDigits].filter(complete);
-    const [line, cleanLine] = await Promise.all([
-      readText(pair.digits, retryMode, true), readText(pair.mask, retryMode, true)
+    const [line, cleanLine, raw] = await Promise.all([
+      readText(pair.digits, retryMode, true), readText(pair.mask, retryMode, true),
+      rawTotal ? readText(rawTotal, retryMode, true) : Promise.resolve('')
     ]);
     // The word layout can close the opening of a HUD 6 and read it as 8.
     // Accept the line layout only when both masks agree and explain any
     // conflicting complete reads using that specific ambiguity.
     const agrees = read => [...read].every((digit, index) =>
       digit === line[index] || (digit === '8' && line[index] === '6'));
-    if (complete(line) && line === cleanLine && completeFirstReads.every(agrees)) {
+    const supportsRaw = read => [...read].every((digit, index) =>
+      digit === raw[index] || (digit === '8' && raw[index] === '6'));
+    if (complete(raw) && [digits, cleanDigits, line, cleanLine].includes(raw) &&
+        [digits, cleanDigits, line, cleanLine].filter(complete).every(supportsRaw)) {
+      digits = cleanDigits = raw;
+    } else if (complete(line) && line === cleanLine && completeFirstReads.every(agrees)) {
       digits = line;
       cleanDigits = cleanLine;
     }
@@ -236,14 +242,14 @@ const server = http.createServer(async (request, response) => {
       if (body.kind === 'home' && body.label) {
         const pair = body.primary ?? body;
         const retryMode = !body.layout && pair.glyphs >= 4 ? 7 : undefined;
-        const [label, primary] = await Promise.all([readText(body.label, 7), readTotal(pair, 8, retryMode)]);
+        const [label, primary] = await Promise.all([readText(body.label, 7), readTotal(pair, 8, retryMode, body.rawTotal)]);
         const labelPattern = body.layout === 'events' ? /\bEVENTS\b/i
           : body.layout === 'wager' ? /TROPHIES\s+COLLECTE[DO]\b/i
           : /TROPHIES\s+COLLE[CG]TE[DS]\b/i;
         if (labelPattern.test(label)) {
           value = primary;
           if (value === null || isLargeTotalChange(value)) {
-            const alternate = await readTotal(body.alternate, body.layout === 'wager' ? 8 : 7);
+            const alternate = await readTotal(body.alternate, body.layout === 'wager' ? 8 : 7, retryMode);
             corroborated = value !== null && value === alternate;
             value ??= alternate;
           }

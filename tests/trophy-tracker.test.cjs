@@ -35,3 +35,16 @@ test('lobby OCR stabilizes large corrections and accepts small updates quickly',
   read(2228, 2500, true, 'events');
   assert.equal(context.state.current, 4250);
 });
+
+test('lobby OCR recovers a six when original pixels corroborate a masked read', async () => {
+  const context = vm.createContext({
+    readText: async (crop, mode) => crop === 'original' || (crop === 'mask' && mode === 7) ? '2226' : '2228'
+  });
+  vm.runInContext(
+    source.slice(source.indexOf('async function readTotal'), source.indexOf('// A short sequence')),
+    context
+  );
+  const pair = { digits: 'digits', mask: 'mask', glyphs: 4 };
+  assert.equal(await context.readTotal(pair, 8, 7, 'original'), 2226);
+  assert.equal(await context.readTotal(pair, 8, 7), 2228);
+});
