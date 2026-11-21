@@ -24,7 +24,7 @@ internal sealed class LocalTracker
     internal sealed record Weapon(string Id, string Name, string Category, Rule[] Camos);
     internal sealed record Catalog(Weapon[] Weapons, Rule[] Shared);
     internal sealed record Entry(int Count, bool Done);
-    internal sealed record State(string? Focus, Dictionary<string, Entry> Progress);
+    internal sealed record State(string? Focus, Dictionary<string, Entry> Progress, string? OverlayLayout = null);
     internal sealed record Edit(string? Weapon, string? Camo, int? Count, bool? Done, int? Increment = null);
 
     public LocalTracker(string data)
@@ -69,7 +69,17 @@ internal sealed class LocalTracker
 
     public object TrackerView()
     {
-        lock (gate) return new { state.Focus, state.Progress, overview = Overlay() };
+        lock (gate) return new { state.Focus, state.Progress, state.OverlayLayout, overview = Overlay() };
+    }
+
+    public bool SetOverlayLayout(string? layout)
+    {
+        if (layout is not ("default" or "11annah")) return false;
+        lock (gate)
+        {
+            if (state.OverlayLayout != layout) SaveState(state with { OverlayLayout = layout });
+        }
+        return true;
     }
 
     public object Overlay()
@@ -77,7 +87,7 @@ internal sealed class LocalTracker
         lock (gate)
         {
             if (state.Focus == null || !weapons.TryGetValue(state.Focus, out var weapon))
-                return new { weapon = (string?)null };
+                return new { weapon = (string?)null, state.OverlayLayout };
             bool Done(Weapon item, Rule camo) => state.Progress.GetValueOrDefault(item.Id + ":" + camo.Id)?.Done == true;
             bool HasCamo(Weapon item, string id) => item.Camos.Any(camo => camo.Id == id && Done(item, camo));
             int ConfirmedMilitaryTotal(bool levelBased) => weapon.Camos
@@ -144,7 +154,7 @@ internal sealed class LocalTracker
             var next = rows.Length == 0 ? remaining.FirstOrDefault() : null;
             var prerequisite = next == null ? null : CompletionGate(next);
             return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
-                minimumLevel = knownLevel, rows,
+                minimumLevel = knownLevel, rows, state.OverlayLayout,
                 waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock, count = prerequisite?.Count, goal = prerequisite?.Goal },
                 complete = remaining.Length == 0 };
         }
@@ -303,16 +313,20 @@ internal sealed class LocalTracker
             var focus = update(next, state.Focus);
             if (focus == state.Focus && next.Count == state.Progress.Count &&
                 next.All(pair => state.Progress.GetValueOrDefault(pair.Key) == pair.Value)) return;
-            var changed = new State(focus, next);
-            var temporary = path + ".tmp";
-            try
-            {
-                File.WriteAllText(temporary, JsonSerializer.Serialize(changed, Json));
-                File.Move(temporary, path, overwrite: true);
-                state = changed;
-            }
-            finally { File.Delete(temporary); }
+            SaveState(state with { Focus = focus, Progress = next });
         }
+    }
+
+    private void SaveState(State changed)
+    {
+        var temporary = path + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, JsonSerializer.Serialize(changed, Json));
+            File.Move(temporary, path, overwrite: true);
+            state = changed;
+        }
+        finally { File.Delete(temporary); }
     }
 
     private static bool IsLevelRule(Rule camo) =>

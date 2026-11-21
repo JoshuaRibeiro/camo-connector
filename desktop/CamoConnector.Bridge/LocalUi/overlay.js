@@ -2,12 +2,12 @@
 
 const key = location.hash.slice(1);
 const byId = id => document.getElementById(id);
-if (new URLSearchParams(location.search).get('layout') === '11annah')
-  document.body.classList.add('layout-11annah');
+const legacyLayout = new URLSearchParams(location.search).get('layout');
 
 let previous;
 
 function render(data) {
+  document.body.classList.toggle('layout-11annah', (data.overlayLayout ?? legacyLayout) === '11annah');
   byId('overlay-card').hidden = !data.weapon;
   byId('weapon').textContent = data.weapon ?? '';
   const level = byId('weapon-level');

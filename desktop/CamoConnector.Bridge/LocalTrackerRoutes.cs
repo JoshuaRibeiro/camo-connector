@@ -7,6 +7,7 @@ namespace CamoConnector.Bridge;
 
 internal sealed class LocalTrackerRoutes(LocalTracker tracker, ProgressFeed feed, byte[] secret)
 {
+    private sealed record OverlaySelection(string? Layout);
     private readonly string overlayToken = Convert.ToHexStringLower(HMACSHA256.HashData(secret, "camo-local-overlay"u8));
 
     public async Task HandleAsync(HttpContext context, string host)
@@ -79,6 +80,15 @@ internal sealed class LocalTrackerRoutes(LocalTracker tracker, ProgressFeed feed
                 overlayUrl = "http://" + host + "/local/overlay#" + overlayToken });
         else if (read && path == "/local/state")
             await response.WriteAsJsonAsync(tracker.TrackerView());
+        else if (write && path == "/local/overlay-layout")
+        {
+            OverlaySelection? selection;
+            try { selection = await request.ReadFromJsonAsync<OverlaySelection>(context.RequestAborted); }
+            catch (Exception error) when (error is JsonException or InvalidOperationException)
+            { response.StatusCode = 400; return; }
+            if (!tracker.SetOverlayLayout(selection?.Layout)) { response.StatusCode = 400; return; }
+            await response.WriteAsJsonAsync(tracker.TrackerView());
+        }
         else if (write && path == "/local/edit")
         {
             LocalTracker.Edit? edit;

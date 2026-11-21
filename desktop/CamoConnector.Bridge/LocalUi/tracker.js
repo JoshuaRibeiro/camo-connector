@@ -3,6 +3,7 @@
 const byId = id => document.getElementById(id);
 const key = location.hash.slice(1);
 const statusLine = byId('status');
+const overlayButtons = document.querySelectorAll('[data-overlay]');
 let catalog;
 let overlayUrl;
 let state;
@@ -161,6 +162,10 @@ function renderOverview() {
 }
 
 function render() {
+  for (const button of overlayButtons) {
+    const active = button.dataset.overlay === (state.overlayLayout ?? 'default');
+    button.setAttribute('aria-pressed', String(active));
+  }
   renderCollection();
   renderOverview();
   renderRoster();
@@ -283,16 +288,17 @@ byId('overlay').addEventListener('click', () => {
   section.hidden = !section.hidden;
   byId('overlay').setAttribute('aria-expanded', String(!section.hidden));
 });
-for (const button of document.querySelectorAll('[data-overlay]')) button.addEventListener('click', async () => {
+for (const button of overlayButtons) button.addEventListener('click', () => {
+  void save('overlay-layout', { layout: button.dataset.overlay }, 'OBS overlay layout updated.');
+});
+byId('copy-overlay-url').addEventListener('click', async () => {
   if (!overlayUrl) return;
-  const url = new URL(overlayUrl);
-  if (button.dataset.overlay === '11annah') url.searchParams.set('layout', '11annah');
   try {
-    await navigator.clipboard.writeText(url.href);
+    await navigator.clipboard.writeText(overlayUrl);
     statusLine.textContent = 'OBS Browser Source URL copied.';
   } catch {
     const input = byId('overlay-url');
-    input.value = url.href;
+    input.value = overlayUrl;
     byId('overlay-dialog').showModal();
     input.select();
   }

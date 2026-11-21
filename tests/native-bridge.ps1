@@ -112,6 +112,16 @@ try {
         throw 'Embedded Night Snow artwork did not return a PNG.'
     }
     $overlayHeaders = @{ Authorization = 'Bearer ' + ([uri]$catalog.overlayUrl).Fragment.TrimStart('#') }
+    $layoutArgs = @{ Uri = "$baseUrl/local/overlay-layout"; Method = 'Post'; ContentType = 'application/json'; NoProxy = $true }
+    $denied = Invoke-WebRequest @layoutArgs -Headers $overlayHeaders -Body '{"layout":"11annah"}' -SkipHttpErrorCheck
+    if ($denied.StatusCode -ne 401) { throw 'OBS access must be read-only.' }
+    $invalid = Invoke-WebRequest @layoutArgs -Headers $native -Body '{"layout":"unknown"}' -SkipHttpErrorCheck
+    if ($invalid.StatusCode -ne 400) { throw 'Unsupported overlay layout was accepted.' }
+    $tracker = Invoke-RestMethod @layoutArgs -Headers $native -Body '{"layout":"11annah"}'
+    $selectedOverlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+    if ($tracker.overlayLayout -ne '11annah' -or $selectedOverlay.overlayLayout -ne '11annah') {
+        throw 'The existing overlay endpoint did not pick up the selected layout.'
+    }
     $military = '{"kind":"military-unlock","source":"live","mode":"mp","weapon":"PM-40 Anvil","tier":1}'
     $focus = '{"kind":"weapon","source":"live","mode":"mp","weapon":"PM-40 Anvil"}'
     $snapshot = '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"PM-40 Anvil","type":"weapon-level","count":9,"goal":11,"objective":"Reach Weapon Level 11"}'
@@ -193,6 +203,17 @@ try {
     $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
     if ($overlay.waiting.id -ne 'harmonic-break' -or $overlay.waiting.count -ne 1 -or $overlay.waiting.goal -ne 33) {
         throw 'Harmonic Break must count launch-weapon Platinum challenges only.'
+    }
+    $persisted = Get-Content -LiteralPath (Join-Path $data 'local-tracker.json') -Raw | ConvertFrom-Json
+    if ($overlay.overlayLayout -ne '11annah' -or $persisted.overlayLayout -ne '11annah') {
+        throw 'Tracker progress edits discarded the selected overlay layout.'
+    }
+    $tracker = Invoke-RestMethod @layoutArgs -Headers $native -Body '{"layout":"default"}'
+    $selectedOverlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+    $currentCatalog = Check-Events 200 $native 'local/catalog'
+    if ($tracker.overlayLayout -ne 'default' -or $selectedOverlay.overlayLayout -ne 'default' -or
+        $currentCatalog.overlayUrl -ne $catalog.overlayUrl) {
+        throw 'Switching back to Default did not retain the existing OBS URL.'
     }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
