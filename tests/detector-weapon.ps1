@@ -298,6 +298,17 @@ if ($pinned.Length -ne 1 -or $pinned[0].Weapon -ne 'Sang 9mm' -or
     $pinned[0].Camo -ne 'Platinum' -or $pinned[0].Count -ne 14 -or $pinned[0].Goal -ne 20) {
     throw 'Left CAMOS panel must recover Sang 9mm Platinum 14/20 from the corroborating objective.'
 }
+$pinnedCatalog.Add('Mojave .357', [CamoConnector.Detector.CamoReference[]]@($platinumReference))
+$mojaveLobby = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('} MOJAVE 35?', .31)
+    [CamoConnector.Detector.HudLine]::new("Get 20 Player Kills 'rom Beaird", .39)
+    [CamoConnector.Detector.HudLine]::new('7/28', .49)
+)
+$pinned = $tracked::ReadRows($mojaveLobby, $pinnedCatalog, [Func[double,byte[]]]{ param($y) return $null })
+if ($pinned.Length -ne 1 -or $pinned[0].Weapon -ne 'Mojave .357' -or
+    $pinned[0].Camo -ne 'Platinum' -or $pinned[0].Count -ne 7 -or $pinned[0].Goal -ne 20) {
+    throw 'Mojave lobby OCR must recover Platinum 7/20.'
+}
 if ($lobby.Length -ne 2 -or $lobby[0].Camo -ne 'Frosted' -or $lobby[0].Count -ne 19 -or
     $lobby[1].WeaponLevelObjective -ne 'Reach Weapon Level 16' -or $lobby[1].Count -ne 12) {
     throw 'Lobby counters did not distinguish Special camo progress from weapon levels'

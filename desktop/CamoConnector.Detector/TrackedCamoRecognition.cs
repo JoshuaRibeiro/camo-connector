@@ -77,8 +77,8 @@ public static class TrackedCamoRecognition
             var named = entries.Select(entry => entry.Name).Where(camo => names.Contains(Key(camo))).Distinct().ToArray();
             if (named.Length > 1) continue;
             var objectiveKey = Key(text);
-            // Small lobby text can lose the first letter of "from" and read "behind" as "Benird".
-            objectiveKey = Regex.Replace(objectiveKey, @"\dplayerkills(?:from|rom)(?:behind|benird)",
+            // Small lobby text can drop the first letter of "from" and distort "behind".
+            objectiveKey = Regex.Replace(objectiveKey, @"\dplayerkills(?:from|rom)(?:behind|benird|beaird|borind)",
                 match => match.Value[0] + "playerkillsfrombehind");
             var objectiveMatches = entries.Where(entry => entry.Goal is int target && count <= target &&
                 (goal == target || (target % 10 == 0 && goal - target is 6 or 8)) &&
@@ -123,6 +123,7 @@ public static class TrackedCamoRecognition
         if (Regex.IsMatch(key, @"\Asignal[5s][0o8](?:la[s5]tu[s5]ed)?\z")) return "Signal 50";
         if (key == "rpgb") return "RPG-8";
         if (key is "sangsmm" or "ypsangsmm" or "ypsang9mm") return "Sang 9mm";
+        if (key == "mojave35") return "Mojave .357";
         if (Regex.IsMatch(key, @"\A(?:(?:krait|karit|crate)p?[g6][8b]|krait)(?:xp)?\z")) return "Krait P68";
         return WeaponRecognition.Read(new[] { label }, false)?.Name;
     }
