@@ -188,7 +188,7 @@ internal sealed class HudCapture : IDisposable
             if (read != null) return await IsReplayAsync(frame, cancel) ? (null, true) : (read, false);
         }
         // Short labels need less background in the crop to separate them from the ammo display.
-        foreach (var area in new[] { (.742, .876, .082, .026), (.782, .877, .048, .026) })
+        foreach (var area in new[] { (.742, .876, .082, .026), (.782, .877, .048, .026), (.719, .884, .105, .026) })
         {
             var (label, _) = await ReadTextAsync(frame, area, cancel, pageMode: 7, trace: trace, regionName: $"hudLine{area.Item1}");
             if (WeaponRecognition.ReadHud(Lines(label), false) is { } weapon)

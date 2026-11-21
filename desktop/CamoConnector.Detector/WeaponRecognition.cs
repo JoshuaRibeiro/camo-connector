@@ -64,6 +64,7 @@ public static class WeaponRecognition
                 "skgfergiean" => "KG-7 Vulcan",
                 "mare" => "Mar-9",
                 "anvil" => "PM-40 Anvil",
+                "kraitp68commando" or "kraitp68comm" => "Krait P68",
                 "w225striga" => "WZ.55 Striga",
                 "raze12" or "razi12" or "razin12" => "Rezi 12",
                 _ => null

@@ -24,6 +24,12 @@ if ($reader::ReadHud(@('.58 GS'), $false).Name -ne '.50 GS' -or
     $reader::ReadHud(@('021 .58 GS'), $false) -or $reader::ReadHud(@('.58 GS'), $true)) {
     throw 'The .50 GS HUD fallback accepted an ambiguous read or missed the short label.'
 }
+if ($reader::ReadHud(@('Krait P68 Commando'), $false).Name -ne 'Krait P68' -or
+    $reader::ReadHud(@('Krait P68 Comm'), $false).Name -ne 'Krait P68' -or
+    $reader::ReadHud(@('Krait P68 Commando'), $true) -or
+    $reader::ReadHud(@('Pick up Krait P68 Commando'), $false)) {
+    throw 'Krait P68 Commando must only match the active weapon HUD label.'
+}
 if ($weapon.Name -ne 'Sang 9mm' -or !$weapon.Akimbo) { throw 'Akimbo OCR failed' }
 if ($reader::Read(@('Signal 50'), $true)) { throw 'Wide HUD accepted an ordinary name' }
 if ($reader::Read(@('Signal 50'), $false).Name -ne 'Signal 50') { throw 'Narrow HUD failed' }
