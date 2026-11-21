@@ -21,7 +21,7 @@ internal sealed class LocalTracker
     {
         public string? Artwork { get; init; }
     }
-    internal sealed record Weapon(string Id, string Name, string Category, Rule[] Camos);
+    internal sealed record Weapon(string Id, string Name, string Category, Rule[] Camos, int? MaximumUnlocks = null);
     internal sealed record Catalog(Weapon[] Weapons, Rule[] Shared);
     internal sealed record Entry(int Count, bool Done);
     internal sealed record State(string? Focus, Dictionary<string, Entry> Progress, string? OverlayLayout = null,
@@ -157,7 +157,7 @@ internal sealed class LocalTracker
             var next = rows.Length == 0 ? remaining.FirstOrDefault() : null;
             var prerequisite = next == null ? null : CompletionGate(next);
             return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
-                minimumLevel = knownLevel, minimumUnlocks, rows, state.OverlayLayout,
+                minimumLevel = knownLevel, minimumUnlocks, weapon.MaximumUnlocks, rows, state.OverlayLayout,
                 waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock, count = prerequisite?.Count, goal = prerequisite?.Goal },
                 complete = remaining.Length == 0 };
         }

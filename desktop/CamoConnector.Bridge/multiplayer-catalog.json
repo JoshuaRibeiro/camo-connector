@@ -338,7 +338,7 @@
       {"id":"sp-2","type":"Special","name":"Ripplewave","unlock":"Earn 51 more weapon unlocks","unlockTotal":51,"objective":"Get 20 Quickscope Kills against Players","goal":20},
       {"id":"sp-3","type":"Special","name":"Sunburn","unlock":"Earn 73 more weapon unlocks","unlockTotal":73,"objective":"Get 40 Longshot Kills against Players","goal":40}
     ] },
-    { "id": "sang-9mm", "name": "Sang 9mm", "category": "Pistol", "camos": [
+    { "id": "sang-9mm", "name": "Sang 9mm", "category": "Pistol", "maximumUnlocks": 37, "camos": [
       {"id":"mil-1","type":"Military","name":"Military Camo 1","unlock":"Earn 8 more weapon unlocks","unlockTotal":8},
       {"id":"mil-2","type":"Military","name":"Military Camo 2","unlock":"Earn 12 more weapon unlocks","unlockTotal":12},
       {"id":"mil-3","type":"Military","name":"Military Camo 3","unlock":"Earn 16 more weapon unlocks","unlockTotal":16},

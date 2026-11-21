@@ -278,8 +278,9 @@ try {
     if ($overlay.weapon -ne 'Sang 9mm' -or $platinum.count -ne 2 -or $platinum.goal -ne 20) {
         throw 'Sang 9mm Platinum progress must appear as 2/20 even before every Gold is recorded locally.'
     }
-    if ($null -ne $overlay.level -or $overlay.minimumLevel -ne 0 -or $overlay.minimumUnlocks -ne 37) {
-        throw 'Space Time should establish 37+ weapon unlocks for Sang 9mm without claiming a level.'
+    if ($null -ne $overlay.level -or $overlay.minimumLevel -ne 0 -or
+        $overlay.minimumUnlocks -ne 37 -or $overlay.maximumUnlocks -ne 37) {
+        throw 'Space Time should establish the confirmed cap of 37 weapon unlocks for Sang 9mm.'
     }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
