@@ -23,7 +23,7 @@ internal sealed partial class ConnectorWindow
         turboEnabled = enable;
         var speed = new NumericUpDown { Minimum = 1, Maximum = 30, Value = 10 };
         panel.Controls.AddRange([enable, new Label { AutoSize = true, Text = "Clicks per second" }, speed,
-            new Label { AutoSize = true, Text = "Press Mouse 4 to arm or disarm. Hold left click to repeat." }]);
+            new Label { AutoSize = true, Text = "Press Mouse 5 (XButton2) to arm or disarm. Hold left click to repeat." }]);
         link.LinkClicked += (_, _) => panel.Visible = !panel.Visible;
         speed.ValueChanged += (_, _) => turboTimer.Interval = (int)Math.Round(1000m / speed.Value);
         enable.CheckedChanged += (_, _) => {
@@ -53,13 +53,13 @@ internal sealed partial class ConnectorWindow
         if (GetRawInputData(message.LParam, 0x10000003, out var packet, ref size,
             (uint)(8 + 2 * IntPtr.Size)) == uint.MaxValue || packet.Type != 0 || packet.Device == IntPtr.Zero) return;
         var flags = packet.ButtonFlags;
-        if ((flags & 0x40) != 0 && !sideHeld) {
+        if ((flags & 0x100) != 0 && !sideHeld) {
             sideHeld = true;
             turboArmed = !turboArmed;
             ResetHold();
             if (turboEnabled != null) turboEnabled.Text = turboArmed ? "Enable turbo clicker (armed)" : "Enable turbo clicker";
         }
-        if ((flags & 0x80) != 0) sideHeld = false;
+        if ((flags & 0x200) != 0) sideHeld = false;
         if ((flags & 1) != 0 && turboArmed) {
             heldMouse = packet.Device;
             turboHeld = true;
