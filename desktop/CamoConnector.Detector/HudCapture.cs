@@ -19,6 +19,7 @@ internal sealed class HudCapture : IDisposable
     public string OcrMode => persistentOcr != null ? "persistent Tesseract" : "Tesseract command line";
     private readonly Dictionary<string, CamoReference[]> catalog;
     private readonly Dictionary<string, CamoReference[]> completionist = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, CamoReference[]> trackedCatalog = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> pointBlankWeapons = new(StringComparer.OrdinalIgnoreCase);
 
     public HudCapture(string runtime)
@@ -49,7 +50,8 @@ internal sealed class HudCapture : IDisposable
             .ToLookup(camo => camo.GetProperty("category").GetString(), camo => new CamoReference(
                 camo.GetProperty("name").GetString()!, null,
                 Goal: camo.TryGetProperty("goal", out var goal) && goal.ValueKind == JsonValueKind.Number
-                    ? goal.GetInt32() : null));
+                    ? goal.GetInt32() : null)
+                { Objective = camo.TryGetProperty("objective", out var objective) ? objective.GetString() : null });
         foreach (var weapon in objectives.RootElement.GetProperty("weapons").EnumerateArray())
         {
             var trackerName = weapon.GetProperty("name").GetString()!;
@@ -78,6 +80,7 @@ internal sealed class HudCapture : IDisposable
                 }
             }
             catalog[detectorName] = entries.ToArray();
+            trackedCatalog[detectorName] = [.. entries, .. completionist[detectorName]];
         }
         persistentOcr = PersistentOcr.Open(runtime, models);
     }
@@ -721,7 +724,7 @@ internal sealed class HudCapture : IDisposable
                 trace: trace, regionName: "trackedRows");
             var lines = TrackedCamoRecognition.ReadTsv(text, height);
             byte[]? Thumbnail(double y) => Sample(frame, layout.Area.Item2 + y * layout.Area.Item4, layout.Thumbnail);
-            var rows = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail);
+            var rows = TrackedCamoRecognition.ReadRows(lines, trackedCatalog, Thumbnail);
             var (x, y, w, h) = layout.Area;
             var counterArea = (x + w * .54, y, w * .46, h);
             var (counterText, counterHeight) = await ReadTextAsync(frame, counterArea, cancel,
@@ -729,7 +732,7 @@ internal sealed class HudCapture : IDisposable
             var counters = TrackedCamoRecognition.ReadTsv(counterText, counterHeight)
                 .Where(line => System.Text.RegularExpressions.Regex.IsMatch(line.Text, @"\A[0-9]{1,4}\s*/\s*[0-9]{1,4}\z"))
                 .ToArray();
-            var fallback = TrackedCamoRecognition.ReadRows(lines, catalog, Thumbnail, counters);
+            var fallback = TrackedCamoRecognition.ReadRows(lines, trackedCatalog, Thumbnail, counters);
             var merged = TrackedCamoRecognition.MergeRows(rows, fallback);
             if (lobby)
             {
@@ -752,7 +755,7 @@ internal sealed class HudCapture : IDisposable
                             (counter, _) = await ReadTextAsync(frame, firstCounterArea, cancel, pageMode: 7,
                                 adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "trackedFirstCounterContrast");
                         var first = TrackedCamoRecognition.ReadRows(
-                            [new(recovered, 0), new(objective, .12)], catalog, static _ => null, [new(counter, .22)]);
+                            [new(recovered, 0), new(objective, .12)], trackedCatalog, static _ => null, [new(counter, .22)]);
                         merged = TrackedCamoRecognition.MergeRows(merged, first);
                     }
                 }

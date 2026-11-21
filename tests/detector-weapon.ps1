@@ -268,6 +268,25 @@ $lobbyLines = [CamoConnector.Detector.HudLine[]]@(
     [CamoConnector.Detector.HudLine]::new('12 / 16', .82)
 )
 $lobby = $tracked::ReadRows($lobbyLines, $catalog, [Func[double,byte[]]]{ param($y) return ,$redReference })
+$platinumReference = [CamoConnector.Detector.CamoReference]::new('Platinum', $null, 0, 20, $null)
+$platinumReference.Objective = 'Get 20 Player Kills from Behind'
+$pinnedCatalog = [System.Collections.Generic.Dictionary[string,CamoConnector.Detector.CamoReference[]]]::new()
+$pinnedCatalog.Add('Sang 9mm', [CamoConnector.Detector.CamoReference[]]@($platinumReference))
+$rightPanel = [CamoConnector.Detector.HudLine[]]@(
+    [CamoConnector.Detector.HudLine]::new('CRONEN OSPREY', .06)
+    [CamoConnector.Detector.HudLine]::new('Earn 4 more weapon unlocks', .13)
+    [CamoConnector.Detector.HudLine]::new('SANG 9MM', .33)
+    [CamoConnector.Detector.HudLine]::new('Get 20 Player Kills from Behind', .39)
+    [CamoConnector.Detector.HudLine]::new('5 / 20', .50)
+    [CamoConnector.Detector.HudLine]::new('JOKR', .60)
+    [CamoConnector.Detector.HudLine]::new('Reach Weapon Level 6', .66)
+    [CamoConnector.Detector.HudLine]::new('1 / 6', .78)
+)
+$pinned = $tracked::ReadRows($rightPanel, $pinnedCatalog, [Func[double,byte[]]]{ param($y) return $null })
+if ($pinned.Length -ne 2 -or $pinned[0].Camo -ne 'Platinum' -or
+    $pinned[0].Count -ne 5 -or $pinned[0].Goal -ne 20 -or $pinned[1].Count -ne 1) {
+    throw 'Right CAMOS panel must match Sang Platinum from its objective and keep JOKR separate.'
+}
 if ($lobby.Length -ne 2 -or $lobby[0].Camo -ne 'Frosted' -or $lobby[0].Count -ne 19 -or
     $lobby[1].WeaponLevelObjective -ne 'Reach Weapon Level 16' -or $lobby[1].Count -ne 12) {
     throw 'Lobby counters did not distinguish Special camo progress from weapon levels'
