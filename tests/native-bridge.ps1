@@ -1,4 +1,4 @@
-param([string]$Executable = "$PSScriptRoot/../dist/desktop-preview/Runtime/Bridge/CamoConnector.Bridge.exe")
+param([string]$Executable = "$PSScriptRoot/../dist/desktop-preview/Runtime/Bridge/CoDStreamingTools.Bridge.exe")
 
 $ErrorActionPreference = 'Stop'
 $application = (Resolve-Path -LiteralPath $Executable).Path

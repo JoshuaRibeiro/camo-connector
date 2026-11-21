@@ -25,7 +25,7 @@ internal sealed partial class ConnectorWindow
     private CancellationTokenSource? previewRead;
     private Process? previewWorker;
     private Task<string>? previewErrors;
-    private string DetectorPath => Path.Combine(root, "Runtime", "Detector", "CamoConnector.Detector.exe");
+    private string DetectorPath => Path.Combine(root, "Runtime", "Detector", "CoDStreamingTools.Detector.exe");
     private string OcrDirectory => Path.Combine(root, "Runtime", "Ocr");
     private string DataDirectory => Path.Combine(root, "Data");
     private string SourceSettings => Path.Combine(DataDirectory, "capture-source.json");

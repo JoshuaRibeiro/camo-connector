@@ -31,7 +31,7 @@ internal static class Program
     {
         var fullPath = Path.GetFullPath(path);
         var name = Path.GetFileNameWithoutExtension(fullPath);
-        const string prefix = "CamoConnector.Updater-";
+        const string prefix = "CoDStreamingTools.Updater-";
         if (!string.Equals(Path.GetDirectoryName(fullPath), Path.TrimEndingDirectorySeparator(Path.GetTempPath()),
             StringComparison.OrdinalIgnoreCase) || Path.GetExtension(fullPath) != ".exe" ||
             !name.StartsWith(prefix, StringComparison.Ordinal) ||
@@ -99,7 +99,7 @@ internal sealed partial class ConnectorWindow : Form
         try
         {
             var data = Directory.CreateDirectory(Path.Combine(root, "Data")).FullName;
-            var executable = Path.Combine(root, "Runtime", "Bridge", "CamoConnector.Bridge.exe");
+            var executable = Path.Combine(root, "Runtime", "Bridge", "CoDStreamingTools.Bridge.exe");
             var start = new ProcessStartInfo(executable)
             {
                 UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = root,

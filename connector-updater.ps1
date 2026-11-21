@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $managedFiles = @(
     'background.js','backup.cjs','backup.js','bridge.cjs','capture-frame.ps1',
-    'connector-app.ps1','connector-updater.ps1','Launch Camo Connector.cmd',
+    'connector-app.ps1','connector-updater.ps1','Launch CoD Streaming Tools.cmd',
     'manifest.json','README.txt','special-catalog.json','sunburn.ps1','tracker.js'
 )
 
@@ -112,7 +112,7 @@ if ($Mode -eq 'Check') {
     return
 }
 Add-Type -AssemblyName System.Windows.Forms
-$stage = [IO.Directory]::CreateDirectory((Join-Path $env:TEMP ('CamoConnector-Update-' + [guid]::NewGuid().ToString('N')))).FullName
+$stage = [IO.Directory]::CreateDirectory((Join-Path $env:TEMP ('CoDStreamingTools-Update-' + [guid]::NewGuid().ToString('N')))).FullName
 $preserveStage = $false
 $reopen = $true
 try {
@@ -127,15 +127,15 @@ try {
     if ((Get-Item -LiteralPath $zip).Length -gt 25MB -or
         (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash -ne $release.Hash) { throw 'Release ZIP checksum failed.' }
     Install-ConnectorArchive $zip $InstallRoot $stage $release.Version
-    [void][Windows.Forms.MessageBox]::Show("Updated to $($release.Version). Reload the browser extension and refresh the tracker.",'Camo Connector')
+    [void][Windows.Forms.MessageBox]::Show("Updated to $($release.Version). Reload the browser extension and refresh the tracker.",'CoD Streaming Tools')
 } catch {
     $preserveStage = $_.Exception.Message -like '*automatic rollback failed*'
     if ($preserveStage) { $reopen = $false }
-    [void][Windows.Forms.MessageBox]::Show($_.Exception.Message,'Camo Connector update')
+    [void][Windows.Forms.MessageBox]::Show($_.Exception.Message,'CoD Streaming Tools update')
 } finally {
     if (!$preserveStage) { [IO.Directory]::Delete($stage,$true) }
     if ($reopen) {
-        $launcher = Join-Path $InstallRoot 'Launch Camo Connector.cmd'
+        $launcher = Join-Path $InstallRoot 'Launch CoD Streaming Tools.cmd'
         Start-Process -FilePath $launcher -WorkingDirectory $InstallRoot -WindowStyle Hidden
     }
     if ($StagedCopy) { Remove-Item -LiteralPath $PSCommandPath -ErrorAction SilentlyContinue }

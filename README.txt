@@ -2,7 +2,7 @@ CoD Streaming Tools
 
 Windows app
 
-For the current portable CamoConnector.exe release, choose one download on
+For the current portable CoDStreamingTools.exe release, choose one download on
 GitHub Releases:
 
 - Standard (win-x64-slim.zip): install the x64 .NET 10 Desktop Runtime and
@@ -11,9 +11,15 @@ GitHub Releases:
 - Offline (win-x64.zip): includes .NET, OCR and capture support. Use this for
   an offline setup or if you prefer to skip installing the .NET prerequisites.
 
-Extract the ZIP before launching CamoConnector.exe. Both downloads use the
+Extract the ZIP before launching CoDStreamingTools.exe. Both downloads use the
 same local tracker, capture controls and OBS overlay. The Tracker view uses
 Microsoft Edge WebView2. In-app updates stay on the edition you installed.
+
+Upgrading from Camo Connector
+
+Close the old app, extract the new ZIP into a fresh folder, and copy your
+existing Data folder into it before opening CoDStreamingTools.exe. The old
+in-app updater only accepts the previous package and executable names.
 
 Tracking and OBS
 

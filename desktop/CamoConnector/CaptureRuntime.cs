@@ -31,7 +31,7 @@ internal sealed partial class ConnectorWindow
             deadline.CancelAfter(TimeSpan.FromMinutes(5));
             var version = new Version(desktopVersion.Major, desktopVersion.Minor, desktopVersion.Build);
             var manifest = await release.RuntimeAsync(version, component.ToLowerInvariant(), updateKey, deadline.Token);
-            var path = Path.Combine(Path.GetTempPath(), "CamoConnector-runtime-" + Guid.NewGuid().ToString("N") + ".zip");
+            var path = Path.Combine(Path.GetTempPath(), "CoDStreamingTools-runtime-" + Guid.NewGuid().ToString("N") + ".zip");
             await using var archive = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None,
                 65536, FileOptions.DeleteOnClose);
             await release.DownloadArchiveAsync(manifest, archive, deadline.Token);

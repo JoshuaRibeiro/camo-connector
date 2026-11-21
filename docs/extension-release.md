@@ -1,10 +1,10 @@
-# Camo Connector browser submissions
+# CoD Streaming Tools browser submissions
 
 **Short description**  
-Sync Call of Duty camo progress to the MW4 tracker using the local Camo Connector desktop app.
+Sync Call of Duty camo progress to the MW4 tracker using the local CoD Streaming Tools desktop app.
 
 **Full description**  
-Connect the Dark Matter Solutions MW4 Camo Tracker to Camo Connector on Windows. Pair the browser with your desktop app to sync supported Multiplayer camo progress and save a local tracker backup. From the tracker backup panel you can restore that backup after confirming the action. The extension updates the tracker from events supplied by the desktop app. The Windows companion app is required.
+Connect the Dark Matter Solutions MW4 Camo Tracker to CoD Streaming Tools on Windows. Pair the browser with your desktop app to sync supported Multiplayer camo progress and save a local tracker backup. From the tracker backup panel you can restore that backup after confirming the action. The extension updates the tracker from events supplied by the desktop app. The Windows companion app is required.
 
 **Support**  
 [GitHub issues](https://github.com/JoshuaRibeiro/camo-connector/issues)
@@ -32,7 +32,7 @@ Firefox host permission patterns cannot specify a port. The Firefox manifest the
 
 For development, use **Load unpacked** on Chrome, Edge, or Opera (`opera://extensions`) and the unpacked Firefox manifest through `about:debugging`. Test with separate clean profiles. The current development companion is the matching repository checkout and needs Windows PowerShell and Node.js. Use the compiled portable companion download for reviewer instructions once it is available. Attach no real user pairing key, sync code, or progress file.
 
-1. Start Camo Connector, choose a writable data folder and click **Start connector**. Click **Copy browser pairing key**.
+1. Start CoD Streaming Tools, choose a writable data folder and click **Start connector**. Click **Copy browser pairing key**.
 2. Open the extension popup, enter the key and click **Connect**. Open the tracker in Multiplayer. Use a disposable tracker profile and a supported in-game event to verify sync.
 3. Verify that a Multiplayer backup is created. Open the tracker’s **Overlay & sync → Backup** panel and use the extension’s restore control on test data.
 4. Stop the app and verify the extension reports it offline. Restart with the same folder and verify reconnection. Restart the browser and repeat. Repeat after updating the extension while keeping the same browser profile.
@@ -42,9 +42,9 @@ For development, use **Load unpacked** on Chrome, Edge, or Opera (`opera://exten
 
 | Browser | First submission |
 | --- | --- |
-| Chrome | Register a publisher in the [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole). Add a new item, upload `CamoConnector-Chrome-vX.Y.Z.zip`, complete Store listing and Privacy, enter reviewer instructions, and submit for review. [Chrome publishing guide](https://developer.chrome.com/docs/webstore/publish) |
-| Firefox | Sign in to the [AMO Developer Hub](https://addons.mozilla.org/developers/), choose **Submit a New Add-on**, then choose listed distribution **On this site**. Upload `CamoConnector-Firefox-vX.Y.Z.zip`, provide the listing, policy and reviewer notes, and submit to Mozilla. AMO handles signing for public distribution. [Mozilla submission guide](https://extensionworkshop.com/documentation/publish/submitting-an-add-on/) |
-| Edge | Register for Edge extensions in [Partner Center](https://partner.microsoft.com/dashboard/), create a new extension, upload `CamoConnector-Edge-vX.Y.Z.zip`, complete availability, properties and listing, provide certification notes, and submit. [Edge publishing guide](https://learn.microsoft.com/en-us/microsoft-edge/extensions/publish/publish-extension) |
+| Chrome | Register a publisher in the [Chrome Web Store developer dashboard](https://chrome.google.com/webstore/devconsole). Add a new item, upload `CoDStreamingTools-Chrome-vX.Y.Z.zip`, complete Store listing and Privacy, enter reviewer instructions, and submit for review. [Chrome publishing guide](https://developer.chrome.com/docs/webstore/publish) |
+| Firefox | Sign in to the [AMO Developer Hub](https://addons.mozilla.org/developers/), choose **Submit a New Add-on**, then choose listed distribution **On this site**. Upload `CoDStreamingTools-Firefox-vX.Y.Z.zip`, provide the listing, policy and reviewer notes, and submit to Mozilla. AMO handles signing for public distribution. [Mozilla submission guide](https://extensionworkshop.com/documentation/publish/submitting-an-add-on/) |
+| Edge | Register for Edge extensions in [Partner Center](https://partner.microsoft.com/dashboard/), create a new extension, upload `CoDStreamingTools-Edge-vX.Y.Z.zip`, complete availability, properties and listing, provide certification notes, and submit. [Edge publishing guide](https://learn.microsoft.com/en-us/microsoft-edge/extensions/publish/publish-extension) |
 | Opera | Sign in to [Opera Add-ons](https://addons.opera.com/en/extensions/), use the Upload Extensions form linked in the publishing guide, and submit the Opera package, listing details, and screenshots for moderation. Opera recommends 612×408 screenshots. [Opera publishing guide](https://help.opera.com/en/extensions/publishing-guidelines/) |
 
 Use the repository’s `icon-128.png` as the source for listing icons. Capture genuine screenshots of the paired popup and the Multiplayer tracker after a successful sync. Use a clean profile and keep the pairing key, tracker sync code and player details out of the captures. For Chrome prepare a 1280×800 screenshot and use the included [440×280 small promotional tile](chrome-promo-440x280.png). Follow the current dashboard specifications for optional graphics and other store-specific sizes. Real screenshots and any listing media beyond the included assets still require capture and review.

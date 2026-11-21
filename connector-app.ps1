@@ -199,7 +199,7 @@ $ffmpeg = if (Test-Path -LiteralPath $bundledFfmpeg) { $bundledFfmpeg }
 $parent = Split-Path $PSScriptRoot -Parent
 $script:running = $false
 $script:captureNumber = 0
-$runFolder = [IO.Directory]::CreateDirectory((Join-Path $env:TEMP ('CamoConnector-' + [guid]::NewGuid().ToString('N')))).FullName
+$runFolder = [IO.Directory]::CreateDirectory((Join-Path $env:TEMP ('CoDStreamingTools-' + [guid]::NewGuid().ToString('N')))).FullName
 $defaultData = if ((Test-Path (Join-Path $parent 'sunburn-events.jsonl')) -or
     (Test-Path (Join-Path $parent 'mw4-camos.latest.json'))) { $parent }
     else { Join-Path $env:LOCALAPPDATA 'CamoConnector' }
@@ -218,7 +218,7 @@ $updateRepository = 'JoshuaRibeiro/camo-connector'
 $version = (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'manifest.json') -Raw | ConvertFrom-Json).version
 
 $form = [Windows.Forms.Form]::new()
-$form.Text = "Camo Connector $version"
+$form.Text = "CoD Streaming Tools $version"
 $form.ClientSize = [Drawing.Size]::new(1050,660)
 $form.MinimumSize = [Drawing.Size]::new(880,570)
 $form.StartPosition = 'CenterScreen'
@@ -363,7 +363,7 @@ $copyPairing.Add_Click({
     $key = $focusClient.DefaultRequestHeaders.Authorization.Parameter
     if (!$key) { return }
     [Windows.Forms.Clipboard]::SetText($key)
-    $status.Text = 'Paste the pairing key into the Camo Connector browser extension.'
+    $status.Text = 'Paste the pairing key into the CoD Streaming Tools browser extension.'
 })
 Set-Running $false
 
@@ -500,7 +500,7 @@ $updateButton.Add_Click({
             return
         }
         Save-Settings
-        $copy = Join-Path $PSScriptRoot ('CamoConnector-Updater-' + [guid]::NewGuid().ToString('N') + '.ps1')
+        $copy = Join-Path $PSScriptRoot ('CoDStreamingTools-Updater-' + [guid]::NewGuid().ToString('N') + '.ps1')
         Copy-Item -LiteralPath $updater -Destination $copy
         $arguments = @('-NoProfile','-File',$copy,'-Mode','Install','-Repository',$updateRepository,
             '-InstallRoot',$PSScriptRoot,'-ExpectedVersion',$script:availableVersion,'-AppProcessId',[string]$PID,'-StagedCopy')
@@ -516,7 +516,7 @@ $updateButton.Add_Click({
 $form.Add_FormClosing({
     if (!$SmokeTest -and !$script:updateClosing) {
         try { Save-Settings } catch {
-            [void][Windows.Forms.MessageBox]::Show($_.Exception.Message,'Could not save Camo Connector settings')
+            [void][Windows.Forms.MessageBox]::Show($_.Exception.Message,'Could not save CoD Streaming Tools settings')
         }
     }
 })

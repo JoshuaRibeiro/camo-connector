@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
-    <AssemblyName>CamoConnector.Bridge</AssemblyName>
+    <AssemblyName>CoDStreamingTools.Bridge</AssemblyName>
     <OutputType>WinExe</OutputType>
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>

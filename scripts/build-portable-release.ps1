@@ -16,7 +16,7 @@ $output = [IO.Directory]::CreateDirectory($OutputDirectory).FullName
 if (Get-ChildItem -LiteralPath $output -Force) { throw 'Release output must be empty.' }
 $assembly = Join-Path $output 'app'
 $slim = Join-Path $output 'slim'
-$programs = @('CamoConnector.exe','CamoConnector.Updater.exe','Runtime/Bridge/CamoConnector.Bridge.exe','Runtime/Detector/CamoConnector.Detector.exe')
+$programs = @('CoDStreamingTools.exe','CoDStreamingTools.Updater.exe','Runtime/Bridge/CoDStreamingTools.Bridge.exe','Runtime/Detector/CoDStreamingTools.Detector.exe')
 $coreFiles = $programs + 'Runtime/Bridge/special-catalog.json'
 
 function Get-ReleaseFiles($directory) {
@@ -32,7 +32,7 @@ function Write-Package($files, $required, $flavor, $manifestName) {
     foreach ($file in $required) {
         if ($file -cnotin $files.Relative) { throw "Missing release file: $file" }
     }
-    $asset = "CamoConnector-v$version-$flavor.zip"
+    $asset = "CoDStreamingTools-v$version-$flavor.zip"
     $archive = Join-Path $output $asset
     $zip = [IO.Compression.ZipFile]::Open($archive, 'Create')
     try {

@@ -10,7 +10,7 @@ On Windows x64 with the .NET 10 SDK, run the following from the repository root.
 ./scripts/build-desktop-preview.ps1 -OcrDirectory '<Tesseract directory>' -CaptureDirectory '<FFmpeg binary directory>'
 ```
 
-Run `dist/desktop-preview/CamoConnector.exe` and click **Connect automatically**
+Run `dist/desktop-preview/CoDStreamingTools.exe` and click **Connect automatically**
 in the development browser extension. Approve the first connection on the
 desktop. The extension keeps the resulting credential in its browser profile.
 In the desktop app, choose a monitor or DirectShow capture device and click
@@ -44,7 +44,7 @@ weapon-name recognition, Military unlock badges, hovered and tracked camo progre
 replay rejection. The detector needs a Windows
 x64 Tesseract distribution in the sibling `Ocr` directory, including its
 dependent DLLs and `tessdata/eng.traineddata`. Set up a test directory with
-`Runtime/Detector/CamoConnector.Detector.exe` and `Runtime/Ocr/tesseract.exe`.
+`Runtime/Detector/CoDStreamingTools.Detector.exe` and `Runtime/Ocr/tesseract.exe`.
 The detector-only CI artifact includes the detector and its runtimes for
 command-line testing. For a local build with a trusted Windows x64 OCR runtime,
 run the following from the repository:
@@ -53,8 +53,8 @@ run the following from the repository:
 ./scripts/build-detector-development.ps1 -OcrDirectory 'C:\Program Files\Tesseract-OCR' -CaptureDirectory '<FFmpeg binary directory>'
 ```
 
-`CamoConnector.Detector.exe --image frame.png Data` prints a read without
-writing tracker data. `CamoConnector.Detector.exe --monitor 0 Data` emits
+`CoDStreamingTools.Detector.exe --image frame.png Data` prints a read without
+writing tracker data. `CoDStreamingTools.Detector.exe --monitor 0 Data` emits
 two-read-confirmed weapon and hovered camo progress events for the selected
 desktop monitor. Hovered camo progress uses the camo title for identity.
 The tracked panel uses the name where available and can identify known
@@ -62,8 +62,8 @@ thumbnails from the existing catalogue. Use a disposable data directory
 until live capture is verified. The development detector also reads
 combat banners, longshot medals, match notices and Gold completion evidence.
 On a development build with FFmpeg in `Runtime/Capture`, run
-`CamoConnector.Detector.exe --list-devices` to list DirectShow sources. Use
-`CamoConnector.Detector.exe --device "<Input>" Data` with the returned Input
+`CoDStreamingTools.Detector.exe --list-devices` to list DirectShow sources. Use
+`CoDStreamingTools.Detector.exe --device "<Input>" Data` with the returned Input
 value. The detector normalises the incoming signal to a 1280×720 frame at
 up to 15 fps. Use an uncropped 16:9 game feed for the existing OCR regions.
 `--video clip.mp4 Data` reads a decoded frame for diagnostics without writing

@@ -27,7 +27,7 @@ function onTrackerConnect(port) {
 }
 
 async function request(route, key, options = {}, client = null) {
-  if (!/^[a-f0-9]{64}$/.test(key || '')) throw Error('Pair Camo Connector using the extension icon.');
+  if (!/^[a-f0-9]{64}$/.test(key || '')) throw Error('Pair CoD Streaming Tools using the extension icon.');
   let response;
   try {
     response = await fetch(bridge + route, {

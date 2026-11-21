@@ -21,8 +21,8 @@ public static class UpdateEnvironment
 
     public static void HandOff(string root, string operation)
     {
-        var copy = Path.Combine(Path.GetTempPath(), "CamoConnector.Updater-" + Guid.NewGuid().ToString("N") + ".exe");
-        File.Copy(Path.Combine(root, "CamoConnector.Updater.exe"), copy);
+        var copy = Path.Combine(Path.GetTempPath(), "CoDStreamingTools.Updater-" + Guid.NewGuid().ToString("N") + ".exe");
+        File.Copy(Path.Combine(root, "CoDStreamingTools.Updater.exe"), copy);
         try
         {
             var launch = new ProcessStartInfo(copy) { UseShellExecute = false, WorkingDirectory = root };

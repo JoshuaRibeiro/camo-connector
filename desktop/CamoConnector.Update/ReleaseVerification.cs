@@ -29,7 +29,7 @@ public sealed class ReleaseVerification
             ?? throw new InvalidDataException("Update manifest is empty.");
         if (!Version.TryParse(manifest.Version, out var version) || version.Build < 0 || version.Revision != -1 ||
             manifest.Version != version.ToString(3) || version <= installedVersion || releaseTag != "v" + manifest.Version ||
-            manifest.Asset != "CamoConnector-v" + manifest.Version + "-" + package + ".zip" ||
+            manifest.Asset != "CoDStreamingTools-v" + manifest.Version + "-" + package + ".zip" ||
             manifest.Size is <= 0 or > 512L * 1024 * 1024 ||
             manifest.Sha256 is not { Length: 64 } || !manifest.Sha256.All(Uri.IsHexDigit))
             throw new InvalidDataException("Update manifest does not match an eligible Windows release.");

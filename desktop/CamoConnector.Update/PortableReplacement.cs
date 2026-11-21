@@ -13,8 +13,8 @@ public sealed class PortableReplacement
 {
     private static readonly string[] Managed =
     {
-        "CamoConnector.exe", "Runtime/Bridge/CamoConnector.Bridge.exe",
-        "Runtime/Bridge/special-catalog.json", "Runtime/Detector/CamoConnector.Detector.exe", "CamoConnector.Updater.exe"
+        "CoDStreamingTools.exe", "Runtime/Bridge/CoDStreamingTools.Bridge.exe",
+        "Runtime/Bridge/special-catalog.json", "Runtime/Detector/CoDStreamingTools.Detector.exe", "CoDStreamingTools.Updater.exe"
     };
     private readonly string root;
     private readonly string work;

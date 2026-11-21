@@ -33,7 +33,7 @@ foreach ($browser in 'Chrome','Firefox','Edge','Opera') {
     foreach ($file in $files) { Copy-Item -LiteralPath (Join-Path $root $file) -Destination $target -Force }
     [IO.File]::WriteAllText((Join-Path $target 'manifest.json'), ($manifest | ConvertTo-Json -Depth 12), $utf8)
     $entries = ($files + @('manifest.json')) | ForEach-Object { Join-Path $target $_ }
-    $archive = Join-Path $output "CamoConnector-$browser-v$($manifest.version).zip"
+    $archive = Join-Path $output "CoDStreamingTools-$browser-v$($manifest.version).zip"
     Compress-Archive -LiteralPath $entries -DestinationPath $archive -Force
     Write-Output $archive
 }

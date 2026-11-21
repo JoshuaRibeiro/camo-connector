@@ -104,10 +104,10 @@ internal static class Program
             try
             {
                 report("Restarting CoD Streaming Tools…");
-                var launch = new ProcessStartInfo(Path.Combine(root, "CamoConnector.exe")) { WorkingDirectory = root };
+                var launch = new ProcessStartInfo(Path.Combine(root, "CoDStreamingTools.exe")) { WorkingDirectory = root };
                 var copy = Environment.ProcessPath;
                 if (copy != null && Path.GetDirectoryName(copy) == Path.TrimEndingDirectorySeparator(Path.GetTempPath()) &&
-                    Path.GetFileName(copy).StartsWith("CamoConnector.Updater-", StringComparison.Ordinal))
+                    Path.GetFileName(copy).StartsWith("CoDStreamingTools.Updater-", StringComparison.Ordinal))
                 {
                     launch.ArgumentList.Add("--cleanup-updater");
                     launch.ArgumentList.Add(copy);

@@ -12,7 +12,7 @@
   document.body.append(banner);
   let matchNotice = '';
   const show = message => {
-    const text = 'Camo Connector · ' + (matchNotice ? matchNotice + ' | ' : '') + message;
+    const text = 'CoD Streaming Tools · ' + (matchNotice ? matchNotice + ' | ' : '') + message;
     if (banner.textContent !== text) banner.textContent = text;
   };
   const label = element => (element.innerText ?? element.textContent).trim().replace(/\s+/g, ' ');
@@ -769,7 +769,7 @@
           openedDetails = null;
         }
         if (timing?.[baseline + 1]) {
-          console.info('[Camo Connector] Space Time +1 timing', {
+          console.info('[CoD Streaming Tools] Space Time +1 timing', {
             ...timing[baseline + 1], receivedAt: receivedTimes.get(String(baseline + 1)),
             appliedAt: new Date().toISOString(), count: updated.count
           });

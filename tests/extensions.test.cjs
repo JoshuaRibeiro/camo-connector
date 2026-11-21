@@ -398,7 +398,7 @@ for (const browser of ['Chrome', 'Firefox', 'Edge', 'Opera']) {
     ]);
     assert.equal(Boolean(manifest.background.scripts), browser === 'Firefox');
     assert.equal(Boolean(manifest.background.service_worker), browser !== 'Firefox');
-    assert.ok(fs.statSync(path.join(root, 'dist', `CamoConnector-${browser}-v${base.version}.zip`)).size > 0);
+    assert.ok(fs.statSync(path.join(root, 'dist', `CoDStreamingTools-${browser}-v${base.version}.zip`)).size > 0);
     for (const file of fs.readdirSync(folder).filter(file => file.endsWith('.js'))) {
       new vm.Script(fs.readFileSync(path.join(folder, file), 'utf8'), { filename: file });
     }

@@ -6,7 +6,7 @@ feed-trace/
 .env
 .env.*
 *.zip
-/CamoConnector-Updater-*.ps1
+/CoDStreamingTools-Updater-*.ps1
 /ffmpeg.exe
 bridge-pairing.key
 /dist/

@@ -10,8 +10,8 @@ function Apply-TestUpdate([string]$directory, [switch]$Interrupt, [switch]$Unman
     $archive = [IO.MemoryStream]::new()
     $zip = [IO.Compression.ZipArchive]::new($archive, 'Create', $true)
     try {
-        $paths = @('CamoConnector.exe','Runtime/Bridge/CamoConnector.Bridge.exe',
-            'Runtime/Bridge/special-catalog.json','Runtime/Detector/CamoConnector.Detector.exe','CamoConnector.Updater.exe')
+        $paths = @('CoDStreamingTools.exe','Runtime/Bridge/CoDStreamingTools.Bridge.exe',
+            'Runtime/Bridge/special-catalog.json','Runtime/Detector/CoDStreamingTools.Detector.exe','CoDStreamingTools.Updater.exe')
         if (!$Slim) { $paths += 'Runtime/Ocr/tesseract.exe','Runtime/Ocr/libstdc++-6.dll','Runtime/Ocr/tessdata/eng.traineddata','Runtime/Capture/ffmpeg.exe' }
         if ($Unmanaged) { $paths += 'Data/settings.json' }
         foreach ($path in $paths) {
@@ -31,20 +31,20 @@ function Apply-TestUpdate([string]$directory, [switch]$Interrupt, [switch]$Unman
 }
 
 if ($InterruptedRoot) { Apply-TestUpdate $InterruptedRoot -Interrupt; exit 1 }
-$root = Join-Path ([IO.Path]::GetTempPath()) ('Camo Connector update test ' + [guid]::NewGuid())
+$root = Join-Path ([IO.Path]::GetTempPath()) ('CoD Streaming Tools update test ' + [guid]::NewGuid())
 try {
     [void][IO.Directory]::CreateDirectory((Join-Path $root 'Data'))
     [void][IO.Directory]::CreateDirectory((Join-Path $root 'Runtime/Ocr'))
     [IO.File]::WriteAllText((Join-Path $root 'Data/settings.json'), 'settings')
     [IO.File]::WriteAllText((Join-Path $root 'notes.txt'), 'notes')
     [IO.File]::WriteAllText((Join-Path $root 'Runtime/Ocr/notes.txt'), 'runtime notes')
-    [IO.File]::WriteAllText((Join-Path $root 'CamoConnector.exe'), 'previous')
+    [IO.File]::WriteAllText((Join-Path $root 'CoDStreamingTools.exe'), 'previous')
     pwsh -NoProfile -File $PSCommandPath -InterruptedRoot $root
     if ($LASTEXITCODE -ne 73) { throw "Expected interruption, received $LASTEXITCODE." }
-    if ([IO.File]::ReadAllText((Join-Path $root 'CamoConnector.exe')) -ne 'new') { throw 'Replacement never started.' }
+    if ([IO.File]::ReadAllText((Join-Path $root 'CoDStreamingTools.exe')) -ne 'new') { throw 'Replacement never started.' }
     [CamoConnector.Update.PortableReplacement]::new($root).Recover()
-    if ([IO.File]::ReadAllText((Join-Path $root 'CamoConnector.exe')) -ne 'previous' -or
-        (Test-Path -LiteralPath (Join-Path $root 'Runtime/Bridge/CamoConnector.Bridge.exe'))) {
+    if ([IO.File]::ReadAllText((Join-Path $root 'CoDStreamingTools.exe')) -ne 'previous' -or
+        (Test-Path -LiteralPath (Join-Path $root 'Runtime/Bridge/CoDStreamingTools.Bridge.exe'))) {
         throw 'Recovery failed to restore the original files.'
     }
     try {
@@ -54,7 +54,7 @@ try {
         if ($_.Exception.ToString() -notmatch 'duplicate or unmanaged path') { throw }
     }
     Apply-TestUpdate $root
-    if ([IO.File]::ReadAllText((Join-Path $root 'CamoConnector.exe')) -ne 'new' -or
+    if ([IO.File]::ReadAllText((Join-Path $root 'CoDStreamingTools.exe')) -ne 'new' -or
         [IO.File]::ReadAllText((Join-Path $root 'Data/settings.json')) -ne 'settings' -or
         [IO.File]::ReadAllText((Join-Path $root 'notes.txt')) -ne 'notes' -or
         [IO.File]::ReadAllText((Join-Path $root 'Runtime/Ocr/notes.txt')) -ne 'runtime notes' -or
@@ -74,7 +74,7 @@ try {
             $zip = [IO.Compression.ZipArchive]::new($archive, 'Create', $true)
             try {
                 $paths = @('Runtime/Capture/ffmpeg.exe')
-                if ($includeUnmanaged) { $paths += 'CamoConnector.exe' }
+                if ($includeUnmanaged) { $paths += 'CoDStreamingTools.exe' }
                 foreach ($path in $paths) {
                     $writer = [IO.StreamWriter]::new($zip.CreateEntry($path).Open())
                     try { $writer.Write('downloaded runtime') } finally { $writer.Dispose() }
@@ -99,7 +99,7 @@ try {
     $content = [Text.Encoding]::UTF8.GetBytes('verified update bytes')
     [IO.File]::WriteAllBytes($archivePath, $content)
     $metadata = [Text.Encoding]::UTF8.GetBytes((@{
-        version = '2.1.0'; asset = 'CamoConnector-v2.1.0-win-x64.zip'; size = $content.Length
+        version = '2.1.0'; asset = 'CoDStreamingTools-v2.1.0-win-x64.zip'; size = $content.Length
         sha256 = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($content))
     } | ConvertTo-Json -Compress))
     $signer = [Security.Cryptography.RSA]::Create(2048)

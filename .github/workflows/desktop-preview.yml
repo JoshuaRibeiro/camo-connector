@@ -111,7 +111,7 @@ jobs:
           if ($LASTEXITCODE -or $languages -notcontains 'eng') { throw 'Bundled OCR cannot load the English model.' }
           $devices = & "$runtime/Capture/ffmpeg.exe" -hide_banner -devices
           if ($LASTEXITCODE -or !($devices -match '\bdshow\b')) { throw 'Bundled FFmpeg lacks DirectShow support.' }
-      - run: ./tests/native-bridge.ps1 -Executable (Join-Path $env:CAMO_CHECK_ROOT 'Runtime/Bridge/CamoConnector.Bridge.exe')
+      - run: ./tests/native-bridge.ps1 -Executable (Join-Path $env:CAMO_CHECK_ROOT 'Runtime/Bridge/CoDStreamingTools.Bridge.exe')
       - name: Check the standard bridge with installed .NET
         if: github.ref_type == 'tag'
         run: |
@@ -125,25 +125,25 @@ jobs:
             }
           }
           $env:DOTNET_DISABLE_GUI_ERRORS = '1'
-          ./tests/native-bridge.ps1 -Executable dist/portable-release/slim/Runtime/Bridge/CamoConnector.Bridge.exe
+          ./tests/native-bridge.ps1 -Executable dist/portable-release/slim/Runtime/Bridge/CoDStreamingTools.Bridge.exe
       - uses: actions/upload-artifact@v4
         if: github.ref_type != 'tag'
         with:
-          name: CamoConnector-detector-development-win-x64
+          name: CoDStreamingTools-detector-development-win-x64
           path: dist/detector-development/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: github.ref_type != 'tag'
         with:
-          name: CamoConnector-desktop-preview-win-x64
+          name: CoDStreamingTools-desktop-preview-win-x64
           path: dist/desktop-preview/
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: github.ref_type == 'tag'
         with:
-          name: CamoConnector-desktop-release
+          name: CoDStreamingTools-desktop-release
           path: |
-            dist/portable-release/CamoConnector-v*-win-x64*.zip
+            dist/portable-release/CoDStreamingTools-v*-win-x64*.zip
             dist/portable-release/portable-*.json
             dist/portable-release/portable-*.sig
             dist/portable-release/runtime-*.json
@@ -159,14 +159,14 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: CamoConnector-desktop-release
+          name: CoDStreamingTools-desktop-release
           path: release
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          $prefix = "CamoConnector-$env:GITHUB_REF_NAME-win-x64"
+          $prefix = "CoDStreamingTools-$env:GITHUB_REF_NAME-win-x64"
           $assets = @(
             "release/$prefix-slim.zip", "release/$prefix.zip", "release/$prefix-ocr.zip", "release/$prefix-capture.zip",
             'release/portable-update.json', 'release/portable-update.sig',
@@ -178,6 +178,7 @@ jobs:
           **Standard download:** [$prefix-slim.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix-slim.zip). Includes FFmpeg and OCR. Requires the installed x64 .NET 10 Desktop Runtime and ASP.NET Core Runtime.
 
           **Offline download:** [$prefix.zip](https://github.com/$env:GH_REPO/releases/download/$env:GITHUB_REF_NAME/$prefix.zip). Includes the .NET runtimes, OCR and capture support. Both editions use Microsoft Edge WebView2 for the built-in tracker.
+          **Upgrading from an older executable name?** Close the old app, extract this ZIP into a fresh folder, and copy your existing Data folder there before opening CoDStreamingTools.exe.
           "@ | Set-Content release-notes.md
           gh release create $env:GITHUB_REF_NAME @assets --verify-tag --latest --generate-notes --notes-file release-notes.md --title "CoD Streaming Tools $env:GITHUB_REF_NAME"
           if ($LASTEXITCODE) { throw 'GitHub Release publishing failed.' }
