@@ -59,7 +59,23 @@ internal sealed partial class ConnectorWindow
                     uri.Scheme != "http" || uri.Host != "127.0.0.1" ||
                     uri.Port != 47150 || uri.AbsolutePath != "/local/tracker";
             };
-            core.NewWindowRequested += (_, args) => args.Handled = true;
+            core.NewWindowRequested += (_, args) =>
+            {
+                args.Handled = true;
+                const string channel = "https://www.twitch.tv/11annah";
+                if (!args.IsUserInitiated || !string.Equals(args.Uri, channel, StringComparison.Ordinal)) return;
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(channel)
+                    {
+                        UseShellExecute = true
+                    });
+                }
+                catch (System.ComponentModel.Win32Exception)
+                {
+                    trackerMessage.Text = "Could not open 11annah’s Twitch channel.";
+                }
+            };
             core.NavigationCompleted += (_, args) => trackerMessage.Text = args.IsSuccess ? "" : "Local tracker could not load.";
             var key = File.ReadAllText(Path.Combine(root, "Data", "bridge-pairing.key")).Trim();
             core.Navigate("http://127.0.0.1:47150/local/tracker#" + key);

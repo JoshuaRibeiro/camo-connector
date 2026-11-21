@@ -29,6 +29,54 @@ function element(tag, text, className) {
   return node;
 }
 
+function progressMeter(label, count, total) {
+  const meter = element('progress');
+  meter.max = total || 1;
+  meter.value = count;
+  meter.setAttribute('aria-label', label);
+  return meter;
+}
+
+function completedCount(weapon, rules) {
+  return rules.filter(rule => state.progress[weapon + ':' + rule.id]?.done).length;
+}
+
+function renderCollection() {
+  const total = catalog.shared.length + catalog.weapons.reduce((sum, weapon) => sum + weapon.camos.length, 0);
+  const done = completedCount('shared', catalog.shared) + catalog.weapons.reduce((sum, weapon) =>
+    sum + completedCount(weapon.id, weapon.camos), 0);
+  byId('overall-count').textContent = done + ' / ' + total + ' camos unlocked';
+  const overall = byId('overall-meter');
+  overall.max = total || 1;
+  overall.value = done;
+
+  const tiers = new Map();
+  for (const weapon of catalog.weapons) {
+    for (const rule of weapon.camos.filter(rule => rule.type === 'Completionist')) {
+      if (!tiers.has(rule.id)) tiers.set(rule.id, { rule, done: 0, total: 0 });
+      const tier = tiers.get(rule.id);
+      tier.total++;
+      tier.done += completedCount(weapon.id, [rule]);
+    }
+  }
+  const cards = [...tiers.values()].map(({ rule, done, total }) => {
+    const card = element('article', null, 'mastery-tile');
+    if (rule.artwork) {
+      const image = element('img');
+      image.src = rule.artwork;
+      image.alt = '';
+      card.append(image);
+    }
+    const copy = element('div', null, 'tile-copy');
+    const caption = element('div', null, 'tile-caption');
+    caption.append(element('h3', rule.name), element('span', done + '/' + total));
+    copy.append(caption, progressMeter(rule.name + ' completion', done, total));
+    card.append(copy);
+    return card;
+  });
+  byId('mastery-tiles').replaceChildren(...cards);
+}
+
 function choose(id) {
   if (id === 'shared') {
     selected = id;
@@ -47,14 +95,15 @@ function renderRoster() {
     const matches = catalog.weapons.filter(weapon => weapon.category === category && weapon.name.toLowerCase().includes(query));
     if (!matches.length) continue;
     entries.push(element('h2', category));
-    for (const weapon of matches) entries.push(selection(weapon.id, weapon.name));
+    for (const weapon of matches) entries.push(selection(weapon.id, weapon.name, weapon.camos));
   }
   if (!query) entries.push(selection('shared', 'Prestige & mastery'));
   roster.replaceChildren(...entries);
 }
 
-function selection(id, label) {
-  const button = element('button', label);
+function selection(id, label, rules = catalog.shared) {
+  const button = element('button');
+  button.append(element('span', label), element('span', completedCount(id, rules) + '/' + rules.length, 'weapon-count'));
   if (id === selected) button.setAttribute('aria-current', 'true');
   button.addEventListener('click', () => choose(id));
   return button;
@@ -81,8 +130,12 @@ function renderOverview() {
     const copy = element('div');
     copy.append(element('div', waiting.name, 'camo-name'));
     copy.append(element('p', waiting.unlock ?? 'Complete the prerequisite camos to unlock this challenge.', 'prerequisite'));
-    if (waiting.count != null && waiting.goal != null)
-      copy.append(element('p', waiting.count + '/' + waiting.goal, 'subtitle'));
+    if (waiting.count != null && waiting.goal != null) {
+      const progress = element('div', null, 'overview-meter');
+      progress.append(progressMeter(waiting.name + ' prerequisite progress', waiting.count, waiting.goal),
+        element('span', waiting.count + '/' + waiting.goal));
+      copy.append(progress);
+    }
     const description = element('div', null, 'camo-description');
     if (waiting.artwork) {
       const image = element('img', null, 'camo-artwork');
@@ -108,6 +161,7 @@ function renderOverview() {
 }
 
 function render() {
+  renderCollection();
   renderOverview();
   renderRoster();
   const detail = byId('detail');
@@ -119,7 +173,9 @@ function render() {
     return;
   }
   const title = element('h2', weapon?.name ?? 'Prestige & mastery');
-  const entries = [title];
+  const detailHeading = element('div', null, 'detail-heading');
+  detailHeading.append(title, element('span', completedCount(selected, rules) + ' / ' + rules.length, 'weapon-count'));
+  const entries = [detailHeading];
   if (weapon) {
     const level = state.progress[weapon.id + ':weapon-level']?.count;
     entries.push(element('p', weapon.category + (level == null ? '' : ' · Weapon level ' + level), 'subtitle'));
@@ -136,6 +192,7 @@ function render() {
 function camoRow(rule, weapon, overview) {
   const current = state.progress[weapon + ':' + rule.id] ?? { count: 0, done: false };
   const row = element('div', null, 'camo-row');
+  row.classList.toggle('camo-complete', current.done);
   const copy = element('div');
   copy.append(element('div', rule.name, 'camo-name'));
   if (rule.objective) copy.append(element('p', rule.objective));
@@ -143,10 +200,7 @@ function camoRow(rule, weapon, overview) {
     rule.unlock.replace(/\bmore\s+/i, ''), 'prerequisite'));
   const controls = element('div', null, 'controls');
   if (overview && !current.done && overview.count != null && overview.goal != null) {
-    const meter = element('progress');
-    meter.max = overview.goal;
-    meter.value = overview.count;
-    meter.setAttribute('aria-label', rule.name + ' progress');
+    const meter = progressMeter(rule.name + ' progress', overview.count, overview.goal);
     const progress = element('div', null, 'overview-meter');
     progress.append(meter, element('span', overview.count + ' / ' + overview.goal));
     copy.append(progress);
@@ -160,6 +214,11 @@ function camoRow(rule, weapon, overview) {
     }
   }
   if (!overview && rule.goal != null) {
+    if (!current.done && current.count > 0) {
+      const progress = element('div', null, 'overview-meter');
+      progress.append(progressMeter(rule.name + ' progress', current.count, rule.goal));
+      copy.append(progress);
+    }
     const input = element('input');
     input.type = 'number';
     input.min = '0';
@@ -219,14 +278,21 @@ async function poll() {
 
 byId('search').addEventListener('input', renderRoster);
 byId('import').addEventListener('click', () => void save('import', {}, 'Saved progress merged.'));
-byId('overlay').addEventListener('click', async () => {
+byId('overlay').addEventListener('click', () => {
+  const section = byId('overlay-settings');
+  section.hidden = !section.hidden;
+  byId('overlay').setAttribute('aria-expanded', String(!section.hidden));
+});
+for (const button of document.querySelectorAll('[data-overlay]')) button.addEventListener('click', async () => {
   if (!overlayUrl) return;
+  const url = new URL(overlayUrl);
+  if (button.dataset.overlay === '11annah') url.searchParams.set('layout', '11annah');
   try {
-    await navigator.clipboard.writeText(overlayUrl);
+    await navigator.clipboard.writeText(url.href);
     statusLine.textContent = 'OBS Browser Source URL copied.';
   } catch {
     const input = byId('overlay-url');
-    input.value = overlayUrl;
+    input.value = url.href;
     byId('overlay-dialog').showModal();
     input.select();
   }

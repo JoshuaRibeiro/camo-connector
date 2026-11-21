@@ -2,6 +2,8 @@
 
 const key = location.hash.slice(1);
 const byId = id => document.getElementById(id);
+if (new URLSearchParams(location.search).get('layout') === '11annah')
+  document.body.classList.add('layout-11annah');
 
 let previous;
 

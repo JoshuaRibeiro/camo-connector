@@ -12,10 +12,36 @@
     <div><h1>Camo tracker</h1><p>Multiplayer</p></div>
     <div class="actions">
       <button id="import">Import saved progress</button>
-      <button id="overlay">Copy OBS overlay URL</button>
+      <button id="overlay" aria-expanded="false" aria-controls="overlay-settings">Overlays</button>
     </div>
   </header>
   <p id="status" role="status"></p>
+  <section id="overlay-settings" aria-labelledby="overlay-heading" hidden>
+    <h2 id="overlay-heading">OBS overlays</h2>
+    <div class="overlay-options">
+      <article>
+        <h3>Default</h3>
+        <p>The original Camo Connector layout.</p>
+        <button data-overlay="default">Copy Default URL</button>
+      </article>
+      <article class="custom-option">
+        <h3>11annah</h3>
+        <p>Teal accents, larger camo art, and a 70% opacity card.</p>
+        <div class="actions">
+          <button data-overlay="11annah">Copy 11annah URL</button>
+          <a class="twitch-link" href="https://www.twitch.tv/11annah" target="_blank" rel="noopener noreferrer">11annah on Twitch ↗</a>
+        </div>
+      </article>
+    </div>
+  </section>
+  <section class="collection" aria-labelledby="collection-heading">
+    <div class="collection-heading">
+      <h2 id="collection-heading">Overall progress</h2>
+      <p id="overall-count" class="subtitle"></p>
+    </div>
+    <progress id="overall-meter" aria-label="Overall camo completion" max="1" value="0"></progress>
+    <div id="mastery-tiles" class="mastery-tiles"></div>
+  </section>
   <section class="overview" aria-labelledby="overview-heading">
     <h2 id="overview-heading">Next camo unlocks</h2>
     <div id="overview-content"></div>

@@ -84,10 +84,71 @@ dialog form { display: grid; gap: .7rem; }
 .overlay-unlock:last-child { padding-bottom: 0; }
 #unlock-rows { margin-top: .5em; }
 #weapon-level { font-size: .85em; }
+.overlay-heading { display: contents; }
+.layout-11annah { --accent: #62bca4; }
+.layout-11annah #overlay-card { background: rgb(16 25 26 / .7); border-left: 0; border-right: .24em solid var(--accent); }
+.layout-11annah .overlay-heading { display: flex; justify-content: space-between; align-items: baseline; gap: .75em; }
+.layout-11annah #weapon-level { text-align: right; }
+.layout-11annah .overlay-unlock { gap: .75em; }
+.layout-11annah .overlay-unlock h2 { margin-top: 0; }
+.layout-11annah .camo-artwork { width: 3.6em; height: 3.6em; }
 progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 @media (max-width: 640px) {
   main { grid-template-columns: minmax(7rem, 32%) 1fr; }
   aside { padding: .65rem; }
   .camo-row { align-items: start; flex-direction: column; }
   .toolbar { align-items: start; }
+}
+
+.tracker .toolbar { padding-block: .95rem; background: #141b22; }
+.tracker .toolbar h1 { letter-spacing: -.045em; }
+.collection, #overlay-settings {
+  margin: 1rem clamp(.85rem, 3vw, 2rem); padding: 1rem;
+  border: 1px solid #31434c; border-radius: .9rem;
+  background: linear-gradient(120deg, #1c3032, #17212a 65%);
+}
+.collection-heading, .detail-heading, .tile-caption {
+  display: flex; align-items: baseline; justify-content: space-between; gap: .5rem;
+}
+.collection-heading { flex-wrap: wrap; }
+.collection h2, #overlay-settings h2 { font-size: 1.15rem; }
+#overall-count, .weapon-count { font-variant-numeric: tabular-nums; }
+#overall-meter { display: block; width: 100%; margin: .55rem 0 .85rem; height: .48rem; }
+.mastery-tiles, .overlay-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
+.mastery-tile {
+  position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: end; min-height: 5.6rem;
+  border: 1px solid #526163; border-radius: .55rem; background: #243237;
+}
+.mastery-tile img, .mastery-tile::before { position: absolute; inset: 0; width: 100%; height: 100%; }
+.mastery-tile img { object-fit: cover; z-index: -2; }
+.mastery-tile::before { content: ''; background: linear-gradient(transparent, #0b1316f5 88%); z-index: -1; }
+.tile-copy { width: 100%; padding: .45rem .55rem; color: #f0f5f6; }
+.tile-caption { flex-wrap: wrap; gap: .2rem .4rem; font-size: .83rem; text-shadow: 0 1px 3px #000; }
+.tile-caption h3 { font-size: inherit; }
+.tile-caption span { font-variant-numeric: tabular-nums; }
+.tile-copy progress { display: block; width: 100%; height: .4rem; margin-top: .25rem; }
+.overlay-options { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: .65rem; }
+.overlay-options article { padding: .8rem; border: 1px solid #405156; border-radius: .65rem; background: #172126; }
+.overlay-options .custom-option { border-top-color: #62bca4; }
+.overlay-options p { margin: .3rem 0 .65rem; color: #9eb3c1; font-size: .86rem; }
+.overlay-options .actions { justify-content: start; }
+.twitch-link {
+  align-self: center; padding: .44rem .62rem; color: #dbc8ff; text-decoration: none;
+  border: 1px solid #64517d; border-radius: 999px; background: #2b2238;
+}
+.twitch-link:is(:hover, :focus-visible) { border-color: #dbc8ff; }
+.tracker .overview { margin: 1rem clamp(.85rem, 3vw, 2rem); padding: .8rem 1rem; border: 1px solid #31434c; border-radius: .8rem; }
+.tracker .camo-row { padding: .42rem .5rem; border-color: #283943; }
+.tracker .camo-complete { border-color: #3b5d53; }
+.tracker .camo-artwork { width: 3.1em; height: 3.1em; }
+.tracker .overview-meter progress { flex: 0 1 6rem; height: .45rem; }
+.tracker nav button { display: flex; align-items: baseline; justify-content: space-between; gap: .35rem; border-radius: .4rem; font-size: .9rem; }
+.weapon-count { color: var(--accent); white-space: nowrap; font-size: .78rem; }
+.tracker .controls button { padding: .3rem .48rem; }
+@media (max-width: 640px) {
+  .mastery-tiles, .overlay-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tracker .camo-row { gap: .35rem; }
+}
+@media (max-width: 400px) {
+  .overlay-options { grid-template-columns: 1fr; }
 }
