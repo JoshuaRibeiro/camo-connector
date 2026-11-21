@@ -24,7 +24,8 @@ internal sealed class LocalTracker
     internal sealed record Weapon(string Id, string Name, string Category, Rule[] Camos);
     internal sealed record Catalog(Weapon[] Weapons, Rule[] Shared);
     internal sealed record Entry(int Count, bool Done);
-    internal sealed record State(string? Focus, Dictionary<string, Entry> Progress, string? OverlayLayout = null);
+    internal sealed record State(string? Focus, Dictionary<string, Entry> Progress, string? OverlayLayout = null,
+        string? PinnedWeapon = null);
     internal sealed record Edit(string? Weapon, string? Camo, int? Count, bool? Done, int? Increment = null);
 
     public LocalTracker(string data)
@@ -166,7 +167,11 @@ internal sealed class LocalTracker
         if (edit.Camo == null)
         {
             if (!weapons.ContainsKey(edit.Weapon) || edit.Increment != null) return false;
-            Change((next, _) => edit.Weapon);
+            lock (gate)
+            {
+                if (state.Focus != edit.Weapon || state.PinnedWeapon != edit.Weapon)
+                    SaveState(state with { Focus = edit.Weapon, PinnedWeapon = edit.Weapon });
+            }
             return true;
         }
         var key = edit.Weapon + ":" + edit.Camo;
@@ -224,8 +229,26 @@ internal sealed class LocalTracker
         var item = document.RootElement;
         if (ProgressFeed.Text(item, "source") != "live" || ProgressFeed.Text(item, "mode") != "mp") return;
         var name = ProgressFeed.Text(item, "weapon");
-        if (name == null || !weapons.TryGetValue(Key(name), out var weapon)) return;
         var kind = ProgressFeed.Text(item, "kind");
+        if (kind == "completionist-unlock" && ProgressFeed.Text(item, "context") == "unlock-banner" &&
+            ProgressFeed.Text(item, "challenge") is { } challenge)
+        {
+            Change((next, focus) =>
+            {
+                foreach (var id in new[] { state.PinnedWeapon, name == null ? null : Key(name), focus })
+                {
+                    if (id == null || !weapons.TryGetValue(id, out var candidate)) continue;
+                    var camo = candidate.Camos.FirstOrDefault(rule =>
+                        rule.Type == "Completionist" && Key(rule.Name) == Key(challenge));
+                    if (camo == null) continue;
+                    ApplyProgress(next, id + ":" + camo.Id, 0, true);
+                    break;
+                }
+                return focus;
+            });
+            return;
+        }
+        if (name == null || !weapons.TryGetValue(Key(name), out var weapon)) return;
         if (kind == "weapon")
         {
             Change((_, _) => weapon.Id);

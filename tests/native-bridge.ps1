@@ -230,6 +230,22 @@ try {
         $currentCatalog.overlayUrl -ne $catalog.overlayUrl) {
         throw 'Switching back to Default did not retain the existing OBS URL.'
     }
+    $pin = @{ weapon = '50-gs' } | ConvertTo-Json
+    Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $pin | Out-Null
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":"Signal 50"}',
+        '{"kind":"completionist-unlock","source":"live","mode":"mp","context":"unlock-banner","weapon":"Signal 50","challenge":"Gold"}'
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $tracker = Check-Events 200 $native 'local/state'
+        if ($tracker.progress.'50-gs:gold'.done) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if (!$tracker.progress.'50-gs:gold'.done -or $tracker.progress.'signal-50:gold'.done -or
+        $tracker.focus -ne 'signal-50') {
+        throw 'A generic Gold banner should follow the pinned weapon after the equipped weapon changes.'
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

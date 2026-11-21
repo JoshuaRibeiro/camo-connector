@@ -458,7 +458,19 @@ internal sealed class HudCapture : IDisposable
             System.Text.RegularExpressions.Regex.IsMatch(heading, @"[CG]OMPLE", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) &&
             CombatRecognition.IsPlatinumArtwork(Sample(frame, .148, (.471, .058, .102, 0))))
             return ("platinum", true, null, null);
-        if (!goldTile && !completed) return (null, false, null, null);
+        var cyanLetters = 0;
+        if (!goldTile && !completed)
+        {
+            for (var y = 0; y < 8; y++)
+            for (var x = 0; x < 72; x++)
+            {
+                var pixel = frame.GetPixel((int)((.363 + x * .0038) * frame.Width),
+                    (int)((.260 + y * .0037) * frame.Height));
+                if (Math.Min(pixel.G, pixel.B) >= 155 && Math.Min(pixel.G, pixel.B) - pixel.R >= 22)
+                    cyanLetters++;
+            }
+            if (cyanLetters < 15) return (null, false, null, null);
+        }
         var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)
             ? "gold-15" : SpecialUnlocks.ReadBanner(heading, text);
@@ -470,6 +482,10 @@ internal sealed class HudCapture : IDisposable
             if (Match(detail) is { } fallback) return (fallback, true, null, null);
             details.Add(detail);
         }
+        // Hardpoint notices can cover the middle of the Gold objective.
+        var goalStart = await ReadBannerText((.402, .297, .083, .025), "goldObjectiveStart");
+        if (CombatRecognition.IsSplitGoldObjective(goalStart, string.Join(" ", details)))
+            return ("gold-15", true, null, null);
         return (null, completed && !goldTile, details.ToArray(), null);
 
         static bool LooksCompleted(string text) => System.Text.RegularExpressions.Regex.IsMatch(text,

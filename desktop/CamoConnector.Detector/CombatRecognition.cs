@@ -103,6 +103,10 @@ public static class CombatRecognition
             Regex.IsMatch(heading, @"\bCOMPLETED\b", IgnoreCase)) && Regex.IsMatch(objective, goldGoal) ||
             goldTile && Regex.IsMatch(objective, @"\A(?:GET)?15PLAYER(?:KILLS)?(?:IN)?ASINGLEMATCH\z");
     }
+
+    internal static bool IsSplitGoldObjective(string start, string end) =>
+        Regex.IsMatch(start, @"\b15\s+PLAYER\b", IgnoreCase) &&
+        Regex.IsMatch(end, @"\bIN\s+A\s+SINGLE\s+MATCH", IgnoreCase);
 }
 
 public sealed class CombatConfirmation

@@ -180,11 +180,16 @@ function render() {
   }
   const title = element('h2', weapon?.name ?? 'Prestige & mastery');
   const detailHeading = element('div', null, 'detail-heading');
-  detailHeading.append(title, element('span', completedCount(selected, rules) + ' / ' + rules.length, 'weapon-count'));
+  const headingMeta = element('div', null, 'weapon-heading-meta');
+  const level = weapon && (state.focus === weapon.id
+    ? state.overview.level ?? (state.overview.minimumLevel ? state.overview.minimumLevel + '+' : null)
+    : state.progress[weapon.id + ':weapon-level']?.count);
+  if (weapon && level != null) headingMeta.append(element('span', 'Weapon level ' + level, 'subtitle'));
+  headingMeta.append(element('span', completedCount(selected, rules) + ' / ' + rules.length, 'weapon-count'));
+  detailHeading.append(title, headingMeta);
   const entries = [detailHeading];
   if (weapon) {
-    const level = state.progress[weapon.id + ':weapon-level']?.count;
-    entries.push(element('p', weapon.category + (level == null ? '' : ' · Weapon level ' + level), 'subtitle'));
+    entries.push(element('p', weapon.category, 'subtitle'));
   }
   for (const group of new Set(rules.map(rule => rule.type))) {
     const section = element('section', null, 'group');

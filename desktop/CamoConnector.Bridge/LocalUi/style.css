@@ -79,11 +79,10 @@ dialog form { display: grid; gap: .7rem; }
 .overlay-unlock:last-child { padding-bottom: 0; }
 #unlock-rows { margin-top: .5em; }
 #weapon-level { font-size: .85em; }
-.overlay-heading { display: contents; }
+.overlay-heading { display: flex; justify-content: space-between; align-items: baseline; gap: .75em; }
+#weapon-level { text-align: right; }
 .layout-11annah { --accent: #62bca4; }
 .layout-11annah #overlay-card { background: rgb(16 25 26 / .7); border-left: 0; border-right: .24em solid var(--accent); }
-.layout-11annah .overlay-heading { display: flex; justify-content: space-between; align-items: baseline; gap: .75em; }
-.layout-11annah #weapon-level { text-align: right; }
 .layout-11annah .overlay-unlock { gap: .75em; }
 .layout-11annah .overlay-unlock h2 { margin-top: 0; }
 .layout-11annah .camo-artwork { width: 4.4em; height: 4.4em; }
@@ -138,6 +137,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .tracker .overview-meter progress { flex: 0 1 6rem; height: .45rem; }
 .tracker nav button { display: flex; align-items: baseline; justify-content: space-between; gap: .35rem; border-radius: .4rem; font-size: .9rem; }
 .weapon-count { color: var(--accent); white-space: nowrap; font-size: .78rem; }
+.weapon-heading-meta { display: flex; flex-wrap: wrap; justify-content: end; align-items: baseline; gap: .3rem .65rem; }
 .tracker .controls button { padding: .3rem .48rem; }
 @media (max-width: 640px) {
   .mastery-tiles, .overlay-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
