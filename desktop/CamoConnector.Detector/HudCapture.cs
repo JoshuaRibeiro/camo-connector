@@ -649,6 +649,16 @@ internal sealed class HudCapture : IDisposable
             if (candidate != null && candidate.Count == candidate.Goal) return null;
             return CamoMenuRecognition.CheckObjectiveGoal(candidate, catalogGoal, objectives);
         }
+        // Keep the progress bar out of the first OCR pass for the standard layout.
+        // When the objective crop already supplied a value, the tight crop can confirm it.
+        CamoProgress? tight = null;
+        if (!raisedDetails && progress != null)
+        {
+            tight = await ReadCounter((.534, .810, .032, .027), PixelAdjustment.Normal, "camoTightCounter");
+            if (CamoMenuRecognition.ConfirmCounter(progress, tight, null) is { } tightConfirmed)
+                return Validate(tightConfirmed);
+            if (tight != null) return null;
+        }
         var isolated = await ReadCounter(raisedDetails ? (.525, .572, .045, .037) : (.512, .795, .060, .045), PixelAdjustment.Normal, "camoCounter");
         if (CamoMenuRecognition.ConfirmCounter(progress, isolated, null) is { } confirmed)
             return Validate(confirmed);
@@ -669,7 +679,7 @@ internal sealed class HudCapture : IDisposable
         var (challenge, _) = await ReadTextAsync(frame, (.341, .774, .280, .033), cancel, pageMode: 7,
             adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "camoChallengeLine");
         if (!CamoMenuRecognition.MatchesCamoObjective(challenge, expectedObjective)) return null;
-        var tight = await ReadCounter((.534, .810, .032, .027), PixelAdjustment.Normal, "camoTightCounter");
+        tight = await ReadCounter((.534, .810, .032, .027), PixelAdjustment.Normal, "camoTightCounter");
         if (tight == null || (isolated != null && isolated != tight) || (alternate != null && alternate != tight))
             return null;
         var corroborating = isolated ?? alternate ??

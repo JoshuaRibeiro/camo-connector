@@ -79,6 +79,22 @@ test('lobby OCR stabilizes large corrections and accepts small updates quickly',
   assert.equal(context.state.current, 4250);
 });
 
+test('an apparent jump to 4938 cannot bypass a lobby OCR reading of 2538', async () => {
+  const context = vm.createContext({
+    state: { current: 2536 },
+    readText: async () => 'TROPHIES COLLECTED',
+    readLobbyLine: async () => 2538
+  });
+  vm.runInContext(source.slice(source.indexOf('function isLargeTotalChange'), source.indexOf('const files =')), context);
+  const read = await context.readHomeTotal({ label: 'label', templateTotal: 4938 });
+  assert.equal(read.value, 2538);
+  assert.equal(read.corroborated, true);
+  context.state.current = 4938;
+  const correction = await context.readHomeTotal({ label: 'label', templateTotal: 2538 });
+  assert.equal(correction.value, 2538);
+  assert.equal(correction.corroborated, true);
+});
+
 test('lobby OCR recovers a six when original pixels corroborate a masked read', async () => {
   const context = vm.createContext({
     readText: async (crop, mode) => crop === 'original' || (crop === 'mask' && mode === 7) ? '2226' : '2228'

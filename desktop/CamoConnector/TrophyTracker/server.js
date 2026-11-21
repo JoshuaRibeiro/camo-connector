@@ -203,12 +203,15 @@ async function readHomeTotal(body) {
   const templateTotal = Number.isInteger(body.templateTotal) && body.templateTotal >= 0 &&
     body.templateTotal <= 99999 ? body.templateTotal : null;
   if (templateTotal !== null && !body.layout && body.label &&
+      !isLargeTotalChange(templateTotal) &&
       /\bTROPHIES\s+COLLE[CG]TE[DS]\b/i.test(await readText(body.label, 7))) {
     return { value: templateTotal, corroborated: true };
   }
   // The lobby line and the isolated number can confirm the total with just two OCR jobs.
   const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal, body.foregroundTotal);
-  if (lobby !== null && !isLargeTotalChange(lobby)) return { value: lobby, corroborated: true };
+  if (lobby !== null && (lobby === templateTotal || !isLargeTotalChange(lobby))) {
+    return { value: lobby, corroborated: true };
+  }
   if (!body.label) return { value: lobby, corroborated: lobby !== null };
 
   const pair = body.primary ?? body;
@@ -220,6 +223,11 @@ async function readHomeTotal(body) {
     : body.layout === 'wager' ? /TROPHIES\s+COLLECTE[DO]\b/i
     : /TROPHIES\s+COLLE[CG]TE[DS]\b/i;
   if (!labelPattern.test(label)) return { value: lobby, corroborated: lobby !== null };
+  // A large lobby change needs agreement between the shape match and numeric OCR
+  // before it can outrank the ordinary lobby reading.
+  if (!body.layout && templateTotal !== null && templateTotal === primary) {
+    return { value: primary, corroborated: true };
+  }
   if (!body.layout && (lobby !== null || primary === null || isLargeTotalChange(primary))) {
     const [alternate, foreground] = await Promise.all([
       readTotal(body.alternate, 7, retryMode),
@@ -231,6 +239,10 @@ async function readHomeTotal(body) {
     if (primary !== null && primary === alternate && !isLargeTotalChange(primary))
       return { value: primary, corroborated: true };
     const value = lobby ?? primary ?? alternate;
+    if (templateTotal !== null && value !== null && value > state.current &&
+        isLargeTotalChange(value) && templateTotal !== value && value !== clean) {
+      return { value, corroborated: false };
+    }
     return { value, corroborated: value !== null &&
       (value === clean || (value === alternate && (value === primary || value === lobby)) ||
         (value === primary && value === lobby)) };
