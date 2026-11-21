@@ -199,11 +199,20 @@ async function readHomeTotal(body) {
     : body.layout === 'wager' ? /TROPHIES\s+COLLECTE[DO]\b/i
     : /TROPHIES\s+COLLE[CG]TE[DS]\b/i;
   if (!labelPattern.test(label)) return { value: lobby, corroborated: lobby !== null };
-  if (lobby !== null) {
-    const alternate = await readTotal(body.alternate, 7, retryMode);
-    if (primary !== null && primary === alternate && primary !== lobby && !isLargeTotalChange(primary))
+  if (!body.layout && (lobby !== null || primary === null || isLargeTotalChange(primary))) {
+    const [alternate, foreground] = await Promise.all([
+      readTotal(body.alternate, 7, retryMode),
+      body.foregroundTotal ? readText(body.foregroundTotal, 7, true) : Promise.resolve('')
+    ]);
+    const clean = /^(0|[1-9]\d{0,5})$/.test(foreground) ? Number(foreground) : null;
+    if (clean !== null && (clean === primary || clean === alternate) && !isLargeTotalChange(clean))
+      return { value: clean, corroborated: true };
+    if (primary !== null && primary === alternate && !isLargeTotalChange(primary))
       return { value: primary, corroborated: true };
-    return { value: lobby, corroborated: primary === lobby || alternate === lobby };
+    const value = lobby ?? primary ?? alternate;
+    return { value, corroborated: value !== null &&
+      (value === clean || (value === alternate && (value === primary || value === lobby)) ||
+        (value === primary && value === lobby)) };
   }
   if (primary !== null && !isLargeTotalChange(primary)) return { value: primary, corroborated: false };
 

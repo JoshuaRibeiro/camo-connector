@@ -127,3 +127,18 @@ test('a 2046 outlier can be corrected by independently corroborated 2546 crops',
   assert.equal(read.value, 2046);
   assert.equal(read.corroborated, false);
 });
+
+test('foreground digits can resolve conflicting 2906 and 2006 lobby reads', async () => {
+  const context = vm.createContext({
+    isLargeTotalChange: (value) => Math.abs(value - 2536) > 126,
+    readLobbyLine: async () => 2906,
+    readText: async (crop) => crop === 'foreground' ? '2556' : 'TROPHIES COLLECTED',
+    readTotal: async (crop) => crop === 'wide' ? 2556 : 2006
+  });
+  vm.runInContext(source.slice(source.indexOf('async function readHomeTotal'), source.indexOf('const files =')), context);
+  const result = await context.readHomeTotal({
+    label: 'label', primary: { glyphs: 4 }, alternate: 'wide', foregroundTotal: 'foreground'
+  });
+  assert.equal(result.value, 2556);
+  assert.equal(result.corroborated, true);
+});
