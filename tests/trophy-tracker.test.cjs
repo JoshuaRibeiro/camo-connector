@@ -159,3 +159,28 @@ test('repeated 2044 reads cannot overwrite a nearby trusted 25xx total', () => {
   for (const time of [1100, 1300, 1500]) context.observe('home', 2544, 'capture', time, true, 'lobby');
   assert.equal(context.state.current, 2544);
 });
+
+test('dim Events card can confirm a large correction without a second mask pair', async () => {
+  let digits = '2551';
+  const context = vm.createContext({
+    state: { current: 2051, match: null, source: 'Lobby' },
+    readLobbyLine: async () => null,
+    readText: async (crop) => crop === 'label' ? 'EVENTS' : digits,
+    readTotal: async (pair) => pair ? 2551 : null
+  });
+  vm.runInContext(
+    'function save(change) { Object.assign(state, change); }\n' +
+    source.slice(source.indexOf('function isLargeTotalChange'), source.indexOf('const files =')),
+    context
+  );
+  const body = { layout: 'events', label: 'label', rawTotal: 'original pixels', primary: { glyphs: 4 } };
+  for (const time of [100, 300, 500]) {
+    const read = await context.readHomeTotal(body);
+    assert.equal(read.corroborated, true);
+    context.observe('home', read.value, 'capture', time, read.corroborated, body.layout);
+  }
+  assert.equal(context.state.current, 2551);
+  context.state.current = 2051;
+  digits = '2051';
+  assert.equal((await context.readHomeTotal(body)).corroborated, false);
+});

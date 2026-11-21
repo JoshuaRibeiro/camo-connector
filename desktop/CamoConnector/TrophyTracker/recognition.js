@@ -233,7 +233,7 @@ export function createRecognizer({ draw, context, crop, signatures }) {
       ? maskPair(lobbyMask(rect, 195, 175, 356, true), lobbyMask(rect, 220, 200, 356, true))
       : null;
     if (!primary && !alternate) return { kind: 'home' };
-    return { kind: 'home', layout: 'events', label: png(header, 3), primary, alternate };
+    return { kind: 'home', layout: 'events', label: png(header, 3), rawTotal: png(rect, 4), primary, alternate };
   }
 
   function maskPair(normal, bright, checkStroke = false) {

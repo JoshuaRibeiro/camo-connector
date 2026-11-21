@@ -231,8 +231,13 @@ async function readHomeTotal(body) {
   }
   if (primary !== null && !isLargeTotalChange(primary)) return { value: primary, corroborated: false };
 
-  const alternate = await readTotal(body.alternate, body.layout === 'wager' ? 8 : 7, retryMode);
-  return { value: primary ?? alternate, corroborated: primary !== null && primary === alternate };
+  const [alternate, raw] = await Promise.all([
+    readTotal(body.alternate, body.layout === 'wager' ? 8 : 7, retryMode),
+    body.layout === 'events' && body.rawTotal ? readText(body.rawTotal, 7, true) : Promise.resolve('')
+  ]);
+  const value = primary ?? alternate;
+  const originalAgrees = /^(0|[1-9]\d{0,5})$/.test(raw) && Number(raw) === value;
+  return { value, corroborated: originalAgrees || (primary !== null && primary === alternate) };
 }
 
 const files = {
