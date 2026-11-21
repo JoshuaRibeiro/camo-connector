@@ -64,3 +64,16 @@ test('lobby fallback requires the visible label and separately read counter to a
   labelled = 'DAILY CHALLENGES 2222';
   assert.equal(await context.readLobbyLine('line', 'number'), null);
 });
+
+test('request reader accepts a multi-crop lobby sample and bounds oversized input', async () => {
+  const context = vm.createContext({});
+  vm.runInContext(source.slice(source.indexOf('async function readBody'), source.indexOf('let ocrInProgress')), context);
+  const lobbyLine = 'A'.repeat(1_050_000);
+  async function* request(body) {
+    const json = JSON.stringify(body);
+    yield json.slice(0, 600_000);
+    yield json.slice(600_000);
+  }
+  assert.equal((await context.readBody(request({ lobbyLine }))).lobbyLine.length, lobbyLine.length);
+  await assert.rejects(context.readBody(request({ lobbyLine: 'A'.repeat(4 * 1024 * 1024) })), /too large/);
+});

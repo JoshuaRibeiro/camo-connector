@@ -201,7 +201,8 @@ async function readBody(request) {
   let body = '';
   for await (const chunk of request) {
     body += chunk;
-    if (body.length > 1_000_000) throw new Error('Capture crop is too large.');
+    // A sample can contain several base64 PNG crops, including the full lobby label.
+    if (body.length > 4 * 1024 * 1024) throw new Error('Capture crop is too large.');
   }
   return JSON.parse(body);
 }
