@@ -151,7 +151,11 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
   const firstTime = repeat ? candidate.firstTime : frameTime;
   const strongReads = (repeat ? candidate.strongReads : 0) + (corroborated ? 1 : 0);
   candidate = { kind, value, session, time: frameTime, firstTime, frames, strongReads, layout };
-  if (frames < 2) return;
+  // A normal lobby increase already has two OCR reads from separate crops.
+  // Keep multi-frame confirmation for corrections, large jumps and match reads.
+  const quickIncrease = kind === 'home' && layout === 'lobby' && corroborated &&
+    state.current > 0 && value > state.current && !isLargeTotalChange(value);
+  if (frames < 2 && !quickIncrease) return;
   if (kind === 'home') {
     // Large corrections need two independently cropped reads across three frames.
     // Only the lobby total can correct a decrease, since other screens can be stale.

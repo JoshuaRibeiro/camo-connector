@@ -92,3 +92,18 @@ test('corroborated lobby totals skip the slower masked OCR path', async () => {
   assert.equal(read.value, 2345);
   assert.equal(read.corroborated, true);
 });
+
+test('a corroborated small lobby gain publishes on the first frame', () => {
+  const context = vm.createContext({ state: { current: 2313, match: null, source: 'Lobby' } });
+  vm.runInContext(
+    'function save(change) { Object.assign(state, change); }\n' +
+    source.slice(source.indexOf('function isLargeTotalChange'), source.indexOf('const files =')),
+    context
+  );
+  context.observe('home', 2345, 'capture', 100, true, 'lobby');
+  assert.equal(context.state.current, 2345);
+  context.observe('home', 4240, 'capture', 300, true, 'lobby');
+  assert.equal(context.state.current, 2345);
+  context.observe('home', 2335, 'capture', 500, true, 'lobby');
+  assert.equal(context.state.current, 2345);
+});

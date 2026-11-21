@@ -54,7 +54,8 @@
       const response = await fetch('/api/state', { cache: 'no-store' });
       if (response.ok) {
         const { current, target } = await response.json();
-        count.textContent = 'Trophy Goal: ' + current + ' / ' + target;
+        const caption = 'Trophy Goal: ' + current + ' / ' + target;
+        if (count.textContent !== caption) count.textContent = caption;
         progress.max = target;
         progress.value = Math.min(current, target);
         progress.hidden = false;
@@ -63,7 +64,7 @@
       count.textContent = '';
       progress.hidden = true;
     }
-    setTimeout(update, 350);
+    setTimeout(update, 200);
   }
   update();
   checkVersion();
