@@ -95,23 +95,20 @@ async function readTotal(pair, mode = 8, retryMode, rawTotal) {
     readText(pair.digits, mode, true), readText(pair.mask, mode, true)
   ]);
   const complete = text => /^(0|[1-9]\d{0,5})$/.test(text) && text.length === pair.glyphs;
-  if (retryMode && (!complete(digits) || digits !== cleanDigits || /[68]/.test(digits + cleanDigits))) {
+  if (retryMode && (!complete(digits) || digits !== cleanDigits || /[068]/.test(digits + cleanDigits))) {
     const completeFirstReads = [digits, cleanDigits].filter(complete);
     const [line, cleanLine, raw] = await Promise.all([
       readText(pair.digits, retryMode, true), readText(pair.mask, retryMode, true),
       rawTotal ? readText(rawTotal, retryMode, true) : Promise.resolve('')
     ]);
-    // The word layout can close the opening of a HUD 6 and read it as 8.
-    // Accept the line layout only when both masks agree and explain any
-    // conflicting complete reads using that specific ambiguity.
-    const agrees = read => [...read].every((digit, index) =>
-      digit === line[index] || (digit === '8' && line[index] === '6'));
-    const supportsRaw = read => [...read].every((digit, index) =>
-      digit === raw[index] || (digit === '8' && raw[index] === '6'));
+    // Retry known glyph confusions only when another OCR pass supports the candidate.
+    const compatible = (read, candidate) => [...read].every((digit, index) =>
+      digit === candidate[index] || (digit === '8' && candidate[index] === '6') ||
+      (digit === '0' && candidate[index] === '5'));
     if (complete(raw) && [digits, cleanDigits, line, cleanLine].includes(raw) &&
-        [digits, cleanDigits, line, cleanLine].filter(complete).every(supportsRaw)) {
+        [digits, cleanDigits, line, cleanLine].filter(complete).every(read => compatible(read, raw))) {
       digits = cleanDigits = raw;
-    } else if (complete(line) && line === cleanLine && completeFirstReads.every(agrees)) {
+    } else if (complete(line) && line === cleanLine && completeFirstReads.every(read => compatible(read, line))) {
       digits = line;
       cleanDigits = cleanLine;
     }
@@ -190,8 +187,8 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
 async function readHomeTotal(body) {
   // The lobby line and the isolated number can confirm the total with just two OCR jobs.
   const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal);
-  if (lobby !== null) return { value: lobby, corroborated: true };
-  if (!body.label) return { value: null, corroborated: false };
+  if (lobby !== null && !isLargeTotalChange(lobby)) return { value: lobby, corroborated: true };
+  if (!body.label) return { value: lobby, corroborated: lobby !== null };
 
   const pair = body.primary ?? body;
   const retryMode = !body.layout && pair.glyphs >= 4 ? 7 : undefined;
@@ -201,7 +198,13 @@ async function readHomeTotal(body) {
   const labelPattern = body.layout === 'events' ? /\bEVENTS\b/i
     : body.layout === 'wager' ? /TROPHIES\s+COLLECTE[DO]\b/i
     : /TROPHIES\s+COLLE[CG]TE[DS]\b/i;
-  if (!labelPattern.test(label)) return { value: null, corroborated: false };
+  if (!labelPattern.test(label)) return { value: lobby, corroborated: lobby !== null };
+  if (lobby !== null) {
+    const alternate = await readTotal(body.alternate, 7, retryMode);
+    if (primary !== null && primary === alternate && primary !== lobby && !isLargeTotalChange(primary))
+      return { value: primary, corroborated: true };
+    return { value: lobby, corroborated: primary === lobby || alternate === lobby };
+  }
   if (primary !== null && !isLargeTotalChange(primary)) return { value: primary, corroborated: false };
 
   const alternate = await readTotal(body.alternate, body.layout === 'wager' ? 8 : 7, retryMode);
@@ -289,7 +292,9 @@ const server = http.createServer(async (request, response) => {
       observe(body.kind, value, body.session, body.frameTime, corroborated,
         body.kind === 'home' ? body.layout ?? 'lobby' : null);
       const source = body.layout === 'events' ? 'Events' : body.kind === 'home' ? 'Lobby' : 'Match';
-      return json({ state: publicState(), reading: value === null ? 'Looking for the trophy counter' : `${source} read: ${value}` });
+      const pending = body.kind === 'home' && value !== null && value !== state.current;
+      return json({ state: publicState(), reading: value === null ? 'Looking for the trophy counter' :
+        pending ? `Checking ${source.toLowerCase()} total: ${value}` : `${source} read: ${value}` });
     } finally {
       ocrInProgress = false;
     }

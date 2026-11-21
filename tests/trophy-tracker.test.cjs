@@ -81,6 +81,7 @@ test('request reader accepts a multi-crop lobby sample and bounds oversized inpu
 test('corroborated lobby totals skip the slower masked OCR path', async () => {
   const context = vm.createContext({
     readLobbyLine: async () => 2345,
+    isLargeTotalChange: () => false,
     readText: async () => assert.fail('masked label read should be skipped'),
     readTotal: async () => assert.fail('masked total read should be skipped')
   });
@@ -106,4 +107,23 @@ test('a corroborated small lobby gain publishes on the first frame', () => {
   assert.equal(context.state.current, 2345);
   context.observe('home', 2335, 'capture', 500, true, 'lobby');
   assert.equal(context.state.current, 2345);
+});
+
+test('a 2046 outlier can be corrected by independently corroborated 2546 crops', async () => {
+  let alternate = 2546;
+  const context = vm.createContext({
+    isLargeTotalChange: (value) => Math.abs(value - 2536) > 126,
+    readLobbyLine: async () => 2046,
+    readText: async () => 'TROPHIES COLLECTED',
+    readTotal: async (crop) => crop === 'wide' ? alternate : 2546
+  });
+  vm.runInContext(source.slice(source.indexOf('async function readHomeTotal'), source.indexOf('const files =')), context);
+  const body = { label: 'label', primary: { glyphs: 4 }, alternate: 'wide' };
+  let read = await context.readHomeTotal(body);
+  assert.equal(read.value, 2546);
+  assert.equal(read.corroborated, true);
+  alternate = null;
+  read = await context.readHomeTotal(body);
+  assert.equal(read.value, 2046);
+  assert.equal(read.corroborated, false);
 });
