@@ -200,6 +200,12 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
 }
 
 async function readHomeTotal(body) {
+  const templateTotal = Number.isInteger(body.templateTotal) && body.templateTotal >= 0 &&
+    body.templateTotal <= 99999 ? body.templateTotal : null;
+  if (templateTotal !== null && !body.layout && body.label &&
+      /\bTROPHIES\s+COLLE[CG]TE[DS]\b/i.test(await readText(body.label, 7))) {
+    return { value: templateTotal, corroborated: true };
+  }
   // The lobby line and the isolated number can confirm the total with just two OCR jobs.
   const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal, body.foregroundTotal);
   if (lobby !== null && !isLargeTotalChange(lobby)) return { value: lobby, corroborated: true };
@@ -229,7 +235,9 @@ async function readHomeTotal(body) {
       (value === clean || (value === alternate && (value === primary || value === lobby)) ||
         (value === primary && value === lobby)) };
   }
-  if (primary !== null && !isLargeTotalChange(primary)) return { value: primary, corroborated: false };
+  if (primary !== null && (primary === templateTotal || !isLargeTotalChange(primary))) {
+    return { value: primary, corroborated: primary === templateTotal };
+  }
 
   const [alternate, raw] = await Promise.all([
     readTotal(body.alternate, body.layout === 'wager' ? 8 : 7, retryMode),

@@ -4,6 +4,49 @@ const vm = require('node:vm');
 const test = require('node:test');
 const source = fs.readFileSync(require.resolve('../desktop/CamoConnector/TrophyTracker/server.js'), 'utf8');
 
+test('the lobby matcher reads the captured 2544 numeral shapes', async () => {
+  const { digitShape, classifyTotal } = await import('../desktop/CamoConnector/TrophyTracker/recognition.js');
+  const { digits } = require('../desktop/CamoConnector/TrophyTracker/signatures.json');
+  // Thresholded pixels from the 2544 report, held out from the digit templates.
+  const rows = [
+    '...####..#####.....##.....##..',
+    '..#....#.#.........##.....##..',
+    '..#...##.#........#.#....###..',
+    '.....##..####....#..#...##.#..',
+    '....##....####..##..#...#..#..',
+    '...##........##.#...#..##..#..',
+    '..##...#.#...#..######.######.',
+    '..#....#.#...#......#......#..',
+    '..######.#####......#......#..'
+  ];
+  const shapes = [[2, 8], [9, 14], [16, 21], [23, 28]].map(([left, right]) => ({
+    shape: digitShape((x, y) => rows[y][x] === '#', left, right, 0, rows.length),
+    narrow: false
+  }));
+  assert.equal(classifyTotal(shapes, digits), 2544);
+  shapes[1].shape.fill(0);
+  assert.equal(classifyTotal(shapes, digits), null);
+});
+
+test('a recognized trophy label allows a template read to skip numeric OCR', async () => {
+  let label = 'TROPHIES COLLECTED';
+  let numberReads = 0;
+  const context = vm.createContext({
+    readText: async () => label,
+    readLobbyLine: async () => { numberReads++; return 2044; },
+    isLargeTotalChange: () => false
+  });
+  vm.runInContext(source.slice(source.indexOf('async function readHomeTotal'), source.indexOf('const files =')), context);
+  const body = { label: 'label', templateTotal: 2544 };
+  const read = await context.readHomeTotal(body);
+  assert.equal(read.value, 2544);
+  assert.equal(read.corroborated, true);
+  assert.equal(numberReads, 0);
+  label = 'UNRELATED LABEL';
+  assert.equal((await context.readHomeTotal(body)).value, 2044);
+  assert.equal(numberReads, 1);
+});
+
 test('lobby OCR stabilizes large corrections and accepts small updates quickly', () => {
   const context = vm.createContext({
     state: { current: 4240, match: null, source: 'Lobby' }
@@ -183,4 +226,6 @@ test('dim Events card can confirm a large correction without a second mask pair'
   context.state.current = 2051;
   digits = '2051';
   assert.equal((await context.readHomeTotal(body)).corroborated, false);
+  assert.equal((await context.readHomeTotal({ ...body, templateTotal: 2551 })).corroborated, true);
+  assert.equal((await context.readHomeTotal({ ...body, templateTotal: 2051 })).corroborated, false);
 });
