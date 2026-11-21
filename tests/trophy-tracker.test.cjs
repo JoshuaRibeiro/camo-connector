@@ -302,6 +302,11 @@ test('dim Events card can confirm a large correction without a second mask pair'
     context.observe('home', read.value, 'capture', time, read.corroborated, body.layout);
   }
   assert.equal(context.state.current, 2551);
+  context.state.current = 2695;
+  for (const time of [700, 900]) context.observe('home', 2685, 'capture', time, true, 'events');
+  assert.equal(context.state.current, 2695);
+  context.observe('home', 2685, 'capture', 1100, true, 'events');
+  assert.equal(context.state.current, 2685);
   context.state.current = 2051;
   digits = '2051';
   assert.equal((await context.readHomeTotal(body)).corroborated, false);

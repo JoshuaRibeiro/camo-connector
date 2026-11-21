@@ -208,8 +208,10 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
   if (frames < 2 && !quickIncrease && !lobbyConfirmed) return;
   if (kind === 'home') {
     // Large corrections need two independently cropped reads across three frames.
-    // Only the lobby total can correct a decrease, since other screens can be stale.
-    if (value < state.current && layout !== 'lobby' || isSuspectedFiveDrop(value)) return;
+    // Events can correct a decrease after three frames with two corroborated reads.
+    const confirmedEvents = layout === 'events' && !isLargeTotalChange(value) && frames >= 3 && strongReads >= 2;
+    if (value < state.current && layout !== 'lobby' && !confirmedEvents) return;
+    if (isSuspectedFiveDrop(value)) return;
     if (isLargeTotalChange(value) &&
         (layout === 'lobby' ? !lobbyConfirmed : frames < 3 || strongReads < 2)) return;
     if (value < state.current && !isLargeTotalChange(value) && frames < 3) return;
