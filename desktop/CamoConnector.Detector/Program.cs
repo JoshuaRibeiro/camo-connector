@@ -50,9 +50,9 @@ try
         return 0;
     }
     var runtime = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "Ocr"));
-    using var capture = new HudCapture(runtime);
     if (probe)
     {
+        using var capture = new HudCapture(runtime);
         var monitor = args[0].EndsWith("-monitor", StringComparison.Ordinal) ? FindMonitor(args[1]) : null;
         using var captured = monitor == null ? new Bitmap(args[1]) : HudCapture.Desktop(monitor);
         using var viewport = args[0].StartsWith("--probe-menu-", StringComparison.Ordinal)
@@ -104,6 +104,7 @@ try
     };
     if (args[0] is "--image" or "--video" or "--device-frame")
     {
+        using var capture = new HudCapture(runtime);
         using var image = external == null ? new Bitmap(args[1]) : await external.NextAsync(stop.Token);
         var result = await capture.DetectAsync(image, stop.Token);
         var unlock = result.Replay ? null : await capture.DetectMilitaryUnlockAsync(image, stop.Token, allowCroppedImage: true);
@@ -145,6 +146,8 @@ try
     }) : null;
     try
     {
+        // Start capture and preview independently of catalog loading and OCR warm-up.
+        using var capture = new HudCapture(runtime);
         await DetectLiveAsync(args[2], capture, external, screen, window, stop.Token);
     }
     finally

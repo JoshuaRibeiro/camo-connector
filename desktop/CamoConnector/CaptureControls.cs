@@ -178,6 +178,7 @@ internal sealed partial class ConnectorWindow
         try
         {
             StopPreview();
+            if (pages.SelectedTab == capturePage) ShowInitialMonitorPreview();
             if (!OcrReady) await InstallRuntimeAsync("Ocr");
             if (closing.IsCancellationRequested || !automaticTracking.Checked) return;
             Directory.CreateDirectory(DataDirectory);
@@ -255,14 +256,16 @@ internal sealed partial class ConnectorWindow
     {
         try
         {
+            if (detector != null) return;
             StopPreview();
-            if (scanning || detector != null || closing.IsCancellationRequested || (pages.SelectedTab != capturePage && trophyView == null) ||
+            if (scanning || closing.IsCancellationRequested || (pages.SelectedTab != capturePage && trophyView == null) ||
                 sources.SelectedItem is not Source source || !File.Exists(DetectorPath)) return;
             // Tracking supplies its own preview. Avoid opening the capture device a second time at startup.
             if (automaticTracking.Checked && bridgeReady && DateTimeOffset.UtcNow >= nextAutomaticCheck) return;
             var mode = source.Mode == "--device" ? "--preview-device" : "--preview-monitor";
             previewWorker = LaunchDetector(mode, source.MonitorId ?? source.Input, DataDirectory);
             _ = StartReadingPreview(previewWorker);
+            if (pages.SelectedTab == capturePage) ShowInitialMonitorPreview();
             previewStatus.Text = "Waiting for a frame from " + source.Name;
             LogLine(captureMessages, previewStatus.Text);
             previewErrors = ReadPreviewDiagnosticsAsync(previewWorker.StandardError);
@@ -377,6 +380,24 @@ internal sealed partial class ConnectorWindow
             previewStatus.Text = "";
         }
         catch (ArgumentException) { }
+    }
+
+    private void ShowInitialMonitorPreview()
+    {
+        if (preview.Image != null || sources.SelectedItem is not Source { Mode: "--monitor" } source ||
+            Screen.AllScreens.FirstOrDefault(screen => screen.DeviceName == source.MonitorId) is not { } monitor) return;
+        var bounds = monitor.Bounds;
+        try
+        {
+            using var snapshot = new Bitmap(bounds.Width, bounds.Height);
+            using (var graphics = Graphics.FromImage(snapshot))
+                graphics.CopyFromScreen(bounds.Location, Point.Empty, bounds.Size, CopyPixelOperation.SourceCopy);
+            var width = Math.Min(640, bounds.Width);
+            var height = Math.Max(1, (int)Math.Round(bounds.Height * ((double)width / bounds.Width)));
+            SetPreview(new Bitmap(snapshot, width, height));
+            previewStatus.Text = "Waiting for live preview";
+        }
+        catch (System.ComponentModel.Win32Exception error) { LogLine(captureMessages, error.Message); }
     }
 
     private void SetPreview(Image? next)

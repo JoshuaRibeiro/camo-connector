@@ -87,7 +87,7 @@ internal sealed partial class ConnectorWindow
         var toggle = navigationToggle = new Button { Height = 38, AccessibleName = "Expand navigation", Margin = new Padding(0, 0, 0, 8) };
         menu.Controls.Add(toggle);
         var entries = new[] { (localTrackerPage, ""), (overlayPage, ""), (capturePage, "\uE7F8"),
-            (trophyPage, "\uE734"), (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
+            (trophyPage, ""), (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
         var icons = ShellFont("Segoe MDL2 Assets", 14);
         var hints = new ToolTip();
         Disposed += (_, _) => { hints.Dispose(); logsPage.Dispose(); };
@@ -106,6 +106,21 @@ internal sealed partial class ConnectorWindow
                 if (page == localTrackerPage)
                     args.Graphics.DrawImageUnscaled(trackerIcon,
                         (iconArea.Width - trackerIcon.Width) / 2, (iconArea.Height - trackerIcon.Height) / 2);
+                else if (page == trophyPage)
+                {
+                    var cupSize = LogicalToDeviceUnits(20);
+                    var saved = args.Graphics.Save();
+                    args.Graphics.TranslateTransform((iconArea.Width - cupSize) / 2f, (iconArea.Height - cupSize) / 2f);
+                    args.Graphics.ScaleTransform(cupSize / 20f, cupSize / 20f);
+                    args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+                    using var pen = new Pen(button.ForeColor, 1.35f) { LineJoin = LineJoin.Round };
+                    args.Graphics.DrawLines(pen, [new Point(5, 3), new(15, 3), new(15, 9), new(12, 12), new(8, 12), new(5, 9), new(5, 3)]);
+                    args.Graphics.DrawLines(pen, [new Point(5, 5), new(2, 5), new(2, 8), new(5, 10)]);
+                    args.Graphics.DrawLines(pen, [new Point(15, 5), new(18, 5), new(18, 8), new(15, 10)]);
+                    args.Graphics.DrawLine(pen, 10, 12, 10, 17);
+                    args.Graphics.DrawLine(pen, 6, 17, 14, 17);
+                    args.Graphics.Restore(saved);
+                }
                 else if (page == overlayPage)
                 {
                     var unit = LogicalToDeviceUnits(1);
@@ -209,7 +224,11 @@ internal sealed partial class ConnectorWindow
         {
             reloadTracker.Visible = pages.SelectedTab == localTrackerPage;
             StyleShell();
-            if (pages.SelectedTab == capturePage && previewWorker == null) StartPreview();
+            if (pages.SelectedTab == capturePage)
+            {
+                ShowInitialMonitorPreview();
+                if (previewWorker == null) StartPreview();
+            }
             else if (pages.SelectedTab != capturePage && detector == null && trophyView == null) StopPreview();
         };
         pages.SelectedTab = localTrackerPage;
