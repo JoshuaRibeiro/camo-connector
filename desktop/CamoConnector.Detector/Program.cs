@@ -119,6 +119,7 @@ try
             combat = replay ? null : await capture.DetectCombatAsync(image, stop.Token),
             matchNotice = replay ? null : await capture.DetectMatchNoticeAsync(image, stop.Token),
             longshot = !replay && await capture.DetectLongshotAsync(image, stop.Token),
+            pointBlank = !replay && await capture.DetectPointBlankAsync(image, stop.Token),
             completionistCount = await capture.DetectCompletionistCountAsync(image, menuWeapon, stop.Token),
             goldBanner = challenge == "gold-15", challenge, banner.LevelUp,
             specialBanner = banner.Completed && challenge == null ? capture.IdentifySpecialBanner(image, result.Weapon?.Name, banner.Details) : null,
@@ -289,6 +290,8 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         var lastLobbyScan = DateTimeOffset.MinValue;
         var lastAkimbo = DateTimeOffset.MinValue;
         var lastLongshot = DateTimeOffset.MinValue;
+        var lastPointBlank = DateTimeOffset.MinValue;
+        var pointBlankCounted = false;
         var longshotCounted = false;
         var lastProgressScan = DateTimeOffset.MinValue;
         var lastTiming = Stopwatch.GetTimestamp();
@@ -343,6 +346,8 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     confirmedWeapon = null;
                     matchPhase = notice;
                     lastAkimbo = lastLongshot = DateTimeOffset.MinValue;
+                    lastPointBlank = DateTimeOffset.MinValue;
+                    pointBlankCounted = false;
                     longshotCounted = false;
                     await AppendAsync(new
                     {
@@ -425,6 +430,21 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 }
                 else if (result.Weapon?.Name == "Signal 50" && now - lastLongshot >= TimeSpan.FromMilliseconds(650))
                     longshotCounted = false;
+                if (result.Weapon is { Name: var medalWeapon } && capture.TracksPointBlank(medalWeapon) &&
+                    await capture.DetectPointBlankAsync(frame, cancel))
+                {
+                    if (!pointBlankCounted)
+                    {
+                        pointBlankCounted = true;
+                        await AppendAsync(new
+                        {
+                            kind = "point-blank-kill", source = "live", mode = "mp", weapon = medalWeapon, at = now
+                        });
+                    }
+                    lastPointBlank = now;
+                }
+                else if (now - lastPointBlank >= TimeSpan.FromMilliseconds(650))
+                    pointBlankCounted = false;
                 var candidate = result.Weapon?.Name ?? (now - lastConfirmedWeapon <= TimeSpan.FromSeconds(5) ? confirmedWeapon : null);
                 if (challengeRead != null)
                 {

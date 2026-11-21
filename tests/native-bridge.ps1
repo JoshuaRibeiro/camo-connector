@@ -167,8 +167,23 @@ try {
     if ($garland.count -ne 3 -or $garland.goal -ne 30) {
         throw 'Garland progress must appear even when the Military tiers only confirm 39 unlocks.'
     }
+    $longshotsBefore = (Check-Events 200 $native 'local/state').progress.'signal-50:sp-3'.count
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"point-blank-kill","source":"live","mode":"mp","weapon":"Signal 50"}',
+        '{"kind":"point-blank-kill","source":"live","mode":"mp","weapon":"Mojave .357"}'
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $tracker = Check-Events 200 $native 'local/state'
+        if ($tracker.progress.'mojave-357:sp-3'.count -eq 4) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($tracker.progress.'mojave-357:sp-3'.count -ne 4 -or
+        $tracker.progress.'signal-50:sp-3'.count -ne $longshotsBefore) {
+        throw 'Point Blank must advance Garland once and leave Signal 50 Longshots alone.'
+    }
     $tracker = Check-Events 200 $native 'local/state'
-    if ($tracker.focus -ne 'mojave-357' -or ($tracker.overview.rows | Where-Object id -eq 'sp-3').count -ne 3) {
+    if ($tracker.focus -ne 'mojave-357' -or ($tracker.overview.rows | Where-Object id -eq 'sp-3').count -ne 4) {
         throw 'Tracker overview did not match the overlay.'
     }
     $editUrl = "$baseUrl/local/edit"
@@ -176,7 +191,7 @@ try {
         $body = @{ weapon = 'mojave-357'; camo = 'sp-3'; increment = $increment } | ConvertTo-Json
         $tracker = Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $body
     }
-    if (($tracker.overview.rows | Where-Object id -eq 'sp-3').count -ne 9) {
+    if (($tracker.overview.rows | Where-Object id -eq 'sp-3').count -ne 10) {
         throw 'The +1 and +5 controls did not update the overview.'
     }
     foreach ($done in $true, $false) {

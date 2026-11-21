@@ -10,6 +10,7 @@ namespace CamoConnector.Detector;
 public sealed record HudLine(string Text, double Y);
 public sealed record CamoReference(string Name, byte[]? Rgb, int Slot = 0, int? Goal = null, byte[]? BannerRgb = null)
 {
+    public string? Objective { get; init; }
     public CamoReference(string name, byte[]? rgb) : this(name, rgb, 0, null) { }
 }
 
@@ -112,12 +113,14 @@ public static class TrackedCamoRecognition
         return WeaponRecognition.Read(new[] { label }, false)?.Name;
     }
 
-    public static string? MatchArtwork(byte[]? sample, CamoReference[] entries)
+    public static string? MatchArtwork(byte[]? sample, CamoReference[] entries) => MatchArtwork(sample, entries, 31);
+
+    internal static string? MatchArtwork(byte[]? sample, CamoReference[] entries, double maximumError)
     {
         if (sample is not { Length: 432 }) return null;
         var ranked = entries.Where(entry => entry.Rgb is { Length: 432 })
             .Select(entry => (entry.Name, Score: entry.Rgb!.Select((channel, index) => Math.Abs(channel - sample[index])).Average()))
             .OrderBy(entry => entry.Score).Take(2).ToArray();
-        return ranked.Length == 2 && ranked[0].Score <= 31 && ranked[1].Score - ranked[0].Score >= 8 ? ranked[0].Name : null;
+        return ranked.Length == 2 && ranked[0].Score <= maximumError && ranked[1].Score - ranked[0].Score >= 8 ? ranked[0].Name : null;
     }
 }

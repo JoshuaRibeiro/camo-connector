@@ -21,6 +21,7 @@ public static class CombatRecognition
     }
 
     public static bool IsLongshot(string text) => Regex.IsMatch(text, @"\bL[O0]NG[\s-]*SH[O0]T\b", IgnoreCase);
+    public static bool IsPointBlank(string text) => Regex.IsMatch(text, @"\bP[O0][I1L]NT[\s-]*BLANK\b", IgnoreCase);
 
     public static string? ReadLobby(string text)
     {

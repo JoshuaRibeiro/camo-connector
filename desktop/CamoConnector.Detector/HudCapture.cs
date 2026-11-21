@@ -18,6 +18,7 @@ internal sealed class HudCapture : IDisposable
     private readonly PersistentOcr? persistentOcr;
     public string OcrMode => persistentOcr != null ? "persistent Tesseract" : "Tesseract command line";
     private readonly Dictionary<string, CamoReference[]> catalog;
+    private readonly HashSet<string> pointBlankWeapons = new(StringComparer.OrdinalIgnoreCase);
 
     public HudCapture(string runtime)
     {
@@ -51,17 +52,20 @@ internal sealed class HudCapture : IDisposable
             foreach (var camo in weapon.GetProperty("camos").EnumerateArray())
             {
                 if (camo.GetProperty("type").GetString() != "Special") continue;
+                var objective = camo.TryGetProperty("objective", out var objectiveValue) ? objectiveValue.GetString() : null;
+                if (objective != null && CombatRecognition.IsPointBlank(objective))
+                    pointBlankWeapons.Add(detectorName);
                 var name = camo.GetProperty("name").GetString()!;
                 var goal = camo.TryGetProperty("goal", out var target) && target.TryGetInt32(out var number)
                     ? (int?)number : null;
                 var index = entries.FindIndex(entry => entry.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
                 if (index >= 0)
-                    entries[index] = entries[index] with { Goal = goal ?? entries[index].Goal };
+                    entries[index] = entries[index] with { Goal = goal ?? entries[index].Goal, Objective = objective };
                 else
                 {
                     var id = camo.GetProperty("id").GetString()!;
                     var slot = int.TryParse(id.AsSpan(3), out var parsedSlot) ? parsedSlot : 0;
-                    entries.Add(new CamoReference(name, null, slot, goal));
+                    entries.Add(new CamoReference(name, null, slot, goal) { Objective = objective });
                 }
             }
             catalog[detectorName] = entries.ToArray();
@@ -339,6 +343,11 @@ internal sealed class HudCapture : IDisposable
     public async Task<bool> DetectLongshotAsync(Bitmap frame, CancellationToken cancel) =>
         CombatRecognition.IsLongshot(string.Join(" ", await ReadAsync(frame, (.578, .395, .139, .175), cancel)));
 
+    public bool TracksPointBlank(string weapon) => pointBlankWeapons.Contains(weapon);
+
+    public async Task<bool> DetectPointBlankAsync(Bitmap frame, CancellationToken cancel) =>
+        CombatRecognition.IsPointBlank(string.Join(" ", await ReadAsync(frame, (.588, .431, .133, .116), cancel)));
+
     public async Task<string?> DetectMatchNoticeAsync(Bitmap frame, CancellationToken cancel)
     {
         var result = string.Join(" ", await ReadAsync(frame, (.797, .042, .181, .127), cancel));
@@ -442,10 +451,9 @@ internal sealed class HudCapture : IDisposable
                 return (null, false, null, levelUp);
         }
         var completed = LooksCompleted(heading);
-        // HUD notices can cover the middle of the completion text. Require the camo artwork as corroboration.
-        if (!completed && (heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
-            heading.Contains("OMPLETED", StringComparison.OrdinalIgnoreCase)))
-            completed = !goldTile && IdentifySpecialBanner(frame, null, null, bannerArtworkOnly: true) != null;
+        // A close match to captured banner art also works when the completion heading is unreadable.
+        if (!completed && !goldTile)
+            completed = IdentifySpecialBanner(frame, null, null, bannerArtworkOnly: true) != null;
         if (!goldTile && (completed || heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
             System.Text.RegularExpressions.Regex.IsMatch(heading, @"[CG]OMPLE", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) &&
             CombatRecognition.IsPlatinumArtwork(Sample(frame, .148, (.471, .058, .102, 0))))
@@ -472,22 +480,42 @@ internal sealed class HudCapture : IDisposable
     public SpecialUnlock? IdentifySpecialBanner(Bitmap frame, string? weapon, string[]? details, bool bannerArtworkOnly = false)
     {
         var sample = Sample(frame, .148, (.471, .058, .102, 0));
+        // Completed challenges can appear after respawn, when the current weapon is unrelated.
+        var all = catalog.Values.SelectMany(entries => entries).ToArray();
+        static string Compact(string value) =>
+            System.Text.RegularExpressions.Regex.Replace(value.ToUpperInvariant(), "[^A-Z0-9]", "");
+        var lines = details?.Select(Compact).Where(text => text.Length > 0).ToArray() ?? [];
+        var matchingObjectives = all.Where(entry => entry.Objective is { Length: > 0 } objective &&
+            lines.Any(line => line.Contains(Compact(objective), StringComparison.Ordinal))).ToArray();
+        var candidates = matchingObjectives.Length == 0 ? all : matchingObjectives;
+        var captured = all.Where(entry => entry.BannerRgb != null);
+        if (MatchBannerArtwork(captured, 15) is { } capturedName &&
+            candidates.Any(entry => entry.Name == capturedName) && ResolveUnique(capturedName) is { } capturedUnlock)
+            return capturedUnlock;
+        if (bannerArtworkOnly) return null;
+        if (matchingObjectives.Length == 1 && ResolveUnique(matchingObjectives[0].Name) is { } objectiveUnlock)
+            return objectiveUnlock;
+        if (matchingObjectives.Length > 1 && MatchBannerArtwork(matchingObjectives) is { } objectiveArt &&
+            ResolveUnique(objectiveArt) is { } matchedUnlock)
+            return matchedUnlock;
         if (weapon != null && catalog.TryGetValue(weapon, out var entries))
         {
-            var name = SpecialUnlocks.ReadNamedBanner(details, entries) ?? MatchBannerArtwork(entries);
+            var eligible = entries.Where(candidates.Contains).ToArray();
+            var name = SpecialUnlocks.ReadNamedBanner(details, eligible) ?? MatchBannerArtwork(eligible);
             return name != null
                 ? new(weapon, name, "catalog-special-unlocked") : null;
         }
-        var candidates = catalog.Values.SelectMany(entries => entries).ToArray();
         var unique = SpecialUnlocks.ReadNamedBanner(details, candidates) ?? MatchBannerArtwork(candidates);
-        if (unique == null) return null;
-        var weapons = catalog.Where(pair => pair.Value.Any(entry => entry.Name == unique)).Take(2).ToArray();
-        return weapons.Length == 1
-            ? new(weapons[0].Key, unique, "catalog-special-unlocked") : null;
+        return unique == null ? null : ResolveUnique(unique);
 
-        string? MatchBannerArtwork(IEnumerable<CamoReference> candidates) => TrackedCamoRecognition.MatchArtwork(sample,
-            candidates.Where(entry => !bannerArtworkOnly || entry.BannerRgb != null)
-                .Select(entry => entry.BannerRgb == null ? entry : entry with { Rgb = entry.BannerRgb }).ToArray());
+        SpecialUnlock? ResolveUnique(string name)
+        {
+            var weapons = catalog.Where(pair => pair.Value.Any(entry => entry.Name == name)).Take(2).ToArray();
+            return weapons.Length == 1 ? new(weapons[0].Key, name, "catalog-special-unlocked") : null;
+        }
+
+        string? MatchBannerArtwork(IEnumerable<CamoReference> candidates, double maximumError = 31) => TrackedCamoRecognition.MatchArtwork(sample,
+            candidates.Select(entry => entry.BannerRgb == null ? entry : entry with { Rgb = entry.BannerRgb }).ToArray(), maximumError);
     }
 
     public async Task<CamoProgress?> DetectCamoProgressAsync(Bitmap frame, string? weapon, CancellationToken cancel,

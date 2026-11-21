@@ -283,6 +283,22 @@ internal sealed class LocalTracker
                 return focus;
             });
         }
+        else if (kind == "point-blank-kill")
+        {
+            var objectives = weapon.Camos.Where(rule => rule.Type == "Special" && rule.Goal > 0 &&
+                rule.Objective?.Contains("Point Blank Kills", StringComparison.OrdinalIgnoreCase) == true).ToArray();
+            if (objectives.Length == 0) return;
+            Change((next, focus) =>
+            {
+                foreach (var objective in objectives)
+                {
+                    var key = weapon.Id + ":" + objective.Id;
+                    var current = next.GetValueOrDefault(key);
+                    if (current?.Done != true) ApplyProgress(next, key, (current?.Count ?? 0) + 1, false);
+                }
+                return focus;
+            });
+        }
         else if (kind == "akimbo-kill" && weapon.Id == "sang-9mm" ||
             ProgressFeed.Text(item, "key") == "signal-50:sp-3" && ProgressFeed.Number(item, "delta") == 1 && weapon.Id == "signal-50")
         {
