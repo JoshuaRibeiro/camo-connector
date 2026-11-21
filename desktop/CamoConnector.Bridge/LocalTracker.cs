@@ -98,6 +98,8 @@ internal sealed class LocalTracker
             var level = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-level")?.Count;
             var knownLevel = Math.Max(level ?? 0, ConfirmedRequirement(IsLevelRule));
             var unlocks = ConfirmedRequirement(camo => camo.Type == "Military" && !IsLevelRule(camo));
+            var minimumUnlocks = Math.Max(unlocks, ConfirmedRequirement(camo =>
+                camo.Type == "Special" && camo.Unlock?.StartsWith("Earn ", StringComparison.OrdinalIgnoreCase) == true));
             bool IsLaunchWeapon(Weapon item) =>
                 item.Id is not ("cronen-osprey" or "csg-35" or "jak-12" or "zlr-talonhawk");
 
@@ -155,7 +157,7 @@ internal sealed class LocalTracker
             var next = rows.Length == 0 ? remaining.FirstOrDefault() : null;
             var prerequisite = next == null ? null : CompletionGate(next);
             return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
-                minimumLevel = knownLevel, rows, state.OverlayLayout,
+                minimumLevel = knownLevel, minimumUnlocks, rows, state.OverlayLayout,
                 waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock, count = prerequisite?.Count, goal = prerequisite?.Goal },
                 complete = remaining.Length == 0 };
         }

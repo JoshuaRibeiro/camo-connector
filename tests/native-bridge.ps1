@@ -263,6 +263,24 @@ try {
     if ($overlay.minimumLevel -ne 46 -or $null -ne $overlay.level) {
         throw 'A completed level-gated Special camo must establish a minimum above an older exact level.'
     }
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":"Sang 9mm"}',
+        '{"kind":"catalog-special-unlocked","source":"live","mode":"mp","weapon":"Sang 9mm","challenge":"Space Time"}',
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"Sang 9mm","type":"camo","camo":"Platinum","count":2,"goal":20}'
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+        $platinum = $overlay.rows | Where-Object id -eq 'platinum'
+        if ($overlay.weapon -eq 'Sang 9mm' -and $platinum.count -eq 2) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($overlay.weapon -ne 'Sang 9mm' -or $platinum.count -ne 2 -or $platinum.goal -ne 20) {
+        throw 'Sang 9mm Platinum progress must appear as 2/20 even before every Gold is recorded locally.'
+    }
+    if ($null -ne $overlay.level -or $overlay.minimumLevel -ne 0 -or $overlay.minimumUnlocks -ne 37) {
+        throw 'Space Time should establish 37+ weapon unlocks for Sang 9mm without claiming a level.'
+    }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {

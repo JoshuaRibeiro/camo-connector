@@ -18,6 +18,7 @@ internal sealed class HudCapture : IDisposable
     private readonly PersistentOcr? persistentOcr;
     public string OcrMode => persistentOcr != null ? "persistent Tesseract" : "Tesseract command line";
     private readonly Dictionary<string, CamoReference[]> catalog;
+    private readonly Dictionary<string, CamoReference[]> completionist = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> pointBlankWeapons = new(StringComparer.OrdinalIgnoreCase);
 
     public HudCapture(string runtime)
@@ -43,11 +44,19 @@ internal sealed class HudCapture : IDisposable
         using var objectivesStream = typeof(HudCapture).Assembly.GetManifestResourceStream("CamoConnector.MultiplayerCatalog")
             ?? throw new InvalidDataException("The multiplayer objective catalogue is missing.");
         using var objectives = JsonDocument.Parse(objectivesStream);
+        var completionByCategory = objectives.RootElement.GetProperty("shared").EnumerateArray()
+            .Where(camo => camo.GetProperty("type").GetString() == "Completionist")
+            .ToLookup(camo => camo.GetProperty("category").GetString(), camo => new CamoReference(
+                camo.GetProperty("name").GetString()!, null,
+                Goal: camo.TryGetProperty("goal", out var goal) && goal.ValueKind == JsonValueKind.Number
+                    ? goal.GetInt32() : null));
         foreach (var weapon in objectives.RootElement.GetProperty("weapons").EnumerateArray())
         {
             var trackerName = weapon.GetProperty("name").GetString()!;
             var detectorName = catalog.Keys.FirstOrDefault(name => name.Equals(trackerName, StringComparison.OrdinalIgnoreCase))
                 ?? trackerName;
+            var category = weapon.GetProperty("category").GetString();
+            completionist[detectorName] = completionByCategory[category == "Melee" ? category : category + "s"].ToArray();
             var entries = (catalog.GetValueOrDefault(detectorName) ?? []).ToList();
             foreach (var camo in weapon.GetProperty("camos").EnumerateArray())
             {
@@ -538,7 +547,9 @@ internal sealed class HudCapture : IDisposable
         Action<string, string, Bitmap>? trace = null)
     {
         if (weapon == null) return null;
-        var names = catalog.GetValueOrDefault(weapon)?.Select(camo => camo.Name).ToArray() ?? [];
+        var references = (catalog.GetValueOrDefault(weapon) ?? [])
+            .Concat(completionist.GetValueOrDefault(weapon) ?? []).ToArray();
+        var names = references.Select(camo => camo.Name).ToArray();
         var (titleText, _) = await ReadTextAsync(frame, (.344, .628, .310, .041), cancel, pageMode: 7,
             trace: trace, regionName: "camoTitle");
         var title = CamoMenuRecognition.ReadKnownCamoTitle(titleText, names);
@@ -573,7 +584,7 @@ internal sealed class HudCapture : IDisposable
         var progress = CamoMenuRecognition.ReadProgress(weapon, title, Lines(objectives), names);
         if (!names.Contains(title)) return progress;
 
-        var catalogGoal = catalog.GetValueOrDefault(weapon)?.FirstOrDefault(camo => camo.Name == title)?.Goal;
+        var catalogGoal = references.FirstOrDefault(camo => camo.Name == title)?.Goal;
         progress = CamoMenuRecognition.CheckObjectiveGoal(progress, catalogGoal, objectives);
 
         // Check the isolated counter even when the wider objective OCR returns a plausible value.

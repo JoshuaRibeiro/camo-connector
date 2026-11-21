@@ -123,6 +123,8 @@ function renderOverview() {
   heading.append(element('h3', weapon.name));
   if (overview.level != null || overview.minimumLevel)
     heading.append(element('span', 'Weapon level ' + (overview.level ?? overview.minimumLevel + '+'), 'subtitle'));
+  else if (overview.minimumUnlocks)
+    heading.append(element('span', 'Weapon unlocks ' + overview.minimumUnlocks + '+', 'subtitle'));
   const entries = [heading];
   const rules = new Map(weapon.camos.map(rule => [rule.id, rule]));
   for (const row of overview.rows) entries.push(camoRow(rules.get(row.id), weapon.id, row));

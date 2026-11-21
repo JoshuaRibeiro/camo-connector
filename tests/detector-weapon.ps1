@@ -138,6 +138,14 @@ if ($optical -ne 'Optical Reverb' -or
 }
 $redTiger = $menu::ReadProgress('.50 GS','RED-TIGER', @('Complete 3 Special Camos','2/3','Point blank kills','3/30'),$camos)
 if ($redTiger.Camo -ne 'Red Tiger' -or $redTiger.Count -ne 3 -or $redTiger.Goal -ne 30) { throw 'Named camo count failed' }
+$pistolPlatinum = $menu::ReadProgress('Sang 9mm', 'PLATINUM', @(
+    'Complete 4 Gold Camo Challenges using Pistols', 'Get 20 Player Kills from Behind', '2/20'
+), @('Gold', 'Platinum', 'Harmonic Break', 'Divergence'))
+$pistolCounter = $menu::ReadProgress('Sang 9mm', 'PLATINUM', @('2/20'), @('Platinum'))
+if ($pistolPlatinum.Camo -ne 'Platinum' -or $pistolPlatinum.Count -ne 2 -or
+    $pistolPlatinum.Goal -ne 20 -or !$menu::ConfirmCounter($pistolPlatinum, $pistolCounter, $null)) {
+    throw 'Sang 9mm Platinum must confirm the 2/20 objective counter.'
+}
 $differentGoal = $menu::ReadProgress('.50 GS','Frosted', @('Different wording 5/10'),$camos)
 if ($differentGoal.Camo -ne 'Frosted' -or $differentGoal.Goal -ne 10) { throw 'Objective affected camo identity' }
 if ($menu::ReadProgress('.50 GS','Splatter Ops', @('3/30','4/30'),$camos)) { throw 'Conflicting counts were accepted' }
