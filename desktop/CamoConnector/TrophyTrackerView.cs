@@ -81,6 +81,7 @@ internal sealed partial class ConnectorWindow
             start.ArgumentList.Add(Path.Combine(assets, "server.js"));
             start.Environment["TROPHY_INSTANCE"] = instance;
             start.Environment["TROPHY_TESSERACT"] = Path.Combine(root, "Runtime", "Ocr", "tesseract.exe");
+            start.Environment["TROPHY_OCR_WORKER"] = Path.Combine(root, "Runtime", "Detector", "CoDStreamingTools.Detector.exe");
             trophyServer = Process.Start(start) ?? throw new InvalidOperationException("The trophy service could not start.");
             var readyBy = DateTime.UtcNow.AddSeconds(8);
             while (true)

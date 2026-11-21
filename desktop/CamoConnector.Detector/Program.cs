@@ -6,6 +6,30 @@ using System.Text.Json;
 using CamoConnector.Detector;
 
 Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
+if (args is ["--ocr-worker", var ocrDirectory])
+{
+    using var engine = PersistentOcr.Open(ocrDirectory, Path.Combine(ocrDirectory, "tessdata"));
+    if (engine == null) return 1;
+    string? line;
+    while ((line = Console.ReadLine()) != null)
+    {
+        try
+        {
+            using var request = JsonDocument.Parse(line);
+            var image = request.RootElement.GetProperty("image").GetBytesFromBase64();
+            var mode = request.RootElement.GetProperty("mode").GetInt32();
+            var numeric = request.RootElement.GetProperty("digits").GetBoolean();
+            var text = await engine.ReadAsync(image, mode, CancellationToken.None, numeric ? "0123456789" : "");
+            Console.WriteLine(JsonSerializer.Serialize(text.Trim()));
+        }
+        catch (Exception error)
+        {
+            Console.Error.WriteLine(error.Message);
+            Console.WriteLine("null");
+        }
+    }
+    return 0;
+}
 var listDevices = args.Length == 1 && args[0] == "--list-devices";
 var previewOnly = args.Length is 2 or 3 && args[0] is "--preview-monitor" or "--preview-device";
 var saveMenuCrops = args.Length == 4 && args[2] == "--save-crops";

@@ -4,6 +4,45 @@ const vm = require('node:vm');
 const test = require('node:test');
 const source = fs.readFileSync(require.resolve('../desktop/CamoConnector/TrophyTracker/server.js'), 'utf8');
 
+test('queued OCR crops retain their modes and results if the native worker is unavailable', async () => {
+  const createWorker = require('../desktop/CamoConnector/TrophyTracker/ocr-worker.cjs');
+  const calls = [];
+  const read = createWorker(require('node:path').join(__dirname, 'absent-ocr-worker'), __dirname,
+    async (crop, mode, digits) => { calls.push([crop, mode, digits]); return crop; });
+  assert.deepEqual(await Promise.all([read('label', 7, false), read('counter', 8, true)]), ['label', 'counter']);
+  assert.deepEqual(calls, [['label', 7, false], ['counter', 8, true]]);
+});
+
+test('a live full-line and template match needs only the labelled crop', async () => {
+  const context = vm.createContext({
+    readText: async crop => { assert.equal(crop, 'line'); return 'TROPHIES COLLECTED: 2538)'; }
+  });
+  vm.runInContext(source.slice(source.indexOf('async function readLobbyLine'), source.indexOf('// A short sequence')), context);
+  assert.equal(await context.readLobbyLine('line', null, null, 2538), 2538);
+  assert.equal(await context.readLobbyLine('line', null, null, 2598), null);
+});
+
+test('a partial upper stroke cannot rewrite a pair of independently read threes', async () => {
+  const context = vm.createContext({ readText: async () => '2538' });
+  vm.runInContext(source.slice(source.indexOf('async function readTotal'), source.indexOf('async function readLobbyLine')), context);
+  assert.equal(await context.readTotal({ digits: 'one', mask: 'two', glyphs: 4,
+    closedUpperLoop: [false, false, true, false] }), 2538);
+});
+
+test('an OCR-only lobby correction needs distinct corroborated full-line crops', () => {
+  const context = vm.createContext({ state: { current: 4938, match: null, source: 'Lobby' } });
+  vm.runInContext('function save(change) { Object.assign(state, change); }\n' +
+    source.slice(source.indexOf('function isLargeTotalChange'), source.indexOf('const files =')), context);
+  let time = 0;
+  const read = crop => context.observe('home', 2538, 'session', time += 300, false, 'lobby', crop);
+  for (let i = 0; i < 4; i++) read('a');
+  read('b');
+  read('c');
+  assert.equal(context.state.current, 4938);
+  read('d');
+  assert.equal(context.state.current, 2538);
+});
+
 test('the lobby matcher reads the captured 2544 numeral shapes', async () => {
   const { digitShape, classifyTotal } = await import('../desktop/CamoConnector/TrophyTracker/recognition.js');
   const { digits } = require('../desktop/CamoConnector/TrophyTracker/signatures.json');

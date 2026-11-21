@@ -592,6 +592,12 @@ internal sealed class HudCapture : IDisposable
         }
         if (title == null)
         {
+            var (brightTitle, _) = await ReadTextAsync(frame, (.344, .613, .310, .060), cancel, pageMode: 7,
+                adjustment: PixelAdjustment.WhiteText, trace: trace, regionName: "whiteCamoTitle");
+            title = CamoMenuRecognition.ReadKnownCamoTitle(brightTitle, titles);
+        }
+        if (title == null)
+        {
             var (wideTitle, _) = await ReadTextAsync(frame, (.312, .614, .472, .064), cancel,
                 trace: trace, regionName: "wideCamoTitle");
             title = CamoMenuRecognition.ReadKnownCamoTitle(wideTitle, titles) ?? string.Join(" ", Lines(wideTitle));
@@ -920,15 +926,18 @@ internal sealed class HudCapture : IDisposable
             }
             finally { crop.UnlockBits(pixels); }
         }
-        using var png = new MemoryStream();
-        crop.Save(png, ImageFormat.Png);
-        if (persistentOcr != null && !positioned && !countersOnly && png.TryGetBuffer(out var image))
+        using var encoded = new MemoryStream();
+        // The in-process decoder consumes these pixels immediately; PNG compression
+        // only saves bandwidth on the pipe used by the CLI fallback.
+        crop.Save(encoded, persistentOcr == null ? ImageFormat.Png : ImageFormat.Bmp);
+        if (persistentOcr != null && encoded.TryGetBuffer(out var image))
         {
-            var text = await persistentOcr.ReadAsync(image, pageMode, cancel);
+            var text = await persistentOcr.ReadAsync(image, pageMode, cancel,
+                countersOnly ? "0123456789/" : "", positioned);
             trace?.Invoke(regionName, text.Trim(), crop);
             return (text, crop.Height);
         }
-        png.Position = 0;
+        encoded.Position = 0;
         var start = new ProcessStartInfo(ocr)
         {
             UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true,
@@ -954,7 +963,7 @@ internal sealed class HudCapture : IDisposable
         {
             var output = process.StandardOutput.ReadToEndAsync(deadline.Token);
             var error = process.StandardError.ReadToEndAsync(deadline.Token);
-            await png.CopyToAsync(process.StandardInput.BaseStream, deadline.Token);
+            await encoded.CopyToAsync(process.StandardInput.BaseStream, deadline.Token);
             process.StandardInput.Close();
             await process.WaitForExitAsync(deadline.Token);
             if (process.ExitCode != 0) throw new IOException("OCR failed: " + (await error).Trim());

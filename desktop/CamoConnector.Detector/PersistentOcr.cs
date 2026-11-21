@@ -40,14 +40,15 @@ internal sealed class PersistentOcr : IDisposable
         }
     }
 
-    public async Task<string> ReadAsync(ArraySegment<byte> image, int pageMode, CancellationToken cancel)
+    public async Task<string> ReadAsync(ArraySegment<byte> image, int pageMode, CancellationToken cancel,
+        string whitelist = "", bool positioned = false)
     {
         await slots.WaitAsync(cancel);
-        try { return await Task.Run(() => Read(image, pageMode), cancel); }
+        try { return await Task.Run(() => Read(image, pageMode, whitelist, positioned), cancel); }
         finally { slots.Release(); }
     }
 
-    private string Read(ArraySegment<byte> image, int pageMode)
+    private string Read(ArraySegment<byte> image, int pageMode, string whitelist, bool positioned)
     {
         if (!engines.TryTake(out var engine)) engine = CreateEngine();
         try
@@ -60,8 +61,11 @@ internal sealed class PersistentOcr : IDisposable
             try
             {
                 TessBaseAPISetPageSegMode(engine, pageMode);
+                // Every request sets its own alphabet because engines are reused across HUD regions.
+                if (TessBaseAPISetVariable(engine, "tessedit_char_whitelist", whitelist) == 0)
+                    throw new IOException("Tesseract could not set the crop alphabet.");
                 TessBaseAPISetImage2(engine, pix);
-                var text = TessBaseAPIGetUTF8Text(engine);
+                var text = positioned ? TessBaseAPIGetTsvText(engine, 0) : TessBaseAPIGetUTF8Text(engine);
                 if (text == IntPtr.Zero) return "";
                 try { return Marshal.PtrToStringUTF8(text) ?? ""; }
                 finally { TessDeleteText(text); }
@@ -104,6 +108,11 @@ internal sealed class PersistentOcr : IDisposable
     private static extern void TessBaseAPISetImage2(IntPtr engine, IntPtr pix);
     [DllImport(TessLibrary, CallingConvention = CallingConvention.Cdecl)]
     private static extern IntPtr TessBaseAPIGetUTF8Text(IntPtr engine);
+    [DllImport(TessLibrary, CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr TessBaseAPIGetTsvText(IntPtr engine, int page);
+    [DllImport(TessLibrary, CallingConvention = CallingConvention.Cdecl)]
+    private static extern int TessBaseAPISetVariable(IntPtr engine, [MarshalAs(UnmanagedType.LPUTF8Str)] string name,
+        [MarshalAs(UnmanagedType.LPUTF8Str)] string value);
     [DllImport(TessLibrary, CallingConvention = CallingConvention.Cdecl)]
     private static extern void TessDeleteText(IntPtr text);
     [DllImport(TessLibrary, CallingConvention = CallingConvention.Cdecl)]

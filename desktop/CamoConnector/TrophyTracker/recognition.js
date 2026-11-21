@@ -54,37 +54,50 @@ export function createRecognizer({ draw, context, crop, signatures }) {
     return correlation(context.getImageData(0, 0, width, height).data, signature);
   }
 
+  const iconWidth = 96;
+  const iconHeight = 48;
+  const mean = signatures.home.reduce((sum, value) => sum + value, 0) / signatures.home.length;
+  const iconShape = signatures.home.map(value => value - mean);
+  const iconEnergy = iconShape.reduce((sum, value) => sum + value * value, 0);
+  const offsets = iconShape.map((_, i) =>
+    Math.floor(2.9 * Math.floor(i / 10)) * iconWidth + Math.floor(2.9 * (i % 10)));
+  const stride = iconWidth + 1;
+  const sums = new Float64Array(stride * (iconHeight + 1));
+  const pooled = new Float32Array(iconWidth * iconHeight);
+
   function lobbyIcon(top = 1346) {
-    const left = 1436, width = 96, height = 48;
+    const left = 1436, width = iconWidth, height = iconHeight;
     draw(left, top, width, height, width, height);
     const { data } = context.getImageData(0, 0, width, height);
-    const pooled = new Float32Array(width * height);
-    // Pool once so the icon can be located across the entire search area from a single capture.
-    for (let y = 0; y < height - 2; y++) {
-      for (let x = 0; x < width - 2; x++) {
-        let light = 0;
-        for (let dy = 0; dy < 3; dy++) {
-          for (let dx = 0; dx < 3; dx++) {
-            const i = ((y + dy) * width + x + dx) * 4;
-            light += .299 * data[i] + .587 * data[i + 1] + .114 * data[i + 2];
-          }
-        }
-        pooled[y * width + x] = light / 9;
+    for (let y = 0; y < height; y++) {
+      let row = 0;
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        row += .299 * data[i] + .587 * data[i + 1] + .114 * data[i + 2];
+        sums[(y + 1) * stride + x + 1] = sums[y * stride + x + 1] + row;
       }
     }
-    const patch = new Float32Array(400);
+    for (let y = 0; y < height - 2; y++) {
+      for (let x = 0; x < width - 2; x++) {
+        const i = y * stride + x;
+        pooled[y * width + x] =
+          (sums[i + 3 * stride + 3] - sums[i + 3 * stride] - sums[i + 3] + sums[i]) / 9;
+      }
+    }
     let best = .69;
     let position = null;
     for (let y = 0; y <= height - 30; y += 2) {
       for (let x = 0; x <= width - 30; x += 2) {
-        for (let row = 0; row < 10; row++) {
-          for (let col = 0; col < 10; col++) {
-            const light = pooled[(y + Math.floor(2.9 * row)) * width + x + Math.floor(2.9 * col)];
-            const i = (row * 10 + col) * 4;
-            patch[i] = patch[i + 1] = patch[i + 2] = light;
-          }
+        let sum = 0, squares = 0, dot = 0;
+        for (let i = 0; i < offsets.length; i++) {
+          const light = pooled[y * width + x + offsets[i]];
+          sum += light;
+          squares += light * light;
+          dot += light * iconShape[i];
         }
-        const score = correlation(patch, signatures.home);
+        const energy = squares - sum * sum / offsets.length;
+        if (energy < offsets.length * 64) continue;
+        const score = dot / Math.sqrt(energy * iconEnergy);
         if (score > best) {
           best = score;
           position = { x: left + x, y: top + y };
@@ -100,7 +113,8 @@ export function createRecognizer({ draw, context, crop, signatures }) {
       const image = context.getImageData(0, 0, crop.width, crop.height);
       for (let i = 0; i < image.data.length; i += 4) {
         const [r, g, b] = [image.data[i], image.data[i + 1], image.data[i + 2]];
-        const ink = r >= 180 && g >= 170 && r - b >= 13;
+        const ink = mask === 'highlight' ? r >= 245 && g >= 245 && r >= b :
+          r >= 180 && g >= 170 && r - b >= 13;
         image.data[i] = image.data[i + 1] = image.data[i + 2] = ink ? 0 : 255;
       }
       context.putImageData(image, 0, 0);
@@ -114,13 +128,11 @@ export function createRecognizer({ draw, context, crop, signatures }) {
     const { width, height } = crop;
     const image = context.getImageData(0, 0, width, height);
     const columns = new Uint16Array(width);
-    const light = new Uint8Array(width * height);
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
         const r = image.data[i];
         const g = image.data[i + 1];
-        light[y * width + x] = Math.min(r, g);
         // The pale gold digits occupy a fixed-height row next to the trophy icon.
         const ink = y >= 7 * scale && y < 38 * scale && r >= redFloor && g >= greenFloor;
         if (ink) columns[x]++;
@@ -144,57 +156,26 @@ export function createRecognizer({ draw, context, crop, signatures }) {
     }
     if (glyphs.length === 0 || glyphs.length > 5) return null;
     const shapes = [];
-    const closedUpperLoop = glyphs.map(([start, end]) => {
+    if (matchDigits) {
       const isInk = (x, y) => image.data[(y * width + x) * 4] === 0;
-      const rowHasInk = (y, right) => {
-        for (let x = start; x < right; x++) {
-          if (isInk(x, y)) return true;
-        }
-        return false;
-      };
-      let top = 0;
-      let bottom = height - 1;
-      while (top < bottom && !rowHasInk(top, end)) top++;
-      while (bottom > top && !rowHasInk(bottom, end)) bottom--;
-      const span = end - start;
-      const glyphHeight = bottom - top;
-      if (matchDigits && glyphHeight >= 14 * scale && glyphHeight <= 27 * scale) {
-        shapes.push({
-          shape: digitShape(isInk, start, end, top, bottom + 1),
-          narrow: span / (glyphHeight + 1) < .55
-        });
-      }
-      const leftEdge = start + Math.ceil(span * .25);
-      const first = top + Math.ceil(glyphHeight * .16);
-      const last = top + Math.floor(glyphHeight * .36);
-      let inkRows = 0;
-      for (let y = first; y <= last; y++) if (rowHasInk(y, leftEdge)) inkRows++;
-      if (last - first < 3 || inkRows < (last - first + 1) * .60) return false;
-
-      // Both 3 and 9 have an upper-left hook in the small HUD font. Only 9
-      // connects that side to the middle bar. Use the original pixels to
-      // retain a faint connection that the OCR threshold may have removed.
-      const middle = start + Math.ceil(span * .55);
-      const hole = [];
-      for (let y = first; y <= last; y += 2) {
-        for (let x = start + Math.ceil(span * .28); x < middle; x += 2) {
-          hole.push(light[y * width + x]);
+      for (const [start, end] of glyphs) {
+        const rowHasInk = y => {
+          for (let x = start; x < end; x++) if (isInk(x, y)) return true;
+          return false;
+        };
+        let top = 0;
+        let bottom = height;
+        while (top < bottom && !rowHasInk(top)) top++;
+        while (bottom > top && !rowHasInk(bottom - 1)) bottom--;
+        const glyphHeight = bottom - top;
+        if (glyphHeight - 1 >= 14 * scale && glyphHeight - 1 <= 27 * scale) {
+          shapes.push({
+            shape: digitShape(isInk, start, end, top, bottom),
+            narrow: (end - start) / glyphHeight < .55
+          });
         }
       }
-      if (!hole.length) return false;
-      hole.sort((a, b) => a - b);
-      const threshold = Math.max(105, hole[Math.floor(hole.length / 2)] + 42);
-      let connectedRows = 0;
-      for (let y = top + Math.ceil(glyphHeight * .40); y <= top + Math.floor(glyphHeight * .56); y++) {
-        let connected = 0;
-        const left = start + Math.floor(span * .10);
-        for (let x = left; x < middle; x++) {
-          if (light[y * width + x] >= threshold) connected++;
-        }
-        if (connected >= (middle - left) * .90) connectedRows++;
-      }
-      return connectedRows >= Math.max(3, glyphHeight * .045);
-    });
+    }
     let left = 0;
     if (trim) {
       const padding = 16;
@@ -203,10 +184,10 @@ export function createRecognizer({ draw, context, crop, signatures }) {
       // Keep room for longer totals in the source crop, then remove unused space before OCR.
       crop.width = right - left;
     }
-    context.putImageData(image, -left, 0);
     const templateTotal = shapes.length === glyphs.length
       ? classifyTotal(shapes, signatures.digits) : null;
-    return { image: crop.toDataURL('image/png').split(',')[1], glyphs: glyphs.length, closedUpperLoop, templateTotal };
+    context.putImageData(image, -left, 0);
+    return { image: crop.toDataURL('image/png').split(',')[1], glyphs: glyphs.length, templateTotal };
   }
 
   function lobbyTemplateTotal(rect, minimumRedBlueDifference) {
@@ -270,22 +251,31 @@ export function createRecognizer({ draw, context, crop, signatures }) {
     const icon = lobby ?? lobbyIcon(234);
     if (icon) {
       const top = icon.y - 8;
+      const wide = [icon.x - 97, top, 94, 45];
       const rect = [icon.x - 81, top, 78, 45];
+      if (lobby) {
+        // In the bottom lobby HUD the full label remains legible even when the
+        // digit crop blends into the scene. Require the labelled number to agree.
+        const templateTotal = lobbyTemplateTotal(wide, 12) ?? lobbyTemplateTotal(wide, -10);
+        if (templateTotal !== null) {
+          return { kind: 'home', lobbyLine: png([1030, top, icon.x - 1030, 45], 2), templateTotal, templateNeedsLine: true };
+        }
+        // Exclude the surrounding scenery from the line. A separate wide
+        // highlights-only crop retains faint strokes against bright backgrounds.
+        return { kind: 'home',
+          lobbyLine: png([1030, top + 4, icon.x - 1030, 36], 2),
+          alternateLine: png([1030, top, icon.x - 1030, 45], 2),
+          rawTotal: png([icon.x - 82, top + 4, 79, 36], 2), foregroundTotal: png(wide, 4, 'highlight') };
+      }
       const soft = lobbyMask(rect, 145, 135);
       const moderate = lobbyMask(rect, 160, 150);
       const useSoft = soft?.glyphs === moderate?.glyphs && soft?.glyphs >= 4;
-      const normal = useSoft ? soft : lobbyMask(rect, 200, 195, rect[2] * 4, !lobby);
-      const bright = useSoft ? moderate : lobbyMask(rect, 215, 205, rect[2] * 4, !lobby);
-      const primary = maskPair(normal, bright, true);
-      // Keep the usual crop for short totals. Wider totals can need room to the left of it.
-      const wide = [icon.x - 97, top, 94, 45];
-      const alternate = lobby
-        ? maskPair(lobbyMask(wide, 190, 180), lobbyMask(wide, 200, 195), true)
-        : maskPair(lobbyMask(rect, 159, 149), lobbyMask(rect, 160, 150), true);
-      // The wider crop protects against accepting a total with a clipped leading digit.
-      const goldTotal = lobby ? lobbyTemplateTotal(wide, 12) : null;
-      const templateTotal = goldTotal ?? (lobby ? lobbyTemplateTotal(wide, -10) : null);
-      return { kind: 'home', lobbyLine: png([1030, top, icon.x - 1030, 45], 2), label: png([1030, top, 350, 45], 3), foregroundTotal: png(wide, 4, true), rawTotal: png(wide, 4), primary, alternate, templateTotal, templateNeedsLine: goldTotal === null };
+      const normal = useSoft ? soft : lobbyMask(rect, 200, 195, rect[2] * 4, true);
+      const bright = useSoft ? moderate : lobbyMask(rect, 215, 205, rect[2] * 4, true);
+      const primary = maskPair(normal, bright);
+      const alternate = maskPair(lobbyMask(rect, 159, 149), lobbyMask(rect, 160, 150));
+      return { kind: 'home', lobbyLine: png([1030, top, icon.x - 1030, 45], 2), label: png([1030, top, 350, 45], 3),
+        foregroundTotal: png(wide, 4, true), rawTotal: png(wide, 4), primary, alternate };
     }
 
     const banner = [1740, 827, 312, 44];
@@ -328,13 +318,10 @@ export function createRecognizer({ draw, context, crop, signatures }) {
     return { kind: 'home', layout: 'events', label: png(header, 3), rawTotal: png(rect, 4), primary, alternate, templateTotal: primary?.templateTotal ?? null };
   }
 
-  function maskPair(normal, bright, checkStroke = false) {
+  function maskPair(normal, bright) {
     if (!normal || !bright || normal.glyphs !== bright.glyphs) return null;
-    const closedUpperLoop = checkStroke
-      ? normal.closedUpperLoop.map((closed, index) => closed && bright.closedUpperLoop[index])
-      : undefined;
     const templateTotal = normal.templateTotal === bright.templateTotal ? normal.templateTotal : null;
-    return { digits: normal.image, mask: bright.image, glyphs: normal.glyphs, closedUpperLoop, templateTotal };
+    return { digits: normal.image, mask: bright.image, glyphs: normal.glyphs, templateTotal };
   }
 
   return sample;

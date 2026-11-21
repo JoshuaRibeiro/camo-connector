@@ -65,10 +65,8 @@ function save(change) {
 }
 
 const cropReads = new Map();
-function readText(png, mode, digits = false) {
-  const key = createHash('sha256').update(`${mode}:${digits}:`).update(png).digest('hex');
-  if (cropReads.has(key)) return cropReads.get(key);
-  const reading = new Promise((resolve, reject) => {
+function cliRead(png, mode, digits) {
+  return new Promise((resolve, reject) => {
     const args = ['stdin', 'stdout', '--psm', String(mode)];
     if (digits) args.push('-c', 'tessedit_char_whitelist=0123456789');
     const process = spawn(tesseract, args, { windowsHide: true, timeout: 3500 });
@@ -83,6 +81,13 @@ function readText(png, mode, digits = false) {
     });
     process.stdin.end(Buffer.from(png, 'base64'));
   });
+}
+const readCrop = process.env.TROPHY_OCR_WORKER
+  ? require('./ocr-worker.cjs')(process.env.TROPHY_OCR_WORKER, path.dirname(tesseract), cliRead) : cliRead;
+function readText(png, mode, digits = false) {
+  const key = createHash('sha256').update(`${mode}:${digits}:`).update(png).digest('hex');
+  if (cropReads.has(key)) return cropReads.get(key);
+  const reading = readCrop(png, mode, digits);
   if (cropReads.size >= 64) cropReads.delete(cropReads.keys().next().value);
   cropReads.set(key, reading);
   void reading.catch(() => { if (cropReads.get(key) === reading) cropReads.delete(key); });
@@ -114,22 +119,20 @@ async function readTotal(pair, mode = 8, retryMode, rawTotal) {
     }
   }
   if (!complete(digits) || digits !== cleanDigits) return null;
-  return Number(digits.replace(/3/g, (digit, index) => pair.closedUpperLoop?.[index] === true ? '9' : digit));
+  return Number(digits);
 }
 
 async function readLobbyLine(lineCrop, numberCrop, foregroundCrop, templateTotal) {
-  if (!lineCrop || !numberCrop) return null;
-  const [line, number] = await Promise.all([
-    readText(lineCrop, 7), readText(numberCrop, 7, true)
-  ]);
+  if (!lineCrop || (!numberCrop && templateTotal == null)) return null;
+  const line = await readText(lineCrop, 7);
   // The icon's antialiased edge can appear as punctuation after the total.
-  const labelled = /\bTROPHIES\s+COLLECTED\s+([1-9]\d{0,5}|0)\s*[:)\]]?\s*$/i.exec(line);
+  const labelled = /\bTROPHIES\s+[C@]OLLECTED\s*:?\s+([1-9]\d{0,5}|0)\s*[:)\]]?\s*$/i.exec(line);
   if (!labelled) return null;
   if (Number(labelled[1]) === templateTotal) return templateTotal;
   // A contradictory shape read cannot be corroborated by another OCR crop
   // from the same frame.
   if (templateTotal != null) return null;
-  if (labelled[1] === number) return Number(number);
+  if (labelled[1] === await readText(numberCrop, 7, true)) return Number(labelled[1]);
   if (foregroundCrop && labelled[1] === await readText(foregroundCrop, 7, true))
     return Number(labelled[1]);
   return null;
@@ -155,26 +158,32 @@ let candidate = null;
 let skippedMatchValue = null;
 let lobbyReads = [];
 
-function confirmLobbyCorrection(value, session, frameTime, corroborated) {
+function confirmLobbyCorrection(value, session, frameTime, corroborated, labelledCrop) {
   // Background motion can alternate correct digits with plausible OCR errors.
   // Keep a bounded window and require the correction to lead competing reads.
   lobbyReads = lobbyReads.filter(read =>
     read.session === session && frameTime > read.time && frameTime - read.time <= 8000
   ).slice(-8);
-  lobbyReads.push({ value, session, time: frameTime, corroborated });
+  lobbyReads.push({ value, session, time: frameTime, corroborated, labelledCrop });
   const matching = lobbyReads.filter(read => read.value === value);
-  const strong = matching.filter(read => read.corroborated).length;
-  if (matching.length < 3 || strong < 2) return false;
+  const votes = reads => {
+    const strong = reads.filter(read => read.corroborated).length;
+    const distinctCrops = new Set(reads.map(read => read.labelledCrop).filter(Boolean)).size;
+    return Math.max(strong, distinctCrops >= 4 ? distinctCrops : 0);
+  };
+  const support = votes(matching);
+  if (matching.length < 3 || support < 2) return false;
   const competing = new Map();
   for (const read of lobbyReads) {
-    if (read.value !== value && read.corroborated) {
-      competing.set(read.value, (competing.get(read.value) ?? 0) + 1);
+    if (read.value !== value) {
+      if (!competing.has(read.value)) competing.set(read.value, []);
+      competing.get(read.value).push(read);
     }
   }
-  return [...competing.values()].every(count => count < strong);
+  return [...competing.values()].every(reads => votes(reads) < support);
 }
 
-function observe(kind, value, session, frameTime, corroborated = false, layout = null) {
+function observe(kind, value, session, frameTime, corroborated = false, layout = null, labelledCrop = null) {
   if (kind === 'match' || (kind === 'home' && layout !== 'lobby')) lobbyReads = [];
   if (value === null) {
     const sameSession = candidate?.session === session;
@@ -191,7 +200,7 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
   const strongReads = (repeat ? candidate.strongReads : 0) + (corroborated ? 1 : 0);
   candidate = { kind, value, session, time: frameTime, firstTime, frames, strongReads, layout };
   const lobbyConfirmed = kind === 'home' && layout === 'lobby' &&
-    confirmLobbyCorrection(value, session, frameTime, corroborated);
+    confirmLobbyCorrection(value, session, frameTime, corroborated, labelledCrop);
   // A normal lobby increase already has two OCR reads from separate crops.
   // Keep multi-frame confirmation for corrections, large jumps and match reads.
   const quickIncrease = kind === 'home' && layout === 'lobby' && corroborated &&
@@ -239,7 +248,10 @@ async function readHomeTotal(body) {
     return { value: templateTotal, corroborated: true };
   }
   // The lobby line and the isolated number can confirm the total with just two OCR jobs.
-  const lobby = await readLobbyLine(body.lobbyLine, body.rawTotal, body.foregroundTotal, templateTotal);
+  let lobby = await readLobbyLine(body.lobbyLine, body.rawTotal, body.foregroundTotal, templateTotal);
+  if (lobby === null && body.alternateLine && !body.layout) {
+    lobby = await readLobbyLine(body.alternateLine, body.rawTotal, body.foregroundTotal, templateTotal);
+  }
   if (lobby !== null && (lobby === templateTotal || !isLargeTotalChange(lobby))) {
     return { value: lobby, corroborated: true };
   }
@@ -316,6 +328,7 @@ async function readBody(request) {
 }
 
 let ocrInProgress = false;
+let correctionRevision = 0;
 const server = http.createServer(async (request, response) => {
   function json(value, status = 200) {
     response.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -359,18 +372,24 @@ const server = http.createServer(async (request, response) => {
       lobbyReads = [];
       skippedMatchValue = null;
       save({ current: body.current, match: null, source: 'Manual correction' });
+      correctionRevision++;
       return json(publicState());
     }
     if (request.url !== '/api/sample') return json({ error: 'Page missing.' }, 404);
     if (ocrInProgress) return json({ state: publicState(), reading: 'OCR busy' });
     ocrInProgress = true;
+    const revision = correctionRevision;
     try {
       let value = null;
       let corroborated = false;
+      let labelledCrop = null;
       if (body.kind === 'home') {
         ({ value, corroborated } = await readHomeTotal(body));
         if (!body.layout && value !== null && isLargeTotalChange(value) &&
             value !== body.templateTotal) {
+          if (corroborated && !body.label && body.lobbyLine && body.rawTotal) {
+            labelledCrop = createHash('sha256').update(body.lobbyLine).digest('hex');
+          }
           corroborated = false;
         }
         if (value === null && !body.label) body.kind = 'none';
@@ -383,8 +402,9 @@ const server = http.createServer(async (request, response) => {
           if (/^[1-9]\d{0,2}$/.test(digits)) value = Number(digits);
         }
       }
+      if (revision !== correctionRevision) return json({ state: publicState(), reading: 'Total corrected' });
       observe(body.kind, value, body.session, body.frameTime, corroborated,
-        body.kind === 'home' ? body.layout ?? 'lobby' : null);
+        body.kind === 'home' ? body.layout ?? 'lobby' : null, labelledCrop);
       const source = body.layout === 'events' ? 'Events' : body.kind === 'home' ? 'Lobby' : 'Match';
       const pending = body.kind === 'home' && value !== null && value !== state.current;
       return json({ state: publicState(), reading: value === null ? 'Looking for the trophy counter' :
