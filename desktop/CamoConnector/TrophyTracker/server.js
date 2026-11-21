@@ -148,7 +148,29 @@ function isSuspectedFiveDrop(value) {
 
 let candidate = null;
 let skippedMatchValue = null;
+let lobbyReads = [];
+
+function confirmLobbyCorrection(value, session, frameTime, corroborated) {
+  // Background motion can alternate correct digits with plausible OCR errors.
+  // Keep a bounded window and require the correction to lead competing reads.
+  lobbyReads = lobbyReads.filter(read =>
+    read.session === session && frameTime > read.time && frameTime - read.time <= 8000
+  ).slice(-8);
+  lobbyReads.push({ value, session, time: frameTime, corroborated });
+  const matching = lobbyReads.filter(read => read.value === value);
+  const strong = matching.filter(read => read.corroborated).length;
+  if (matching.length < 3 || strong < 2) return false;
+  const competing = new Map();
+  for (const read of lobbyReads) {
+    if (read.value !== value && read.corroborated) {
+      competing.set(read.value, (competing.get(read.value) ?? 0) + 1);
+    }
+  }
+  return [...competing.values()].every(count => count < strong);
+}
+
 function observe(kind, value, session, frameTime, corroborated = false, layout = null) {
+  if (kind === 'match' || (kind === 'home' && layout !== 'lobby')) lobbyReads = [];
   if (value === null) {
     const sameSession = candidate?.session === session;
     const gap = sameSession ? frameTime - candidate.time : Infinity;
@@ -163,19 +185,23 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
   const firstTime = repeat ? candidate.firstTime : frameTime;
   const strongReads = (repeat ? candidate.strongReads : 0) + (corroborated ? 1 : 0);
   candidate = { kind, value, session, time: frameTime, firstTime, frames, strongReads, layout };
+  const lobbyConfirmed = kind === 'home' && layout === 'lobby' &&
+    confirmLobbyCorrection(value, session, frameTime, corroborated);
   // A normal lobby increase already has two OCR reads from separate crops.
   // Keep multi-frame confirmation for corrections, large jumps and match reads.
   const quickIncrease = kind === 'home' && layout === 'lobby' && corroborated &&
     state.current > 0 && value > state.current && !isLargeTotalChange(value);
-  if (frames < 2 && !quickIncrease) return;
+  if (frames < 2 && !quickIncrease && !lobbyConfirmed) return;
   if (kind === 'home') {
     // Large corrections need two independently cropped reads across three frames.
     // Only the lobby total can correct a decrease, since other screens can be stale.
     if (value < state.current && layout !== 'lobby' || isSuspectedFiveDrop(value)) return;
-    if (isLargeTotalChange(value) && (frames < 3 || strongReads < 2)) return;
+    if (isLargeTotalChange(value) &&
+        (layout === 'lobby' ? !lobbyConfirmed : frames < 3 || strongReads < 2)) return;
     if (value < state.current && !isLargeTotalChange(value) && frames < 3) return;
     skippedMatchValue = null;
     if (state.current !== value || state.match !== null || state.source !== 'Lobby') {
+      if (state.current !== value) lobbyReads = [];
       save({ current: value, match: null, source: 'Lobby' });
     }
   } else if (state.match === null) {

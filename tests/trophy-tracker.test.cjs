@@ -95,6 +95,21 @@ test('an apparent jump to 4938 cannot bypass a lobby OCR reading of 2538', async
   assert.equal(correction.corroborated, true);
 });
 
+test('interleaved lobby OCR errors do not erase a supported correction', () => {
+  const context = vm.createContext({ state: { current: 4938, match: null, source: 'Lobby' } });
+  vm.runInContext(
+    'function save(change) { Object.assign(state, change); }\n' +
+    source.slice(source.indexOf('function isLargeTotalChange'), source.indexOf('const files =')),
+    context
+  );
+  const reads = [[2538, true], [4938, true], [2038, false], [2538, true],
+    [2938, true], [4038, false], [2538, false]];
+  reads.forEach(([number, corroborated], index) => {
+    context.observe('home', number, 'capture', 100 + index * 450, corroborated, 'lobby');
+    assert.equal(context.state.current, index === reads.length - 1 ? 2538 : 4938);
+  });
+});
+
 test('lobby OCR recovers a six when original pixels corroborate a masked read', async () => {
   const context = vm.createContext({
     readText: async (crop, mode) => crop === 'original' || (crop === 'mask' && mode === 7) ? '2226' : '2228'
