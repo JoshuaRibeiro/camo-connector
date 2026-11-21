@@ -86,7 +86,7 @@ internal sealed partial class ConnectorWindow
         footer.Controls.Add(version);
         var toggle = navigationToggle = new Button { Height = 38, AccessibleName = "Expand navigation", Margin = new Padding(0, 0, 0, 8) };
         menu.Controls.Add(toggle);
-        var entries = new[] { (localTrackerPage, ""), (capturePage, "\uE7F8"),
+        var entries = new[] { (localTrackerPage, ""), (overlayPage, "\uE7B3"), (capturePage, "\uE7F8"),
             (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
         var icons = ShellFont("Segoe MDL2 Assets", 14);
         var hints = new ToolTip();

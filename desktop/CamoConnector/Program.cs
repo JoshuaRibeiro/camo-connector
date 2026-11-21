@@ -88,7 +88,7 @@ internal sealed partial class ConnectorWindow : Form
         Shown += async (_, _) =>
         {
             await StartBridgeAsync();
-            if (!IsDisposed && !closing.IsCancellationRequested && pages.SelectedTab == localTrackerPage)
+            if (!IsDisposed && !closing.IsCancellationRequested && TrackerHost != null)
                 await OpenLocalTrackerAsync();
         };
     }

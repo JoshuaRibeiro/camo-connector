@@ -101,6 +101,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 }
 
 .tracker .toolbar { padding-block: .95rem; background: #141b22; }
+.tracker .toolbar[hidden] { display: none; }
 .tracker .toolbar h1 { letter-spacing: -.045em; }
 .collection, #overlay-settings {
   margin: 1rem clamp(.85rem, 3vw, 2rem); padding: 1rem;

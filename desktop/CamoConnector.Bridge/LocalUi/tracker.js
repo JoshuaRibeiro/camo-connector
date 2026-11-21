@@ -283,10 +283,15 @@ async function poll() {
 
 byId('search').addEventListener('input', renderRoster);
 byId('import').addEventListener('click', () => void save('import', {}, 'Saved progress merged.'));
-byId('overlay').addEventListener('click', () => {
-  const section = byId('overlay-settings');
-  section.hidden = !section.hidden;
-  byId('overlay').setAttribute('aria-expanded', String(!section.hidden));
+function showSection(page) {
+  const overlays = page === 'overlays';
+  byId('tracker-toolbar').hidden = overlays;
+  byId('tracker-content').hidden = overlays;
+  byId('overlay-settings').hidden = !overlays;
+}
+showSection(new URLSearchParams(location.search).get('page'));
+window.chrome?.webview?.addEventListener('message', event => {
+  if (event.data === 'tracker' || event.data === 'overlays') showSection(event.data);
 });
 for (const button of overlayButtons) button.addEventListener('click', () => {
   void save('overlay-layout', { layout: button.dataset.overlay }, 'OBS overlay layout updated.');

@@ -6,15 +6,21 @@ namespace CamoConnector;
 internal sealed partial class ConnectorWindow
 {
     private readonly TabPage localTrackerPage = new("Tracker");
+    private readonly TabPage overlayPage = new("Overlays");
     private readonly BannerButton reloadTracker = new() { Text = "Refresh tracker", AutoSize = true };
     private readonly Label trackerMessage = new() { AutoSize = true, Dock = DockStyle.Top };
     private WebView2? localTrackerView;
     private bool localTrackerLoading;
+    private bool localTrackerDocumentReady;
+
+    private TabPage? TrackerHost => pages.SelectedTab is { } page &&
+        (page == localTrackerPage || page == overlayPage) ? page : null;
 
     private void AddLocalTrackerPage()
     {
         localTrackerPage.Controls.Add(trackerMessage);
         pages.TabPages.Add(localTrackerPage);
+        pages.TabPages.Add(overlayPage);
         reloadTracker.Click += async (_, _) =>
         {
             if (localTrackerView?.CoreWebView2 is { } core) core.Reload();
@@ -22,9 +28,23 @@ internal sealed partial class ConnectorWindow
         };
         pages.SelectedIndexChanged += async (_, _) =>
         {
-            if (bridgeReady && pages.SelectedTab == localTrackerPage && localTrackerView == null)
-                await OpenLocalTrackerAsync();
+            if (TrackerHost is not { } host) return;
+            host.Controls.Add(trackerMessage);
+            if (localTrackerView == null) await OpenLocalTrackerAsync();
+            else ShowTrackerSection();
         };
+    }
+
+    private void ShowTrackerSection()
+    {
+        if (TrackerHost is not { } host || localTrackerView is not { } view) return;
+        if (view.Parent != host)
+        {
+            host.Controls.Add(view);
+            view.BringToFront();
+        }
+        if (localTrackerDocumentReady)
+            view.CoreWebView2.PostWebMessageAsString(host == overlayPage ? "overlays" : "tracker");
     }
 
     private async Task OpenLocalTrackerAsync()
@@ -45,7 +65,7 @@ internal sealed partial class ConnectorWindow
             var environment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
             if (IsDisposed || closing.IsCancellationRequested) return;
             view = new WebView2 { Dock = DockStyle.Fill };
-            localTrackerPage.Controls.Add(view);
+            (TrackerHost ?? localTrackerPage).Controls.Add(view);
             view.BringToFront();
             await view.EnsureCoreWebView2Async(environment);
             if (IsDisposed || closing.IsCancellationRequested) return;
@@ -58,6 +78,7 @@ internal sealed partial class ConnectorWindow
                 args.Cancel = !Uri.TryCreate(args.Uri, UriKind.Absolute, out var uri) ||
                     uri.Scheme != "http" || uri.Host != "127.0.0.1" ||
                     uri.Port != 47150 || uri.AbsolutePath != "/local/tracker";
+                if (!args.Cancel) localTrackerDocumentReady = false;
             };
             core.NewWindowRequested += (_, args) =>
             {
@@ -76,10 +97,17 @@ internal sealed partial class ConnectorWindow
                     trackerMessage.Text = "Could not open 11annah’s Twitch channel.";
                 }
             };
-            core.NavigationCompleted += (_, args) => trackerMessage.Text = args.IsSuccess ? "" : "Local tracker could not load.";
+            core.NavigationCompleted += (_, args) =>
+            {
+                localTrackerDocumentReady = args.IsSuccess;
+                trackerMessage.Text = args.IsSuccess ? "" : "Local tracker could not load.";
+                if (args.IsSuccess) ShowTrackerSection();
+            };
             var key = File.ReadAllText(Path.Combine(root, "Data", "bridge-pairing.key")).Trim();
-            core.Navigate("http://127.0.0.1:47150/local/tracker#" + key);
+            var query = pages.SelectedTab == overlayPage ? "?page=overlays" : "";
+            core.Navigate("http://127.0.0.1:47150/local/tracker" + query + "#" + key);
             localTrackerView = view;
+            ShowTrackerSection();
         }
         catch (OperationCanceledException) when (closing.IsCancellationRequested) { }
         catch (Exception error)
