@@ -497,7 +497,8 @@ internal sealed class HudCapture : IDisposable
         Action<string, string, Bitmap>? trace = null)
     {
         const string bannerHeading = "CHALLENGE COMPLETED";
-        if (StrokeScore(frame, BannerStrokes[bannerHeading], cyan: true) >= .65)
+        var recognisedHeading = StrokeScore(frame, BannerStrokes[bannerHeading], cyan: true) >= .65;
+        if (recognisedHeading)
         {
             var scores = BannerStrokes.Where(entry => entry.Key != bannerHeading)
                 .Select(entry => (entry.Key, Score: StrokeScore(frame, entry.Value)))
@@ -518,7 +519,7 @@ internal sealed class HudCapture : IDisposable
             PixelAdjustment adjustment = PixelAdjustment.Normal, int pageMode = 7) =>
             string.Join(" ", Lines((await ReadTextAsync(frame, area, cancel, pageMode: pageMode,
                 adjustment: adjustment, trace: trace, regionName: region)).Text));
-        var heading = await ReadBannerText((.365, .257, .274, .041), "unlockHeading", PixelAdjustment.CyanText);
+        var heading = recognisedHeading ? bannerHeading : await ReadBannerText((.365, .257, .274, .041), "unlockHeading", PixelAdjustment.CyanText);
         if (!LooksCompleted(heading))
             heading = await ReadBannerText((.350, .250, .300, .047), "unlockHeadingOriginal", pageMode: 6);
         var levelHeading = heading;
@@ -625,7 +626,7 @@ internal sealed class HudCapture : IDisposable
             return name != null
                 ? new(weapon, name, "catalog-special-unlocked") : null;
         }
-        var unique = SpecialUnlocks.ReadNamedBanner(details, candidates) ?? MatchBannerArtwork(candidates);
+        var unique = SpecialUnlocks.ReadNamedBanner(details, candidates);
         return unique == null ? null : ResolveUnique(unique);
 
         SpecialUnlock? ResolveUnique(string name)
