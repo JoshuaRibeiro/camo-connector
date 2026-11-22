@@ -103,10 +103,11 @@ try
         {
             var (weapon, replay) = await capture.DetectAsync(frame, stop.Token, RecordCrop);
             var banner = await capture.DetectChallengeBannerAsync(frame, stop.Token, RecordCrop);
-            var special = banner.Completed && banner.Challenge == null && !replay
+            var resolved = banner.Challenge ?? capture.ReadCompletionistObjective(weapon?.Name, banner.Details);
+            var special = banner.Completed && resolved == null && !replay
                 ? capture.IdentifySpecialBanner(frame, weapon?.Name, banner.Details) : null;
             var militaryUnlock = replay ? null : await capture.DetectMilitaryUnlockAsync(frame, stop.Token);
-            result = new { source, weapon, replay, banner.Challenge, banner.Completed, banner.LevelUp, special, militaryUnlock, cropDirectory, reads };
+            result = new { source, weapon, replay, Challenge = resolved, banner.Completed, banner.LevelUp, special, militaryUnlock, cropDirectory, reads };
         }
         else
         {
@@ -135,7 +136,7 @@ try
         var replay = result.Replay || unlock != null && result.Weapon == null && await capture.IsReplayAsync(image, stop.Token);
         var menuWeapon = replay ? null : await capture.ReadCamoMenuWeaponAsync(image, stop.Token);
         var banner = replay ? default : await capture.DetectChallengeBannerAsync(image, stop.Token);
-        var challenge = banner.Challenge;
+        var challenge = banner.Challenge ?? capture.ReadCompletionistObjective(result.Weapon?.Name, banner.Details);
         Console.WriteLine(JsonSerializer.Serialize(new
         {
             weapon = result.Weapon?.Name, menuWeapon, akimbo = result.Weapon?.Akimbo, replay, militaryUnlock = replay ? null : unlock,
@@ -500,7 +501,8 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                             level = levelUp.Level, at = now
                         });
                     }
-                    var challenge = banner.Challenge;
+                    var objectiveChallenge = capture.ReadCompletionistObjective(candidate, banner.Details);
+                    var challenge = banner.Challenge ?? objectiveChallenge;
                     if (challenge is not ("gold-15" or "platinum")) visibleCompletionBanner = null;
                     if (banner.Completed && (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
                     {
@@ -512,7 +514,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                                 await AppendAsync(new
                                 {
                                     kind = "completionist-unlock", source = "live", mode = "mp",
-                                    context = "unlock-banner", weapon = result.Weapon?.Name,
+                                    context = objectiveChallenge == null ? "unlock-banner" : "weapon-objective-banner", weapon = objectiveChallenge == null ? result.Weapon?.Name : candidate,
                                     challenge = challenge == "gold-15" ? "Gold" : "Platinum", at = now
                                 });
                             }

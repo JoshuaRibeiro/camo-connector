@@ -247,12 +247,15 @@ internal sealed class LocalTracker
         if (ProgressFeed.Text(item, "source") != "live" || ProgressFeed.Text(item, "mode") != "mp") return;
         var name = ProgressFeed.Text(item, "weapon");
         var kind = ProgressFeed.Text(item, "kind");
-        if (kind == "completionist-unlock" && ProgressFeed.Text(item, "context") == "unlock-banner" &&
+        var context = ProgressFeed.Text(item, "context");
+        if (kind == "completionist-unlock" && context is ("unlock-banner" or "weapon-objective-banner") &&
             ProgressFeed.Text(item, "challenge") is { } challenge)
         {
             Change((next, focus) =>
             {
-                foreach (var id in new[] { state.PinnedWeapon, name == null ? null : Key(name), focus })
+                var equipped = name == null ? null : Key(name);
+                var candidates = context == "weapon-objective-banner" ? new[] { equipped } : new[] { state.PinnedWeapon, equipped, focus };
+                foreach (var id in candidates)
                 {
                     if (id == null || !weapons.TryGetValue(id, out var candidate)) continue;
                     var camo = candidate.Camos.FirstOrDefault(rule =>

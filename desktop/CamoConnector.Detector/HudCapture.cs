@@ -459,9 +459,53 @@ internal sealed class HudCapture : IDisposable
         return best;
     }
 
+    // Each pair samples a bright letter stroke and its adjoining dark outline.
+    // Positions use the 2560 x 1440 reference viewport and scale with the capture.
+    private static readonly Dictionary<string, int[]> BannerStrokes = LoadBannerStrokes();
+
+    private static Dictionary<string, int[]> LoadBannerStrokes()
+    {
+        using var stream = typeof(HudCapture).Assembly.GetManifestResourceStream("CamoConnector.BannerStrokes")!;
+        return JsonSerializer.Deserialize<Dictionary<string, int[]>>(stream)!;
+    }
+
+    private static double StrokeScore(Bitmap frame, int[] points, bool cyan = false)
+    {
+        Color At(int x, int y) => frame.GetPixel(x * frame.Width / 2560, y * frame.Height / 1440);
+        var hits = 0;
+        for (var i = 0; i < points.Length; i += 4)
+        {
+            var x = points[i];
+            var y = points[i + 1];
+            var ink = At(x, y);
+            var edge = At(x + points[i + 2], y + points[i + 3]);
+            var light = Math.Min(ink.G, ink.B);
+            if (light > 155 && light - Math.Min(edge.G, edge.B) > 15 && (!cyan || light - ink.R > 16))
+                hits++;
+        }
+        return hits * 4.0 / points.Length;
+    }
+
+    public string? ReadCompletionistObjective(string? weapon, string[]? details)
+    {
+        if (weapon == null || details == null) return null;
+        var match = (completionist.GetValueOrDefault(weapon) ?? []).FirstOrDefault(entry =>
+            entry.Objective != null && details.Contains(entry.Objective, StringComparer.OrdinalIgnoreCase));
+        return match?.Name switch { "Gold" => "gold-15", "Platinum" => "platinum", _ => null };
+    }
+
     public async Task<(string? Challenge, bool Completed, string[]? Details, WeaponLevelRead? LevelUp)> DetectChallengeBannerAsync(Bitmap frame, CancellationToken cancel,
         Action<string, string, Bitmap>? trace = null)
     {
+        const string bannerHeading = "CHALLENGE COMPLETED";
+        if (StrokeScore(frame, BannerStrokes[bannerHeading], cyan: true) >= .65)
+        {
+            var scores = BannerStrokes.Where(entry => entry.Key != bannerHeading)
+                .Select(entry => (entry.Key, Score: StrokeScore(frame, entry.Value)))
+                .OrderByDescending(entry => entry.Score).Take(2).ToArray();
+            if (scores[0].Score >= .77 && scores[0].Score - scores[1].Score >= .045)
+                return (null, true, [scores[0].Key], null);
+        }
         var warmPixels = 0;
         for (var y = 0; y < 5; y++)
         for (var x = 0; x < 5; x++)
@@ -489,6 +533,8 @@ internal sealed class HudCapture : IDisposable
             var (number, _) = await ReadTextAsync(frame, (.479, .334, .042, .048), cancel, pageMode: 7,
                 countersOnly: true, adjustment: PixelAdjustment.YellowText, trace: trace, regionName: "weaponLevelNumber");
             if (WeaponRecognition.ReadLevelUp(levelHeading, name, number) == null) {
+                if (WeaponRecognition.Read([name], false) == null)
+                    name = await ReadBannerText((.435, .309, .130, .028), "wideLevelName");
                 if (WeaponRecognition.Read([name], false) == null) name = await ReadBannerText((.4781, .3111, .04375, .02292), "levelNameTight");
                 (number, _) = await ReadTextAsync(frame, (.484, .33333, .032, .04583), cancel, pageMode: 8,
                     countersOnly: true, adjustment: PixelAdjustment.BrightGold, trace: trace, regionName: "levelNumberTight");
@@ -551,6 +597,11 @@ internal sealed class HudCapture : IDisposable
         var matchingObjectives = all.Where(entry => entry.Objective is { Length: > 0 } objective &&
             lines.Any(line => line.Contains(Compact(objective), StringComparison.Ordinal))).ToArray();
         var candidates = matchingObjectives.Length == 0 ? all : matchingObjectives;
+        if (weapon != null && catalog.TryGetValue(weapon, out var weaponEntries))
+        {
+            var local = matchingObjectives.Where(weaponEntries.Contains).ToArray();
+            if (local.Length == 1) return new(weapon, local[0].Name, "catalog-special-unlocked");
+        }
         var captured = all.Where(entry => entry.BannerRgb != null);
         if (MatchBannerArtwork(captured, 15) is { } capturedName &&
             candidates.Any(entry => entry.Name == capturedName) && ResolveUnique(capturedName) is { } capturedUnlock) {

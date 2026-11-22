@@ -246,6 +246,18 @@ try {
         $tracker.focus -ne 'signal-50') {
         throw 'A generic Gold banner should follow the pinned weapon after the equipped weapon changes.'
     }
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"completionist-unlock","source":"live","mode":"mp","context":"weapon-objective-banner","weapon":"CSG-35","challenge":"Platinum"}'
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $tracker = Check-Events 200 $native 'local/state'
+        if ($tracker.progress.'csg-35:platinum'.done) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if (!$tracker.progress.'csg-35:platinum'.done -or $tracker.progress.'50-gs:platinum'.done) {
+        throw 'A weapon-specific completion objective should update its recognised weapon.'
+    }
     $levelEdit = @{ weapon = 'signal-50'; camo = 'weapon-level'; count = 24 } | ConvertTo-Json
     $tracker = Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $levelEdit
     $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'

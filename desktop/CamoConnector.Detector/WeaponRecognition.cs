@@ -75,7 +75,7 @@ public static class WeaponRecognition
     }
 
     internal static bool IsLevelUpHeading(string text) =>
-        Key(text) is "newunlock" or "weaponlevelup" or "weaponleveledup" or "weaponlevelledup";
+        Key(text) is "levelup" or "newunlock" or "weaponlevelup" or "weaponleveledup" or "weaponlevelledup";
 
     public static WeaponLevelRead? ReadLevelUp(string heading, string name, string number)
     {
