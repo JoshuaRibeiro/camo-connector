@@ -165,3 +165,26 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .weapon-switch { display: flex; justify-content: space-between; gap: .5rem; margin-top: .65rem; }
 .weapon-switch button { min-width: 2.4rem; }
 @media (max-width: 680px) { #overview-content { grid-template-columns: 1fr; } }
+
+.tracker #tracker-content { grid-template-columns: minmax(17rem, 39%) minmax(0, 1fr); }
+#roster .weapon-card { padding: .7rem .55rem; border-bottom: 1px solid #354149; border-radius: .55rem; }
+.weapon-card-heading { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: .5rem; }
+.roster-open { display: grid; place-items: center; width: 1.55rem; aspect-ratio: 1; border-radius: .35rem; background: #111719; color: var(--accent); }
+.roster-identity, .next-caption { display: grid; gap: .12rem; }
+.roster-identity strong, .next-caption strong { color: #e6eef2; text-transform: uppercase; }
+.roster-identity small { color: #9eb3c1; text-transform: uppercase; letter-spacing: .06em; }
+.weapon-ring { width: 1.65rem; }
+.weapon-ring::after { inset: 4px; }
+.roster-tiles { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-left: 2.05rem; }
+.roster-group { display: flex; align-items: center; gap: .25rem; }
+.roster-group + .roster-group { border-left: 1px solid #44545d; padding-left: .45rem; }
+.roster-group .strip-tile { width: 1.7rem; border-radius: .3rem; }
+.roster-group[data-type="Military"] .camo-strip { gap: 1px; }
+.roster-group[data-type="Military"] .strip-tile { width: .85rem; aspect-ratio: 2 / 3; border-radius: .2rem; }
+.weapon-card .strip-tile { opacity: .65; }
+.weapon-card .strip-tile.unlocked { opacity: 1; }
+.weapon-card .weapon-next { display: grid; gap: .25rem; margin-left: 2.05rem; }
+.next-label { color: var(--accent); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.next-preview { display: flex; align-items: center; gap: .45rem; }
+.next-preview .strip-tile { width: 1.8rem; opacity: 1; }
+@media (max-width: 680px) { .tracker #tracker-content { grid-template-columns: 1fr; } }

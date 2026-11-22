@@ -126,11 +126,32 @@ function weaponCard(weapon) {
   const ring = element('span', null, 'weapon-ring');
   ring.style.setProperty('--completion', (total ? count / total * 100 : 0) + '%');
   ring.setAttribute('aria-hidden', 'true');
-  heading.append(element('strong', weapon.name), ring, element('span', count + '/' + total, 'weapon-count'));
-  button.append(heading, camoStrip(weapon));
+  const identity = element('span', null, 'roster-identity');
+  identity.append(element('strong', weapon.name), element('small', weapon.category));
+  heading.append(element('span', '+', 'roster-open'), identity, ring, element('span', count + '/' + total, 'weapon-count'));
+  const tiles = element('span', null, 'roster-tiles');
+  const groups = Map.groupBy(weapon.camos, rule => rule.type);
+  for (const [type, rules] of groups) {
+    const group = element('span', null, 'roster-group');
+    group.dataset.type = type;
+    group.append(camoStrip({ ...weapon, camos: rules }));
+    if (type === 'Military') group.append(element('small', completedCount(weapon.id, rules) + '/' + rules.length));
+    tiles.append(group);
+  }
+  button.append(heading, tiles);
   const next = weapon.camos.find(rule => !state.progress[weapon.id + ':' + rule.id]?.done);
-  if (next) button.append(element('span', 'Next · ' + next.name, 'weapon-next'));
-  if (weapon.id === selected) button.setAttribute('aria-current', 'true');
+  if (next) {
+    const preview = element('span', null, 'weapon-next');
+    const caption = element('span', null, 'next-caption');
+    caption.append(element('strong', next.name));
+    if (next.unlock || next.objective) caption.append(element('small', next.unlock || next.objective));
+    preview.append(element('small', 'Next camo', 'next-label'));
+    const row = element('span', null, 'next-preview');
+    row.append(camoStrip({ ...weapon, camos: [next] }), caption);
+    preview.append(row);
+    button.append(preview);
+  }
+    if (weapon.id === selected) button.setAttribute('aria-current', 'true');
   button.addEventListener('click', () => choose(weapon.id));
   return button;
 }
