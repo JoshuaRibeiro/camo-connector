@@ -553,7 +553,9 @@ internal sealed class HudCapture : IDisposable
         var candidates = matchingObjectives.Length == 0 ? all : matchingObjectives;
         var captured = all.Where(entry => entry.BannerRgb != null);
         if (MatchBannerArtwork(captured, 15) is { } capturedName &&
-            candidates.Any(entry => entry.Name == capturedName) && ResolveUnique(capturedName) is { } capturedUnlock)
+            candidates.Any(entry => entry.Name == capturedName) && ResolveUnique(capturedName) is { } capturedUnlock &&
+            (weapon == null || capturedUnlock.Weapon == weapon || matchingObjectives.Length > 0 ||
+                SpecialUnlocks.ReadNamedBanner(details, candidates) == capturedName))
             return capturedUnlock;
         if (bannerArtworkOnly) return null;
         if (matchingObjectives.Length == 1 && ResolveUnique(matchingObjectives[0].Name) is { } objectiveUnlock)
