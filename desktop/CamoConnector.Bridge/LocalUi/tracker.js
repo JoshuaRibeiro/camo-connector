@@ -95,10 +95,44 @@ function renderRoster() {
     const matches = catalog.weapons.filter(weapon => weapon.category === category && weapon.name.toLowerCase().includes(query));
     if (!matches.length) continue;
     entries.push(element('h2', category));
-    for (const weapon of matches) entries.push(selection(weapon.id, weapon.name, weapon.camos));
+    for (const weapon of matches) entries.push(weaponCard(weapon));
   }
   if (!query) entries.push(selection('shared', 'Prestige & mastery'));
   roster.replaceChildren(...entries);
+}
+
+function camoStrip(weapon) {
+  const strip = element('span', null, 'camo-strip');
+  for (const rule of weapon.camos) {
+    const done = state.progress[weapon.id + ':' + rule.id]?.done;
+    const tile = element('span', null, done ? 'strip-tile unlocked' : 'strip-tile');
+    tile.title = rule.name + (done ? ' · Unlocked' : ' · Locked');
+    if (rule.artwork) {
+      const image = element('img');
+      image.src = rule.artwork;
+      image.alt = tile.title;
+      tile.append(image);
+    }
+    strip.append(tile);
+  }
+  return strip;
+}
+
+function weaponCard(weapon) {
+  const button = element('button', null, 'weapon-card');
+  const count = completedCount(weapon.id, weapon.camos);
+  const total = weapon.camos.length;
+  const heading = element('span', null, 'weapon-card-heading');
+  const ring = element('span', null, 'weapon-ring');
+  ring.style.setProperty('--completion', (total ? count / total * 100 : 0) + '%');
+  ring.setAttribute('aria-hidden', 'true');
+  heading.append(element('strong', weapon.name), ring, element('span', count + '/' + total, 'weapon-count'));
+  button.append(heading, camoStrip(weapon));
+  const next = weapon.camos.find(rule => !state.progress[weapon.id + ':' + rule.id]?.done);
+  if (next) button.append(element('span', 'Next · ' + next.name, 'weapon-next'));
+  if (weapon.id === selected) button.setAttribute('aria-current', 'true');
+  button.addEventListener('click', () => choose(weapon.id));
+  return button;
 }
 
 function selection(id, label, rules = catalog.shared) {
@@ -119,8 +153,8 @@ function renderOverview() {
   }
 
   const overview = state.overview;
-  const heading = element('div', null, 'detail-heading');
-  heading.append(element('h3', weapon.name));
+  const heading = element('div', null, 'featured-weapon');
+  heading.append(element('h3', weapon.name), element('p', weapon.category, 'subtitle'), camoStrip(weapon));
   if (overview.maximumCamoLevel > 0 && overview.minimumLevel >= overview.maximumCamoLevel)
     heading.append(element('span', 'Weapon level ' + (overview.level ?? overview.minimumLevel), 'subtitle'));
   else if (overview.level != null || overview.minimumLevel)
@@ -128,7 +162,16 @@ function renderOverview() {
   else if (overview.minimumUnlocks)
     heading.append(element('span', 'Weapon unlocks ' + overview.minimumUnlocks +
       (overview.weaponUnlocks != null || overview.minimumUnlocks === overview.maximumCamoUnlocks ? '' : '+'), 'subtitle'));
-  const entries = [heading];
+  const index = catalog.weapons.indexOf(weapon);
+  const navigation = element('div', null, 'weapon-switch');
+  for (const offset of [-1, 1]) {
+    const button = element('button', offset < 0 ? '‹' : '›');
+    button.setAttribute('aria-label', offset < 0 ? 'Previous weapon' : 'Next weapon');
+    button.addEventListener('click', () => choose(catalog.weapons[(index + offset + catalog.weapons.length) % catalog.weapons.length].id));
+    navigation.append(button);
+  }
+  heading.append(navigation);
+  const entries = [];
   const rules = new Map(weapon.camos.map(rule => [rule.id, rule]));
   for (const row of overview.rows) entries.push(camoRow(rules.get(row.id), weapon.id, row));
   if (overview.waiting) {
@@ -164,7 +207,9 @@ function renderOverview() {
     for (const rule of completed) history.append(camoRow(rule, weapon.id, {}));
     entries.push(history);
   }
-  content.replaceChildren(...entries);
+  const objectives = element('div', null, 'featured-objectives');
+  objectives.append(...entries);
+  content.replaceChildren(heading, objectives);
 }
 
 function render() {
