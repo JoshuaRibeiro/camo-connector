@@ -230,7 +230,7 @@ try {
         $currentCatalog.overlayUrl -ne $catalog.overlayUrl) {
         throw 'Switching back to Default did not retain the existing OBS URL.'
     }
-    $pin = @{ weapon = '50-gs' } | ConvertTo-Json
+    $pin = @{ weapon = 'patriot-xmr' } | ConvertTo-Json
     Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $pin | Out-Null
     [IO.File]::AppendAllLines($eventLog, [string[]]@(
         '{"kind":"weapon","source":"live","mode":"mp","weapon":"Signal 50"}',
@@ -239,10 +239,10 @@ try {
     $deadline = [DateTime]::UtcNow.AddSeconds(5)
     do {
         $tracker = Check-Events 200 $native 'local/state'
-        if ($tracker.progress.'50-gs:gold'.done) { break }
+        if ($tracker.progress.'patriot-xmr:gold'.done) { break }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
-    if (!$tracker.progress.'50-gs:gold'.done -or $tracker.progress.'signal-50:gold'.done -or
+    if (!$tracker.progress.'patriot-xmr:gold'.done -or $tracker.progress.'signal-50:gold'.done -or
         $tracker.focus -ne 'signal-50') {
         throw 'A generic Gold banner should follow the pinned weapon after the equipped weapon changes.'
     }
@@ -255,9 +255,18 @@ try {
         if ($tracker.progress.'csg-35:platinum'.done) { break }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
-    if (!$tracker.progress.'csg-35:platinum'.done -or $tracker.progress.'50-gs:platinum'.done) {
+    if (!$tracker.progress.'csg-35:platinum'.done -or $tracker.progress.'patriot-xmr:platinum'.done) {
         throw 'A weapon-specific completion objective should update its recognised weapon.'
     }
+    foreach ($id in 'patriot-xmr', 'csg-35') {
+        $baseCamos = ($catalog.catalog.weapons | Where-Object id -eq $id).camos | Where-Object type -in 'Military','Special'
+        if ($baseCamos.Count -ne 11) { throw 'Expected eight Military and three Special camos.' }
+        foreach ($camo in $baseCamos) {
+            $entry = $tracker.progress."$($id):$($camo.id)"
+            if (!$entry.done -or $entry.count -ne [int]$camo.goal) { throw "Missing prerequisite $id $($camo.name)." }
+        }
+    }
+    if (!$tracker.progress.'csg-35:gold'.done) { throw 'Platinum must also complete Gold.' }
     $levelEdit = @{ weapon = 'signal-50'; camo = 'weapon-level'; count = 24 } | ConvertTo-Json
     $tracker = Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $levelEdit
     $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
@@ -334,16 +343,16 @@ try {
         throw 'Weapon unlocks must use the catalog threshold and stay separate from weapon levels.'
     }
     [IO.File]::AppendAllLines($eventLog, [string[]]@(
-        '{"kind":"weapon","source":"live","mode":"mp","weapon":"CSG-35"}'
-        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"CSG-35","type":"post-match-unlocks","count":25,"goal":42}'
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":"M4"}'
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"M4","type":"post-match-unlocks","count":25,"goal":42}'
     ))
     $deadline = [DateTime]::UtcNow.AddSeconds(5)
     do {
         $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
-        if ($overlay.weapon -eq 'CSG-35' -and $overlay.weaponUnlocks -eq 25) { break }
+        if ($overlay.weapon -eq 'M4' -and $overlay.weaponUnlocks -eq 25) { break }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
-    if ($overlay.weapon -ne 'CSG-35' -or $overlay.weaponUnlocks -ne 25) { throw 'Post-match unlock total missing.' }
+    if ($overlay.weapon -ne 'M4' -or $overlay.weaponUnlocks -ne 25) { throw 'Post-match unlock total missing.' }
     [IO.File]::AppendAllLines($eventLog, [string[]]@(
         '{"kind":"military-unlock","source":"live","mode":"mp","weapon":"Signal 50","tier":8}'
         '{"kind":"weapon","source":"live","mode":"mp","weapon":"Signal 50"}'

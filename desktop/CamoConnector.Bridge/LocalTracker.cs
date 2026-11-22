@@ -56,7 +56,8 @@ internal sealed class LocalTracker
         state = File.Exists(path)
             ? JsonSerializer.Deserialize<State>(File.ReadAllText(path), Json) ?? throw new InvalidDataException("Invalid local tracker data.")
             : new(null, new(StringComparer.Ordinal));
-        if (!File.Exists(path) && File.Exists(backup))
+        if (File.Exists(path)) Change((_, focus) => focus); // Repair prerequisites in existing saves.
+        else if (File.Exists(backup))
         {
             try { ImportBackup(); }
             catch (Exception error) when (error is IOException or JsonException)
@@ -420,6 +421,18 @@ internal sealed class LocalTracker
         {
             var next = new Dictionary<string, Entry>(state.Progress, StringComparer.Ordinal);
             var focus = update(next, state.Focus);
+            foreach (var weapon in catalog.Weapons)
+            {
+                var prefix = weapon.Id + ":";
+                var platinum = next.GetValueOrDefault(prefix + "platinum")?.Done == true;
+                if (!platinum && next.GetValueOrDefault(prefix + "gold")?.Done != true) continue;
+                foreach (var camo in weapon.Camos)
+                {
+                    if (camo.Type is not ("Military" or "Special") && !(platinum && camo.Id == "gold")) continue;
+                    var key = prefix + camo.Id;
+                    if (next.GetValueOrDefault(key)?.Done != true) ApplyProgress(next, key, 0, true);
+                }
+            }
             if (focus == state.Focus && next.Count == state.Progress.Count &&
                 next.All(pair => state.Progress.GetValueOrDefault(pair.Key) == pair.Value)) return;
             SaveState(state with { Focus = focus, Progress = next });
