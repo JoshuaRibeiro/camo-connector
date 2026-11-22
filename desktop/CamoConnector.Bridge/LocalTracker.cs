@@ -304,7 +304,11 @@ internal sealed class LocalTracker
             var key = weapon.Id + ":weapon-level";
             Change((next, focus) =>
             {
-                if (level.Value > (next.GetValueOrDefault(key)?.Count ?? 0))
+                var exactMenuLevel = kind == "progress-snapshot" && ProgressFeed.Text(item, "context") == "camo-menu" &&
+                    level.Value < ProgressFeed.Number(item, "goal");
+                if (exactMenuLevel)
+                    next[key] = new(level.Value, false);
+                else if (level.Value > (next.GetValueOrDefault(key)?.Count ?? 0))
                     next[key] = new(level.Value, next.GetValueOrDefault(key)?.Done == true);
                 return focus;
             });

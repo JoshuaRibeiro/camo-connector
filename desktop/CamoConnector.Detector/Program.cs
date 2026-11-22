@@ -561,7 +561,15 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 var hovered = result.Replay ? null : await capture.DetectCamoProgressAsync(frame, menuWeapon, cancel);
                 CamoProgress[] reads = hovered == null ? [] : [hovered];
                 camoReads += reads.Length;
-                foreach (var progress in progressConfirmation.ObserveRows(reads)) await PublishProgressAsync(progress, "camo-menu");
+                foreach (var progress in progressConfirmation.ObserveRows(reads))
+                    {
+                        if (progress.WeaponLevelObjective != null && progress.WeaponUnlocksRemaining == null && progress.Count < progress.Goal)
+                        {
+                            seenWeaponLevels[progress.Weapon] = progress.Count;
+                            seenMaxLevels.Remove(progress.Weapon);
+                        }
+                        await PublishProgressAsync(progress, "camo-menu");
+                    }
                 var militaryTier = menuWeapon == null ? null : await capture.ReadMilitaryMenuCountAsync(frame, cancel);
                 var menuMilitary = menuWeapon != null && militaryTier is int tier && tier > 0
                     ? new MilitaryUnlock(menuWeapon, tier) : null;

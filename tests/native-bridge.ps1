@@ -151,6 +151,20 @@ try {
             throw "The overlay listed the wrong challenges at weapon level $($expected.Level)."
         }
     }
+    $jokrLevel = '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"JOKR","type":"weapon-level","context":"camo-menu","count":23,"goal":26,"objective":"Reach Weapon Level 26"}'
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":"JOKR"}'
+        '{"kind":"weapon-level-up","source":"live","mode":"mp","weapon":"JOKR","level":93}'
+        $jokrLevel
+        ($jokrLevel.Replace('23','10').Replace('26','10'))
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+        if ($overlay.level -eq 23) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($overlay.level -ne 23) { throw 'JOKR 23/26 must correct level 93 and survive a capped 10/10 read.' }
     $mojave = @(
         '{"kind":"weapon","source":"live","mode":"mp","weapon":"Mojave .357"}'
         '{"kind":"military-unlock","source":"live","mode":"mp","weapon":"Mojave .357","tier":8}'
