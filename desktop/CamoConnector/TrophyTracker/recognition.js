@@ -30,6 +30,38 @@ export function classifyTotal(shapes, templates) {
   return Number(digits.join(''));
 }
 
+// Wager uses tall, pale-gold numerals on a textured panel. Keep their native
+// aspect ratio and reject clipped or fragmented rows before matching shapes.
+export function wagerShapes(data, width, height, floor) {
+  const ink = (x, y) => {
+    const i = (y * width + x) * 4;
+    return data[i] >= floor && data[i + 1] >= floor - 10 && data[i] - data[i + 2] >= 14;
+  };
+  const shapes = [];
+  let left = -1;
+  for (let x = 0; x <= width; x++) {
+    let count = 0;
+    if (x < width) for (let y = 0; y < height; y++) count += Number(ink(x, y));
+    if (count >= height * .05) {
+      if (left < 0) left = x;
+      continue;
+    }
+    if (left < 0) continue;
+    let top = height, bottom = 0;
+    for (let y = 0; y < height; y++) {
+      for (let col = left; col < x; col++) {
+        if (ink(col, y)) { top = Math.min(top, y); bottom = y + 1; break; }
+      }
+    }
+    const h = bottom - top, aspect = (x - left) / h;
+    if (h < height * .57 || h > height * .93 || aspect < .13 || aspect > .68 ||
+        left === 0 || x === width || shapes.length === 5) return [];
+    shapes.push({ shape: digitShape(ink, left, x, top, bottom), narrow: aspect < .38 });
+    left = -1;
+  }
+  return shapes;
+}
+
 export function createRecognizer({ draw, context, crop, signatures }) {
   function correlation(pixels, signature) {
     let sumA = 0, sumB = 0, squaresA = 0, squaresB = 0, products = 0;
@@ -280,6 +312,14 @@ export function createRecognizer({ draw, context, crop, signatures }) {
 
     const banner = [1740, 827, 312, 44];
     if (signatures.wager && similarity(banner, signatures.wager, 64, 12) >= .65) {
+      const area = [1716, 880, 545, 185];
+      draw(...area, area[2], area[3]);
+      const pixels = context.getImageData(0, 0, area[2], area[3]).data;
+      const match = floor => classifyTotal(wagerShapes(pixels, area[2], area[3], floor), signatures.digits);
+      const templateTotal = match(170);
+      if (templateTotal !== null && templateTotal === match(205)) {
+        return { kind: 'home', label: png(banner, 2), layout: 'wager', templateTotal };
+      }
       const rect = [1716, 865, 545, 220];
       const primary = maskPair(lobbyMask(rect, 125, 115, 390, true), lobbyMask(rect, 145, 135, 390, true));
       const alternate = maskPair(lobbyMask(rect, 195, 185, 390, true), lobbyMask(rect, 210, 195, 390, true));

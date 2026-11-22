@@ -183,7 +183,7 @@ function confirmLobbyCorrection(value, session, frameTime, corroborated, labelle
   return [...competing.values()].every(reads => votes(reads) < support);
 }
 
-function observe(kind, value, session, frameTime, corroborated = false, layout = null, labelledCrop = null) {
+function observe(kind, value, session, frameTime, corroborated = false, layout = null, labelledCrop = null, wagerShape = false) {
   if (kind === 'match' || (kind === 'home' && layout !== 'lobby')) lobbyReads = [];
   if (value === null) {
     const sameSession = candidate?.session === session;
@@ -210,8 +210,10 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
     // Large corrections need two independently cropped reads across three frames.
     // Menu totals can correct a decrease after three frames with two corroborated reads.
     const confirmedMenu = (layout === 'events' || layout === 'wager') && !isLargeTotalChange(value) && frames >= 3 && strongReads >= 2;
-    if (value < state.current && layout !== 'lobby' && !confirmedMenu) return;
-    if (isSuspectedFiveDrop(value)) return;
+    const verifiedWager = layout === 'wager' && wagerShape && frames >= 3 && strongReads >= 2;
+    if (layout === 'wager' && isLargeTotalChange(value) && !verifiedWager) return;
+    if (value < state.current && layout !== 'lobby' && !confirmedMenu && !verifiedWager) return;
+    if (isSuspectedFiveDrop(value) && !verifiedWager) return;
     if (isLargeTotalChange(value) &&
         (layout === 'lobby' ? !lobbyConfirmed : frames < 3 || strongReads < 2)) return;
     if (value < state.current && !isLargeTotalChange(value) && frames < 3) return;
@@ -244,6 +246,10 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
 async function readHomeTotal(body) {
   const templateTotal = Number.isInteger(body.templateTotal) && body.templateTotal >= 0 &&
     body.templateTotal <= 99999 ? body.templateTotal : null;
+  if (templateTotal !== null && body.layout === 'wager') {
+    const labelled = /TROPHIES\s+COLLECTE[DO]\b/i.test(await readText(body.label, 7));
+    return { value: labelled ? templateTotal : null, corroborated: labelled };
+  }
   if (templateTotal !== null && !body.templateNeedsLine && !body.layout && body.label &&
       !isLargeTotalChange(templateTotal) &&
       /\bTROPHIES\s+COLLE[CG]TE[DS]\b/i.test(await readText(body.label, 7))) {
@@ -406,7 +412,7 @@ const server = http.createServer(async (request, response) => {
       }
       if (revision !== correctionRevision) return json({ state: publicState(), reading: 'Total corrected' });
       observe(body.kind, value, body.session, body.frameTime, corroborated,
-        body.kind === 'home' ? body.layout ?? 'lobby' : null, labelledCrop);
+        body.kind === 'home' ? body.layout ?? 'lobby' : null, labelledCrop, body.layout === 'wager' && corroborated && value === body.templateTotal);
       const source = body.layout === 'wager' ? 'Wager' : body.layout === 'events' ? 'Events' : body.kind === 'home' ? 'Lobby' : 'Match';
       const pending = body.kind === 'home' && value !== null && value !== state.current;
       return json({ state: publicState(), reading: value === null ? 'Looking for the trophy counter' :

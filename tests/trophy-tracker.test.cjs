@@ -323,3 +323,29 @@ test('dim Events card can confirm a large correction without a second mask pair'
   assert.equal((await context.readHomeTotal({ ...body, templateTotal: 2551 })).corroborated, true);
   assert.equal((await context.readHomeTotal({ ...body, templateTotal: 2051 })).corroborated, false);
 });
+
+test('the Wager panel corrects a stale total after three confirmed frames', () => {
+  for (const initial of [3531, 9521]) {
+    const context = vm.createContext({ state: { current: initial, match: null, source: 'Lobby' } });
+    vm.runInContext('function save(change) { Object.assign(state, change); }\n' +
+      source.slice(source.indexOf('function isLargeTotalChange'), source.indexOf('const files =')), context);
+    for (let frame = 1; frame <= 3; frame++) {
+      context.observe('home', 3521, 'session', frame * 300, true, 'wager', null, true);
+      assert.equal(context.state.current, frame === 3 ? 3521 : initial);
+    }
+    for (let frame = 4; frame <= 9; frame++)
+      context.observe('home', 9521, 'session', frame * 300, true, 'wager');
+    assert.equal(context.state.current, 3521);
+  }
+});
+
+test('Wager matches the captured 3521 at two foreground thresholds', async () => {
+  const { wagerShapes, classifyTotal } = await import('../desktop/CamoConnector/TrophyTracker/recognition.js');
+  const { digits } = require('../desktop/CamoConnector/TrophyTracker/signatures.json');
+  // Two-threshold foreground mask from the reported Wager screen.
+  const foreground = require('node:zlib').inflateSync(Buffer.from('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', 'base64'));
+  const pixels = Buffer.alloc(foreground.length * 4);
+  foreground.forEach((v, i) => { pixels[i * 4] = pixels[i * 4 + 1] = v; });
+  for (const floor of [170, 205])
+    assert.equal(classifyTotal(wagerShapes(pixels, 545, 185, floor), digits), 3521);
+});
