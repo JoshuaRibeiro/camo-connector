@@ -286,6 +286,8 @@ internal sealed class HudCapture : IDisposable
             adjustment: PixelAdjustment.WhiteText);
         if (!WeaponRecognition.IsUnlockHeader(header))
             (header, _) = await ReadTextAsync(frame, (.909, .218, .063, .024), cancel, pageMode: 7);
+        if (!WeaponRecognition.IsUnlockHeader(header))
+            (header, _) = await ReadTextAsync(frame, (.909375, .21597, .05859, .02778), cancel, pageMode: 7, adjustment: PixelAdjustment.NativeWhite);
         MilitaryUnlock? badge = null;
         if (WeaponRecognition.IsUnlockHeader(header))
         {
@@ -303,6 +305,15 @@ internal sealed class HudCapture : IDisposable
                         pageMode: 7, adjustment: PixelAdjustment.YellowText);
                     badge = WeaponRecognition.ReadMilitaryUnlock([header, weapon, yellowTier]);
                 }
+            }
+        }
+        if (badge == null && WeaponRecognition.IsUnlockHeader(header)) {
+            var (weapon, _) = await ReadTextAsync(frame, (.833, .245, .042, .025), cancel, pageMode: 7);
+            var (tier, _) = await ReadTextAsync(frame, (.83359, .26944, .13281, .03194), cancel, pageMode: 7, adjustment: PixelAdjustment.BadgeGold);
+            badge = WeaponRecognition.ReadMilitaryUnlock([header, weapon, tier]);
+            if (badge == null && tier.Contains("CAMO", StringComparison.OrdinalIgnoreCase) && WeaponRecognition.Read([weapon], false) == null) {
+                var hud = await DetectAsync(frame, cancel);
+                if (!hud.Replay && hud.Weapon != null) badge = WeaponRecognition.ReadMilitaryUnlock([header, hud.Weapon.Name, tier]);
             }
         }
         badge ??= WeaponRecognition.ReadMilitaryUnlock(await ReadAsync(frame, (.827, .045, .155, .405), cancel));
@@ -470,22 +481,22 @@ internal sealed class HudCapture : IDisposable
         var levelHeading = heading;
         if (!LooksCompleted(heading) && !WeaponRecognition.IsLevelUpHeading(heading))
             levelHeading = await ReadBannerText((.425, .268, .150, .037), "weaponLevelHeading", PixelAdjustment.YellowText);
+        if (!LooksCompleted(heading) && !WeaponRecognition.IsLevelUpHeading(levelHeading))
+            levelHeading = await ReadBannerText((.42969, .27083, .140625, .03472), "levelHeadingTight", PixelAdjustment.BrightGold, 8);
         if (WeaponRecognition.IsLevelUpHeading(levelHeading))
         {
             var name = await ReadBannerText((.447, .308, .106, .030), "weaponLevelName");
             var (number, _) = await ReadTextAsync(frame, (.479, .334, .042, .048), cancel, pageMode: 7,
                 countersOnly: true, adjustment: PixelAdjustment.YellowText, trace: trace, regionName: "weaponLevelNumber");
+            if (WeaponRecognition.ReadLevelUp(levelHeading, name, number) == null) {
+                if (WeaponRecognition.Read([name], false) == null) name = await ReadBannerText((.4781, .3111, .04375, .02292), "levelNameTight");
+                (number, _) = await ReadTextAsync(frame, (.484, .33333, .032, .04583), cancel, pageMode: 8,
+                    countersOnly: true, adjustment: PixelAdjustment.BrightGold, trace: trace, regionName: "levelNumberTight");
+            }
             if (WeaponRecognition.ReadLevelUp(levelHeading, name, number) is { } levelUp)
                 return (null, false, null, levelUp);
         }
         var completed = LooksCompleted(heading);
-        // A close match to captured banner art also works when the completion heading is unreadable.
-        if (!completed && !goldTile)
-            completed = IdentifySpecialBanner(frame, null, null, bannerArtworkOnly: true) != null;
-        if (!goldTile && (completed || heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
-            System.Text.RegularExpressions.Regex.IsMatch(heading, @"[CG]OMPLE", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) &&
-            CombatRecognition.IsPlatinumArtwork(Sample(frame, .148, (.471, .058, .102, 0))))
-            return ("platinum", true, null, null);
         var cyanLetters = 0;
         if (!goldTile && !completed)
         {
@@ -497,8 +508,16 @@ internal sealed class HudCapture : IDisposable
                 if (Math.Min(pixel.G, pixel.B) >= 155 && Math.Min(pixel.G, pixel.B) - pixel.R >= 22)
                     cyanLetters++;
             }
-            if (cyanLetters < 15) return (null, false, null, null);
+
         }
+        // A close match to captured banner art also works when the completion heading is unreadable.
+        if (!completed && !goldTile)
+            completed = IdentifySpecialBanner(frame, null, null, bannerArtworkOnly: true) != null;
+        if (!goldTile && (completed || heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
+            System.Text.RegularExpressions.Regex.IsMatch(heading, @"[CG]OMPLE", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) &&
+            CombatRecognition.IsPlatinumArtwork(Sample(frame, .148, (.471, .058, .102, 0))))
+            return ("platinum", true, null, null);
+        if (!goldTile && !completed && cyanLetters < 15) return (null, false, null, null);
         var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)
             ? "gold-15" : SpecialUnlocks.ReadBanner(heading, text);
@@ -882,7 +901,7 @@ internal sealed class HudCapture : IDisposable
         return rgb;
     }
 
-    private enum PixelAdjustment { BrightRedChannel, Normal, Contrast, Invert, CyanText, WhiteText, YellowText }
+    private enum PixelAdjustment { NativeWhite, BadgeGold, BrightGold, BrightRedChannel, Normal, Contrast, Invert, CyanText, WhiteText, YellowText }
 
     private async Task<string[]> ReadAsync(Bitmap frame, (double X, double Y, double W, double H) area,
         CancellationToken cancel, PixelAdjustment adjustment = PixelAdjustment.Normal)
@@ -897,14 +916,14 @@ internal sealed class HudCapture : IDisposable
     {
         var region = new Rectangle((int)Math.Round(area.X * frame.Width), (int)Math.Round(area.Y * frame.Height),
             Math.Max(1, (int)Math.Round(area.W * frame.Width)), Math.Max(1, (int)Math.Round(area.H * frame.Height)));
-        var scale = adjustment == PixelAdjustment.BrightRedChannel ? 1.0 : Math.Min(3.0, 2400.0 / Math.Max(region.Width, region.Height));
+        var scale = adjustment is PixelAdjustment.BrightRedChannel or PixelAdjustment.BrightGold or PixelAdjustment.NativeWhite or PixelAdjustment.BadgeGold ? 1.0 : Math.Min(3.0, 2400.0 / Math.Max(region.Width, region.Height));
         using var crop = new Bitmap(Math.Max(1, (int)Math.Round(region.Width * scale)),
             Math.Max(1, (int)Math.Round(region.Height * scale)), PixelFormat.Format24bppRgb);
         using (var graphics = Graphics.FromImage(crop))
         {
             graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
             var destination = new Rectangle(Point.Empty, crop.Size);
-            if (adjustment is PixelAdjustment.Normal or PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText or PixelAdjustment.BrightRedChannel)
+            if (adjustment is PixelAdjustment.Normal or PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText or PixelAdjustment.BrightRedChannel or PixelAdjustment.BrightGold or PixelAdjustment.NativeWhite or PixelAdjustment.BadgeGold)
                 graphics.DrawImage(frame, destination, region, GraphicsUnit.Pixel);
             else
             {
@@ -919,7 +938,7 @@ internal sealed class HudCapture : IDisposable
                 graphics.DrawImage(frame, destination, region.X, region.Y, region.Width, region.Height, GraphicsUnit.Pixel, attributes);
             }
         }
-        if (adjustment is PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText or PixelAdjustment.BrightRedChannel)
+        if (adjustment is PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText or PixelAdjustment.BrightRedChannel or PixelAdjustment.BrightGold or PixelAdjustment.NativeWhite or PixelAdjustment.BadgeGold)
         {
             var pixels = crop.LockBits(new Rectangle(Point.Empty, crop.Size), ImageLockMode.ReadWrite, crop.PixelFormat);
             try
@@ -933,6 +952,9 @@ internal sealed class HudCapture : IDisposable
                     {
                         var ink = adjustment switch
                         {
+                            PixelAdjustment.NativeWhite => Math.Min(row[x], Math.Min(row[x + 1], row[x + 2])) > 220,
+                            PixelAdjustment.BadgeGold => row[x + 2] > 180 && row[x + 1] > 180 && row[x + 1] - row[x] > 35,
+                            PixelAdjustment.BrightGold => row[x + 2] > 215 && row[x + 1] > 215 && row[x + 1] - row[x] > 25,
                             PixelAdjustment.BrightRedChannel => row[x + 2] > 205,
                             PixelAdjustment.WhiteText => Math.Min(row[x], Math.Min(row[x + 1], row[x + 2])) >= 205,
                             PixelAdjustment.YellowText => Math.Min(row[x + 1], row[x + 2]) >= 155 &&
