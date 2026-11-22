@@ -276,6 +276,19 @@ try {
         throw 'A completed level-gated Special camo must establish a minimum above an older exact level.'
     }
     [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"weapon-level-max","source":"live","mode":"mp","weapon":"Pila"}'
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+        if ($overlay.maxLevel) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    $tracker = Check-Events 200 $native 'local/state'
+    if (!$overlay.maxLevel -or !$tracker.progress.'pila:mil-8'.done -or $tracker.progress.'pila:sp-2'.done) {
+        throw 'PILA MAX should confirm level-based Military unlocks and preserve Special challenges.'
+    }
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
         '{"kind":"weapon","source":"live","mode":"mp","weapon":"Sang 9mm"}',
         '{"kind":"catalog-special-unlocked","source":"live","mode":"mp","weapon":"Sang 9mm","challenge":"Space Time"}',
         '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"Sang 9mm","type":"camo","camo":"Platinum","count":2,"goal":20}'

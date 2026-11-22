@@ -535,6 +535,9 @@ internal sealed class HudCapture : IDisposable
                 if (WeaponRecognition.Read([name], false) == null)
                     name = await ReadBannerText((.435, .309, .130, .028), "wideLevelName");
                 if (WeaponRecognition.Read([name], false) == null) name = await ReadBannerText((.4781, .3111, .04375, .02292), "levelNameTight");
+                var maxLabel = await ReadBannerText((.471, .334, .058, .047), "weaponLevelMax", PixelAdjustment.BrightGold);
+                if (WeaponRecognition.ReadLevelUp(levelHeading, name, maxLabel) is { IsMax: true } maximum)
+                    return (null, false, null, maximum);
                 (number, _) = await ReadTextAsync(frame, (.484, .33333, .032, .04583), cancel, pageMode: 8,
                     countersOnly: true, adjustment: PixelAdjustment.BrightGold, trace: trace, regionName: "levelNumberTight");
             }

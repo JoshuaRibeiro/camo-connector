@@ -12,7 +12,7 @@ function render(data) {
   byId('weapon').textContent = data.weapon ?? '';
   const level = byId('weapon-level');
   level.hidden = !data.weapon;
-  level.textContent = data.maximumCamoLevel > 0 && data.minimumLevel >= data.maximumCamoLevel
+  level.textContent = data.maxLevel ? 'Weapon level MAX' : data.maximumCamoLevel > 0 && data.minimumLevel >= data.maximumCamoLevel
     ? 'Weapon level ' + (data.level ?? data.minimumLevel) :
     data.level != null ? 'Weapon level ' + data.level :
     data.minimumLevel ? 'Weapon level ' + data.minimumLevel + '+' :

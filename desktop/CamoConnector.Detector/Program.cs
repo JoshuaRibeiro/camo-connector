@@ -303,6 +303,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
     {
         var confirmation = new WeaponConfirmation();
         var menuConfirmation = new WeaponConfirmation();
+        var seenMaxLevels = new HashSet<string>();
         var seenWeaponLevels = new Dictionary<string, int>();
         MilitaryUnlock? previousMenuMilitary = null;
         var progressConfirmation = new CamoProgressConfirmation();
@@ -491,13 +492,14 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                 {
                     lastChallengeScan = now;
                     var banner = await challengeRead;
-                    if (banner.LevelUp is { } levelUp && levelUp.Level > seenWeaponLevels.GetValueOrDefault(levelUp.Weapon) &&
+                    if (banner.LevelUp is { } levelUp && (levelUp.IsMax ? !seenMaxLevels.Contains(levelUp.Weapon) : levelUp.Level > seenWeaponLevels.GetValueOrDefault(levelUp.Weapon)) &&
                         (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
                     {
-                        seenWeaponLevels[levelUp.Weapon] = levelUp.Level;
+                        if (levelUp.IsMax) seenMaxLevels.Add(levelUp.Weapon);
+                        else seenWeaponLevels[levelUp.Weapon] = levelUp.Level;
                         await AppendAsync(new
                         {
-                            kind = "weapon-level-up", source = "live", mode = "mp", weapon = levelUp.Weapon,
+                            kind = levelUp.IsMax ? "weapon-level-max" : "weapon-level-up", source = "live", mode = "mp", weapon = levelUp.Weapon,
                             level = levelUp.Level, at = now
                         });
                     }

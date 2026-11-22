@@ -96,12 +96,14 @@ internal sealed class LocalTracker
                 .Select(camo => camo.UnlockTotal ?? 0).DefaultIfEmpty().Max();
 
             var level = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-level")?.Count;
+            var maxLevel = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-level")?.Done == true;
             var knownLevel = Math.Max(level ?? 0, ConfirmedRequirement(IsLevelRule));
             var observedUnlocks = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-unlocks")?.Count;
             var minimumUnlocks = Math.Max(observedUnlocks ?? 0, ConfirmedRequirement(IsWeaponUnlockRule));
             var weaponUnlocks = minimumUnlocks == observedUnlocks ? observedUnlocks : null;
             var maximumCamoLevel = weapon.Camos.Where(IsLevelRule)
                 .Select(camo => camo.UnlockTotal ?? 0).DefaultIfEmpty().Max();
+            if (maxLevel) knownLevel = Math.Max(knownLevel, maximumCamoLevel);
             var maximumCamoUnlocks = weapon.Camos.Where(IsWeaponUnlockRule)
                 .Select(camo => camo.UnlockTotal ?? 0).DefaultIfEmpty().Max();
             bool IsLaunchWeapon(Weapon item) =>
@@ -161,7 +163,7 @@ internal sealed class LocalTracker
             var next = rows.Length == 0 ? remaining.FirstOrDefault() : null;
             var prerequisite = next == null ? null : CompletionGate(next);
             return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
-                minimumLevel = knownLevel, weaponUnlocks, minimumUnlocks, maximumCamoLevel, maximumCamoUnlocks, rows, state.OverlayLayout,
+                maxLevel, minimumLevel = knownLevel, weaponUnlocks, minimumUnlocks, maximumCamoLevel, maximumCamoUnlocks, rows, state.OverlayLayout,
                 waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock, count = prerequisite?.Count, goal = prerequisite?.Goal },
                 complete = remaining.Length == 0 };
         }
@@ -275,6 +277,18 @@ internal sealed class LocalTracker
             return;
         }
 
+        if (kind == "weapon-level-max")
+        {
+            Change((next, focus) =>
+            {
+                var key = weapon.Id + ":weapon-level";
+                next[key] = new(next.GetValueOrDefault(key)?.Count ?? 0, true);
+                foreach (var camo in weapon.Camos.Where(rule => rule.Type == "Military" && IsLevelRule(rule)))
+                    ApplyProgress(next, weapon.Id + ":" + camo.Id, 0, true);
+                return focus;
+            });
+            return;
+        }
         if (kind == "weapon-level-up" ||
             kind == "progress-snapshot" && ProgressFeed.Text(item, "type") == "weapon-level")
         {
@@ -288,7 +302,7 @@ internal sealed class LocalTracker
             Change((next, focus) =>
             {
                 if (level.Value > (next.GetValueOrDefault(key)?.Count ?? 0))
-                    next[key] = new(level.Value, false);
+                    next[key] = new(level.Value, next.GetValueOrDefault(key)?.Done == true);
                 return focus;
             });
             return;

@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 namespace CamoConnector.Detector;
 
 public sealed record WeaponRead(string Name, bool Akimbo);
-public sealed record WeaponLevelRead(string Weapon, int Level);
+public sealed record WeaponLevelRead(string Weapon, int Level, bool IsMax = false);
 public sealed record MilitaryUnlock(string Weapon, int Tier);
 
 public static class WeaponRecognition
@@ -81,6 +81,8 @@ public static class WeaponRecognition
     {
         if (!IsLevelUpHeading(heading)) return null;
         var weapon = Read([name], false);
+        if (weapon != null && number.Trim().Equals("MAX", StringComparison.OrdinalIgnoreCase))
+            return new(weapon.Name, 0, true);
         var match = Regex.Match(number.Trim(), @"\A(?:LEVEL\s+)?([0-9]{1,3})\z", RegexOptions.IgnoreCase);
         if (weapon == null || !match.Success || !int.TryParse(match.Groups[1].Value, out var level) ||
             level is < 1 or > 200) return null;

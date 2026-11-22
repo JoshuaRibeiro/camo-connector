@@ -176,7 +176,8 @@ function renderOverview() {
   const overview = state.overview;
   const heading = element('div', null, 'featured-weapon');
   heading.append(element('h3', weapon.name), element('p', weapon.category, 'subtitle'), camoStrip(weapon));
-  if (overview.maximumCamoLevel > 0 && overview.minimumLevel >= overview.maximumCamoLevel)
+  if (overview.maxLevel) heading.append(element('span', 'Weapon level MAX', 'subtitle'));
+  else if (overview.maximumCamoLevel > 0 && overview.minimumLevel >= overview.maximumCamoLevel)
     heading.append(element('span', 'Weapon level ' + (overview.level ?? overview.minimumLevel), 'subtitle'));
   else if (overview.level != null || overview.minimumLevel)
     heading.append(element('span', 'Weapon level ' + (overview.level ?? overview.minimumLevel + '+'), 'subtitle'));
@@ -263,8 +264,9 @@ function render() {
     input.max = '200';
     const recorded = state.progress[weapon.id + ':weapon-level']?.count;
     const exact = state.focus === weapon.id ? state.overview.level : recorded;
-    input.value = exact ?? '';
-    input.placeholder = level ?? '—';
+    const atMax = state.progress[weapon.id + ':weapon-level']?.done;
+    input.value = atMax ? '' : exact ?? '';
+    input.placeholder = atMax ? 'MAX' : level ?? '—';
     input.addEventListener('change', () => {
       if (!input.value || !input.checkValidity()) { input.value = exact ?? ''; return; }
       void save('edit', { weapon: weapon.id, camo: 'weapon-level', count: input.valueAsNumber });
