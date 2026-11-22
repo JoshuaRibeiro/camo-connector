@@ -688,9 +688,15 @@ internal sealed class HudCapture : IDisposable
             var adjustment = frame.Height < 800 ? PixelAdjustment.Normal : PixelAdjustment.BrightRedChannel;
             var (digits, _) = await ReadTextAsync(frame, (.528, .816, .038, .025), cancel,
                 countersOnly: true, pageMode: 7, adjustment: adjustment, trace: trace, regionName: "selectedChallengeCounter");
-            var meter = CamoMenuRecognition.ReadProgress(weapon, title, [digits], names);
-            if (meter != null && meter.Goal == selected.Goal && meter.Count > 0 && meter.Count < meter.Goal &&
-                MatchesChallengeBar(frame, meter.Count, meter.Goal)) return meter;
+            // A small capture may lose the last digit of the denominator. The catalog
+            // supplies the goal, and the separate filled bar must corroborate the count.
+            var fraction = System.Text.RegularExpressions.Regex.Match(digits.Trim(), @"\A(\d{1,3})/(\d{1,3})\z");
+            if (fraction.Success && selected.Goal.Value.ToString().StartsWith(fraction.Groups[2].Value, StringComparison.Ordinal))
+            {
+                var count = int.Parse(fraction.Groups[1].Value);
+                if (count > 0 && count < selected.Goal && MatchesChallengeBar(frame, count, selected.Goal.Value))
+                    return new(weapon, title, count, selected.Goal.Value);
+            }
         }
         var objectivesArea = raisedDetails ? (.313, .455, .342, .159) : (.313, .679, .342, .181);
         var (objectives, _) = await ReadTextAsync(frame, objectivesArea, cancel,
@@ -814,6 +820,11 @@ internal sealed class HudCapture : IDisposable
         if (!string.Concat(label.Text.Where(char.IsLetter)).Equals("UNLOCKS", StringComparison.OrdinalIgnoreCase)) return null;
         var title = await ReadTextAsync(frame, (.050, .128, .36, .054), cancel, pageMode: 7, adjustment: PixelAdjustment.WhiteText, trace: trace, regionName: "summarytitle");
         var weapon = TrackedCamoRecognition.ReadWeapon(title.Text);
+        if (weapon == null) {
+            var plain = await ReadTextAsync(frame, (.050, .128, .36, .054), cancel, pageMode: 7,
+                trace: trace, regionName: "summaryPlainTitle");
+            weapon = TrackedCamoRecognition.ReadWeapon(plain.Text);
+        }
         if (weapon == null) {
             var compact = await ReadTextAsync(frame, (.050, .128, .118, .054), cancel, pageMode: 7,
                 adjustment: PixelAdjustment.WhiteText, trace: trace, regionName: "summaryCompactTitle");
@@ -973,7 +984,7 @@ internal sealed class HudCapture : IDisposable
     {
         int left = (int)(frame.Width * .347), right = (int)(frame.Width * .521);
         var expected = left + (right - left) * count / (double)goal;
-        var tolerance = Math.Max(2, (right - left) * .012);
+        var tolerance = Math.Max(3, (right - left) * .012);
         for (var y = (int)(frame.Height * .822); y <= frame.Height * .836; y++)
         {
             int lastBright = left, bright = 0;
