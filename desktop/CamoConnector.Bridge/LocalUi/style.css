@@ -166,7 +166,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .weapon-switch button { min-width: 2.4rem; }
 @media (max-width: 680px) { #overview-content { grid-template-columns: 1fr; } }
 
-.tracker #tracker-content { grid-template-columns: minmax(17rem, 39%) minmax(0, 1fr); }
+.tracker #tracker-content { grid-template-columns: clamp(17rem, 30%, 31rem) minmax(0, 1fr); }
 #roster .weapon-card { padding: .7rem .55rem; border-bottom: 1px solid #354149; border-radius: .55rem; }
 .weapon-card-heading { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: .5rem; }
 .roster-open { display: grid; place-items: center; width: 1.55rem; aspect-ratio: 1; border-radius: .35rem; background: #111719; color: var(--accent); }
