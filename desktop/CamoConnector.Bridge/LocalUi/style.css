@@ -189,3 +189,21 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .next-preview { display: flex; align-items: center; gap: .45rem; }
 .next-preview .strip-tile { width: 1.8rem; opacity: 1; }
 @media (max-width: 680px) { .tracker #tracker-content { grid-template-columns: 1fr; } }
+
+.tracker { --tracker-background: #131517; --accent: #f5bf6f; color: #f1efe7; }
+.tracker .overview { background: linear-gradient(105deg,#302b24,#202325 65%); border: 1px solid #464642; border-left: 3px solid var(--accent); border-radius: .45rem; padding: 1rem 1.2rem; }
+.tracker .featured-weapon h3 { letter-spacing: -.035em; font-weight: 800; }
+.tracker .overview h2, .tracker nav h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .095em; }
+.tracker aside { background: #181b1d; border-color: #393c3c; }
+.tracker button, .tracker input { border-radius: .35rem; background-color: #25292b; }
+.tracker #roster .weapon-card { background: #1e2123; border: 1px solid #393d3d; border-left: 3px solid transparent; border-radius: .3rem; padding: .85rem .65rem; gap: .6rem; }
+.tracker #roster .weapon-card:hover { border-color: #87877a; }
+.tracker #roster .weapon-card[aria-current="true"] { border-left-color: var(--accent); background: linear-gradient(100deg,#353027,#222527 80%); }
+.tracker .roster-identity strong { font-size: 1.05rem; letter-spacing: .015em; }
+.tracker .weapon-ring { background: conic-gradient(#89d9b1 var(--completion), #424745 0); }
+.tracker .roster-group .strip-tile { width: 1.95rem; aspect-ratio: 1; flex-shrink: 0; }
+.tracker .roster-group[data-type="Military"] .strip-tile { flex: 0 0 1.65rem; width: 1.65rem; }
+.tracker .roster-group[data-type="Military"] .strip-tile + .strip-tile { margin-left: -.72rem; }
+.tracker .next-label { font-size: .66rem; }
+.tracker .camo-row, .tracker .overlay-options article { background: #202325; border-color: #404442; border-radius: .35rem; }
+.tracker .camo-complete { border-left: 3px solid #89d9b1; }

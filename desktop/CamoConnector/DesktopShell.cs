@@ -4,13 +4,13 @@ namespace CamoConnector;
 
 internal sealed partial class ConnectorWindow
 {
-    private static readonly Color ShellBackground = Color.FromArgb(17, 20, 25);
-    private static readonly Color ShellPanel = Color.FromArgb(26, 32, 39);
-    private static readonly Color ShellBorder = Color.FromArgb(64, 88, 101);
-    private static readonly Color ShellButton = Color.FromArgb(33, 45, 56);
-    private static readonly Color ShellAccent = Color.FromArgb(141, 215, 206);
-    private static readonly Color ShellText = Color.FromArgb(215, 226, 232);
-    private static readonly Color ShellMuted = Color.FromArgb(158, 179, 193);
+    private static readonly Color ShellBackground = Color.FromArgb(19, 21, 23);
+    private static readonly Color ShellPanel = Color.FromArgb(31, 34, 36);
+    private static readonly Color ShellBorder = Color.FromArgb(73, 77, 76);
+    private static readonly Color ShellButton = Color.FromArgb(44, 47, 47);
+    private static readonly Color ShellAccent = Color.FromArgb(245, 191, 111);
+    private static readonly Color ShellText = Color.FromArgb(241, 239, 231);
+    private static readonly Color ShellMuted = Color.FromArgb(184, 188, 184);
     private readonly TabPage capturePage = new("Auto tracking"),
         helpPage = new("How it works"), settingsPage = new("Settings");
     private readonly List<Font> shellFonts = [];
@@ -30,7 +30,7 @@ internal sealed partial class ConnectorWindow
             base.OnPaintBackground(e);
             if (SystemInformation.HighContrast || Width < 4 || Height < 4) return;
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            using var outline = RoundedOutline(ClientSize, LogicalToDeviceUnits(19), 1);
+            using var outline = RoundedOutline(ClientSize, LogicalToDeviceUnits(8), 1);
             using var fill = new SolidBrush(ShellPanel);
             using var stroke = new Pen(ShellBorder);
             e.Graphics.FillPath(fill, outline);
