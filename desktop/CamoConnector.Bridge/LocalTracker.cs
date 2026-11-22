@@ -111,6 +111,8 @@ internal sealed class LocalTracker
 
             (int Count, int Goal)? CompletionGate(Rule camo)
             {
+                if (camo.Id == "platinum" && camo.Unlock == "Complete the Gold Camo Challenge")
+                    return (HasCamo(weapon, "gold") ? 1 : 0, 1);
                 var required = Regex.Match(camo.Unlock ?? "", @"^Complete (\d+) ");
                 if (!required.Success) return null;
                 var goal = int.Parse(required.Groups[1].Value);

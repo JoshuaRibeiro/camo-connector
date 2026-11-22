@@ -265,6 +265,17 @@ try {
         throw 'The manually entered weapon level did not reach the active overlay.'
     }
     foreach ($edit in @(
+        @{ weapon = 'fss-carbon-edge-1095' },
+        @{ weapon = 'fss-carbon-edge-1095'; camo = 'gold'; count = 15; done = $true }
+    )) {
+        Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body ($edit | ConvertTo-Json) | Out-Null
+    }
+    $knife = Check-Events 200 $overlayHeaders 'local/overlay-state'
+    $platinum = $knife.rows | Where-Object id -eq 'platinum'
+    if ($platinum.goal -ne 15 -or $platinum.objective -ne 'Get 3 Kills without Dying 15 times against Players') {
+        throw 'Knife Gold must open its Platinum streak objective immediately.'
+    }
+    foreach ($edit in @(
         @{ weapon = 'pila' },
         @{ weapon = 'pila'; camo = 'weapon-level'; count = 30 },
         @{ weapon = 'pila'; camo = 'sp-3'; count = 30; done = $true }
