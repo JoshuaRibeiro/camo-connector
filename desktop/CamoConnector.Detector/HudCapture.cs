@@ -533,9 +533,9 @@ internal sealed class HudCapture : IDisposable
             var (number, _) = await ReadTextAsync(frame, (.479, .334, .042, .048), cancel, pageMode: 7,
                 countersOnly: true, adjustment: PixelAdjustment.YellowText, trace: trace, regionName: "weaponLevelNumber");
             if (WeaponRecognition.ReadLevelUp(levelHeading, name, number) == null) {
-                if (WeaponRecognition.Read([name], false) == null)
+                if (WeaponRecognition.ReadLevelName(name) == null)
                     name = await ReadBannerText((.435, .309, .130, .028), "wideLevelName");
-                if (WeaponRecognition.Read([name], false) == null) name = await ReadBannerText((.4781, .3111, .04375, .02292), "levelNameTight");
+                if (WeaponRecognition.ReadLevelName(name) == null) name = await ReadBannerText((.4781, .3111, .04375, .02292), "levelNameTight");
                 var maxLabel = await ReadBannerText((.471, .334, .058, .047), "weaponLevelMax", PixelAdjustment.BrightGold);
                 if (WeaponRecognition.ReadLevelUp(levelHeading, name, maxLabel) is { IsMax: true } maximum)
                     return (null, false, null, maximum);
@@ -680,6 +680,18 @@ internal sealed class HudCapture : IDisposable
             title = CamoMenuRecognition.ReadKnownCamoTitle(wideTitle, titles) ?? string.Join(" ", Lines(wideTitle));
         }
         if (title.Length == 0) return null;
+        // The lower meter belongs to the active challenge. Verify its number against
+        // the filled bar before spending OCR passes on the surrounding description.
+        var selected = references.FirstOrDefault(entry => entry.Name == title);
+        if (!raisedDetails && selected?.Goal is > 1 and <= 100)
+        {
+            var adjustment = frame.Height < 800 ? PixelAdjustment.Normal : PixelAdjustment.BrightRedChannel;
+            var (digits, _) = await ReadTextAsync(frame, (.528, .816, .038, .025), cancel,
+                countersOnly: true, pageMode: 7, adjustment: adjustment, trace: trace, regionName: "selectedChallengeCounter");
+            var meter = CamoMenuRecognition.ReadProgress(weapon, title, [digits], names);
+            if (meter != null && meter.Goal == selected.Goal && meter.Count > 0 && meter.Count < meter.Goal &&
+                MatchesChallengeBar(frame, meter.Count, meter.Goal)) return meter;
+        }
         var objectivesArea = raisedDetails ? (.313, .455, .342, .159) : (.313, .679, .342, .181);
         var (objectives, _) = await ReadTextAsync(frame, objectivesArea, cancel,
             trace: trace, regionName: "camoObjectives");
@@ -955,6 +967,27 @@ internal sealed class HudCapture : IDisposable
             if (merged.Length > 0) return merged;
         }
         return [];
+    }
+
+    private static bool MatchesChallengeBar(Bitmap frame, int count, int goal)
+    {
+        int left = (int)(frame.Width * .347), right = (int)(frame.Width * .521);
+        var expected = left + (right - left) * count / (double)goal;
+        var tolerance = Math.Max(2, (right - left) * .012);
+        for (var y = (int)(frame.Height * .822); y <= frame.Height * .836; y++)
+        {
+            int lastBright = left, bright = 0;
+            for (var x = left; x < right; x += 2)
+            {
+                var pixel = frame.GetPixel(x, y);
+                if (pixel.R < 170 || pixel.G < 145 || pixel.R < pixel.B + 12) continue;
+                lastBright = x;
+                bright++;
+            }
+            if (Math.Abs(lastBright - expected) <= tolerance && bright * 2 >= .68 * (expected - left))
+                return true;
+        }
+        return false;
     }
 
     private static byte[]? Sample(Bitmap frame, double top, (double X, double W, double H, double Offset) thumbnail)

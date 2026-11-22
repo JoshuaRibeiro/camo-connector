@@ -75,12 +75,21 @@ public static class WeaponRecognition
     }
 
     internal static bool IsLevelUpHeading(string text) =>
-        Key(text) is "levelup" or "newunlock" or "weaponlevelup" or "weaponleveledup" or "weaponlevelledup";
+        Key(text) is "leveleup" or "levelup" or "newunlock" or "weaponlevelup" or "weaponleveledup" or "weaponlevelledup";
+
+    internal static WeaponRead? ReadLevelName(string text)
+    {
+        var exact = Read([text], false);
+        if (exact != null) return exact;
+        // The wide nameplate crop can include a stray glyph beyond its right edge.
+        var trimmed = Regex.Replace(text.Trim(), @"\s*[\p{Pd}|]\s*[a-z0-9]\z", "", RegexOptions.IgnoreCase);
+        return trimmed.Length != text.Trim().Length && trimmed.Contains(' ') ? Read([trimmed], false) : null;
+    }
 
     public static WeaponLevelRead? ReadLevelUp(string heading, string name, string number)
     {
         if (!IsLevelUpHeading(heading)) return null;
-        var weapon = Read([name], false);
+        var weapon = ReadLevelName(name);
         if (weapon != null && number.Trim().Equals("MAX", StringComparison.OrdinalIgnoreCase))
             return new(weapon.Name, 0, true);
         var match = Regex.Match(number.Trim(), @"\A(?:LEVEL\s+)?([0-9]{1,3})\z", RegexOptions.IgnoreCase);

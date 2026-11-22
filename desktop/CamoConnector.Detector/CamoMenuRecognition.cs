@@ -41,7 +41,7 @@ public static class CamoMenuRecognition
         const string suffix = "progression";
         // The crop can end partway through the neighboring Mode Mastery label.
         key = Regex.Replace(key, @"(?<=progression)modemast(?:e(?:ry?)?)?\z", "");
-        if (Regex.IsMatch(key, @"\Afsscarbonedge1[068]95progressionfi\z"))
+        if (Regex.IsMatch(key, @"\Afsscarbo[nk]edge1[068]95progression(?:fi|i)?\z"))
             return "FSS Carbon Edge 1095";
         if (!key.EndsWith(suffix, StringComparison.Ordinal)) return null;
         var name = key[..^suffix.Length];

@@ -11,6 +11,12 @@ if ($levelUp.Weapon -ne 'PM-40 Anvil' -or $levelUp.Level -ne 10 -or
     $reader::ReadLevelUp('WEAPON LEVEL UP', '', '10')) {
     throw 'Weapon level banner did not require both an identified weapon and an explicit level.'
 }
+$carbonMax = $reader::ReadLevelUp('LEVELEUP -', 'FSS CARBON EDGE 1095-m', 'MAX')
+if (!$carbonMax.IsMax -or $carbonMax.Weapon -ne 'FSS Carbon Edge 1095' -or
+    $reader::ReadLevelUp('DOUBLE KILL', 'FSS CARBON EDGE 1095-m', 'MAX') -or
+    $reader::ReadLevelUp('LEVEL UP', 'FSS CARBON EDGE 1095-other', 'MAX')) {
+    throw 'The MAX banner must identify the level-up heading and a catalogued weapon.'
+}
 $menuReader = [CamoConnector.Detector.CamoMenuRecognition]
 $militaryLevel = $menuReader::ReadMilitaryLevel('PM-40 Anvil', 'MILITARY CAMO 2', "Reach Weapon Level 11`n9 / 11")
 if ($militaryLevel.Count -ne 9 -or $militaryLevel.Goal -ne 11 -or
