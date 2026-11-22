@@ -9,7 +9,7 @@ internal sealed partial class ConnectorWindow
 {
     private static readonly Uri TrophyUrl = new("http://127.0.0.1:47851/");
     private readonly TabPage trophyPage = new("Trophy Tracker");
-    private readonly TrackingSwitch trophyEnabled = new(rectangular: true) { Text = "Enable Trophy Tracker" };
+    private readonly TrackingSwitch trophyEnabled = new(roundedThumb: true) { Text = "Enable Trophy Tracker" };
     private readonly Label trophyStatus = new() { AutoSize = true, Text = "Trophy Tracker is off." };
     private readonly Panel trophyHost = new() { Dock = DockStyle.Fill };
     private string TrophyPreference => Path.Combine(DataDirectory, "trophy-tracking.txt");
