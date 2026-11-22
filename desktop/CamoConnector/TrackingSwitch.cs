@@ -6,8 +6,11 @@ internal sealed partial class ConnectorWindow
 {
     private sealed class TrackingSwitch : CheckBox
     {
-        public TrackingSwitch()
+        private readonly bool rectangular;
+
+        public TrackingSwitch(bool rectangular = false)
         {
+            this.rectangular = rectangular;
             Dock = DockStyle.Fill;
             DoubleBuffered = true;
             CheckedChanged += (_, _) => Invalidate();
@@ -29,7 +32,8 @@ internal sealed partial class ConnectorWindow
                 ink, TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             using var outline = new GraphicsPath();
-            outline.AddRoundedRectangle(track, new Size(track.Height / 2, track.Height / 2));
+            if (rectangular) outline.AddRectangle(track);
+            else outline.AddRoundedRectangle(track, new Size(track.Height / 2, track.Height / 2));
             using var fill = new SolidBrush(highContrast ? SystemColors.Control : Checked ? ShellButton : ShellBackground);
             using var border = new Pen(Checked ? accent : highContrast ? ink : ShellBorder);
             e.Graphics.FillPath(fill, outline);
@@ -37,8 +41,10 @@ internal sealed partial class ConnectorWindow
             var inset = LogicalToDeviceUnits(3);
             var knobSize = track.Height - inset * 2;
             using var knob = new SolidBrush(Checked ? accent : highContrast ? ink : ShellMuted);
-            e.Graphics.FillEllipse(knob, Checked ? track.Right - inset - knobSize : track.Left + inset,
+            var thumb = new Rectangle(Checked ? track.Right - inset - knobSize : track.Left + inset,
                 track.Top + inset, knobSize, knobSize);
+            if (rectangular) e.Graphics.FillRectangle(knob, thumb);
+            else e.Graphics.FillEllipse(knob, thumb);
             if (Focused && ShowFocusCues)
                 ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -1, -1), ink, BackColor);
         }
