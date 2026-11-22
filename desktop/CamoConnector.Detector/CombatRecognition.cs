@@ -12,6 +12,16 @@ public static class CombatRecognition
 {
     private const RegexOptions IgnoreCase = RegexOptions.IgnoreCase | RegexOptions.CultureInvariant;
 
+    public static bool MatchesCompletionObjective(string read, string objective)
+    {
+        static string Normalize(string text)
+        {
+            var letters = Regex.Replace(text.ToUpperInvariant(), @"[^A-Z0-9]", "");
+            return Regex.Replace(letters, @"^GET(?=[0-9])", "");
+        }
+        return Normalize(read) == Normalize(objective);
+    }
+
     public static CombatRead Read(string kill, string death, string card)
     {
         var ordinal = Regex.Match(card, @"\b([0-9]{1,3})(?:ST|ND|RD|TH)\s+K[I1L]LL\b", IgnoreCase);

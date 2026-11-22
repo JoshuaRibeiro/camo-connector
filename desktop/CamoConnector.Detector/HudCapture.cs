@@ -489,7 +489,7 @@ internal sealed class HudCapture : IDisposable
     {
         if (weapon == null || details == null) return null;
         var match = (completionist.GetValueOrDefault(weapon) ?? []).FirstOrDefault(entry =>
-            entry.Objective != null && details.Contains(entry.Objective, StringComparer.OrdinalIgnoreCase));
+            entry.Objective != null && details.Any(line => CombatRecognition.MatchesCompletionObjective(line, entry.Objective)));
         return match?.Name switch { "Gold" => "gold-15", "Platinum" => "platinum", _ => null };
     }
 
@@ -565,7 +565,10 @@ internal sealed class HudCapture : IDisposable
         if (!goldTile && (completed || heading.Contains("CHALLEN", StringComparison.OrdinalIgnoreCase) ||
             System.Text.RegularExpressions.Regex.IsMatch(heading, @"[CG]OMPLE", System.Text.RegularExpressions.RegexOptions.IgnoreCase)) &&
             CombatRecognition.IsPlatinumArtwork(Sample(frame, .148, (.471, .058, .102, 0))))
-            return ("platinum", true, null, null);
+        {
+            var objective = await ReadBannerText((.35, .299, .30, .024), "platinumObjective");
+            return ("platinum", true, [objective], null);
+        }
         if (!goldTile && !completed && cyanLetters < 15) return (null, false, null, null);
         var detail = await ReadBannerText((.395, .300, .210, .020), "unlockObjective");
         string? Match(string text) => CombatRecognition.IsGoldBanner(heading, text, goldTile)
@@ -578,6 +581,8 @@ internal sealed class HudCapture : IDisposable
             if (Match(detail) is { } fallback) return (fallback, true, null, null);
             details.Add(detail);
         }
+        if (completed)
+            details.Add(await ReadBannerText((.35, .299, .30, .024), "wideCompletionObjective"));
         // Hardpoint notices can cover the middle of the Gold objective.
         var goalStart = await ReadBannerText((.402, .297, .083, .025), "goldObjectiveStart");
         if (CombatRecognition.IsSplitGoldObjective(goalStart, string.Join(" ", details)))

@@ -505,6 +505,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                     }
                     var objectiveChallenge = capture.ReadCompletionistObjective(candidate, banner.Details);
                     var challenge = banner.Challenge ?? objectiveChallenge;
+                    var weaponConfirmed = objectiveChallenge != null && objectiveChallenge == challenge;
                     if (challenge is not ("gold-15" or "platinum")) visibleCompletionBanner = null;
                     if (banner.Completed && (result.Weapon != null || !await capture.IsReplayAsync(frame, cancel)))
                     {
@@ -516,7 +517,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
                                 await AppendAsync(new
                                 {
                                     kind = "completionist-unlock", source = "live", mode = "mp",
-                                    context = objectiveChallenge == null ? "unlock-banner" : "weapon-objective-banner", weapon = objectiveChallenge == null ? result.Weapon?.Name : candidate,
+                                    context = weaponConfirmed ? "weapon-objective-banner" : "unlock-banner", weapon = weaponConfirmed ? candidate : result.Weapon?.Name,
                                     challenge = challenge == "gold-15" ? "Gold" : "Platinum", at = now
                                 });
                             }

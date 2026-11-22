@@ -3,6 +3,11 @@ $detector = Join-Path (Split-Path $PSScriptRoot -Parent) 'desktop/CamoConnector.
 Add-Type -Path @((Join-Path $detector 'WeaponRecognition.cs'), (Join-Path $detector 'CamoMenuRecognition.cs'),
     (Join-Path $detector 'TrackedCamoRecognition.cs'), (Join-Path $detector 'CombatRecognition.cs'),
     (Join-Path $detector 'CaptureDevices.cs'), (Join-Path $detector 'SpecialUnlocks.cs'))
+$expected = 'Get 50 Headshots against Players'
+if (![CamoConnector.Detector.CombatRecognition]::MatchesCompletionObjective('50 HEAD SHOTS AGAINST PLAYERS |', $expected) -or
+    [CamoConnector.Detector.CombatRecognition]::MatchesCompletionObjective('Get 5 Headshots against Players', $expected)) {
+    throw 'Platinum banner matching must preserve the required headshot count.'
+}
 $reader = [CamoConnector.Detector.WeaponRecognition]
 $levelUp = $reader::ReadLevelUp('WEAPON LEVELED UP', 'PM-40 ANVIL', '10')
 if ($levelUp.Weapon -ne 'PM-40 Anvil' -or $levelUp.Level -ne 10 -or
