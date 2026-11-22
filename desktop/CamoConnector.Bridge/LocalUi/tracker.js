@@ -305,7 +305,7 @@ function camoRow(rule, weapon, overview) {
   }
   if (overview && rule.goal != null && !current.done) {
     for (const increment of [1, 5]) {
-      const button = element('button', '+' + increment);
+      const button = element('button', '+' + increment, 'camo-increment');
       button.setAttribute('aria-label', 'Add ' + increment + ' to ' + rule.name);
       button.addEventListener('click', () => void save('edit', { weapon, camo: rule.id, increment }));
       controls.append(button);
@@ -329,8 +329,9 @@ function camoRow(rule, weapon, overview) {
     });
     controls.append(input, element('span', '/ ' + rule.goal));
   }
-  const done = element('button', current.done ? (overview ? 'Untick' : 'Done') : (overview ? 'Tick' : 'Mark done'));
+  const done = element('button', '\u2713', 'camo-check');
   done.setAttribute('aria-label', (current.done ? 'Undo ' : 'Mark complete: ') + rule.name);
+  done.title = done.getAttribute('aria-label');
   done.setAttribute('aria-pressed', String(current.done));
   done.addEventListener('click', () => void save('edit', {
     weapon, camo: rule.id, count: current.done ? 0 : rule.goal ?? 0, done: !current.done

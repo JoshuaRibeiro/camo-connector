@@ -207,3 +207,20 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .tracker .next-label { font-size: .66rem; }
 .tracker .camo-row, .tracker .overlay-options article { background: #202325; border-color: #404442; border-radius: .35rem; }
 .tracker .camo-complete { border-left: 3px solid #89d9b1; }
+
+.tracker .camo-row { flex-wrap: wrap; }
+.tracker .camo-row .controls { margin-inline-start: auto; }
+.tracker .controls .camo-increment, .tracker .controls .camo-check {
+  min-height: 2.25rem; border-radius: .5rem; font-weight: 700; line-height: 1;
+}
+.tracker .controls .camo-increment {
+  min-width: 2.6rem; background: linear-gradient(#364045,#293135); border-color: #546166;
+  color: #f5f3ed; font-variant-numeric: tabular-nums;
+}
+.tracker .controls .camo-increment:hover { background: #424d50; border-color: var(--accent); }
+.tracker .controls .camo-check {
+  width: 2.25rem; background: #257249; border-color: #49966a; color: white; font-size: 1.18rem;
+}
+.tracker .controls .camo-check[aria-pressed="true"] { background: #18452f; border-color: #79bc94; }
+.tracker .controls .camo-check:hover { background: #308459; }
+.tracker .controls button:active { transform: translateY(1px); }

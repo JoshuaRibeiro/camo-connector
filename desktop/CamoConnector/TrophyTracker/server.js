@@ -37,7 +37,7 @@ function londonDay(at = new Date()) {
   const { year, month, day, hour } = Object.fromEntries(
     londonCalendar.formatToParts(at).map(({ type, value }) => [type, value])
   );
-  const goalDay = Number(day) - (Number(hour) < 8 ? 1 : 0);
+  const goalDay = Number(day) - (Number(hour) < 4 ? 1 : 0);
   return new Date(Date.UTC(Number(year), Number(month) - 1, goalDay)).toISOString().slice(0, 10);
 }
 
