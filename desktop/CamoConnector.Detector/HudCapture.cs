@@ -60,8 +60,7 @@ internal sealed class HudCapture : IDisposable
             var detectorName = catalog.Keys.FirstOrDefault(name => name.Equals(trackerName, StringComparison.OrdinalIgnoreCase))
                 ?? trackerName;
             levelRequirements[detectorName] = weapon.GetProperty("camos").EnumerateArray()
-                .Where(camo => camo.GetProperty("type").GetString() == "Military" &&
-                    camo.TryGetProperty("unlock", out var unlock) && unlock.ValueKind == JsonValueKind.String &&
+                .Where(camo => camo.TryGetProperty("unlock", out var unlock) && unlock.ValueKind == JsonValueKind.String &&
                     unlock.GetString()!.StartsWith("Reach Weapon Level ", StringComparison.OrdinalIgnoreCase) &&
                     camo.TryGetProperty("unlockTotal", out var total) && total.ValueKind == JsonValueKind.Number)
                 .ToDictionary(camo => camo.GetProperty("name").GetString()!,
@@ -700,6 +699,30 @@ internal sealed class HudCapture : IDisposable
             if (requirements?.TryGetValue(title, out var threshold) == true &&
                 CamoMenuRecognition.ReadWeaponUnlocks(weapon, title, objectives, threshold) == null)
                 objectives += "\n" + detail;
+        }
+        if (!raisedDetails && names.Contains(title) &&
+            levelRequirements.GetValueOrDefault(weapon)?.TryGetValue(title, out var requiredLevel) == true)
+        {
+            // A locked special shows the level meter on its first row. Once eligible,
+            // its challenge can occupy that row instead, sometimes with the same goal.
+            var (counter, _) = await ReadTextAsync(frame, (.524, .744, .050, .035), cancel, pageMode: 7,
+                countersOnly: true, trace: trace, regionName: "prerequisiteLevelCounter");
+            if (CamoMenuRecognition.ReadLevelMeter(weapon, requiredLevel, counter) is { } level &&
+                level.Count < requiredLevel)
+            {
+                var (label, _) = await ReadTextAsync(frame, (.344, .712, .165, .035), cancel, pageMode: 7,
+                    adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "prerequisiteLevelLabel");
+                var explicitLabel = System.Text.RegularExpressions.Regex.IsMatch(label,
+                    $@"\bWeapon\s+Level\s+{requiredLevel}\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                if (explicitLabel) return level;
+                if (references.First(entry => entry.Name == title).Goal != requiredLevel)
+                {
+                    var (second, _) = await ReadTextAsync(frame, (.527, .748, .035, .027), cancel, pageMode: 7,
+                        countersOnly: true, adjustment: PixelAdjustment.Contrast, trace: trace, regionName: "prerequisiteLevelContrast");
+                    if (CamoMenuRecognition.ReadLevelMeter(weapon, requiredLevel, second)?.Count == level.Count)
+                        return level;
+                }
+            }
         }
         var progress = CamoMenuRecognition.ReadProgress(weapon, title, Lines(objectives), names);
         if (requirements?.TryGetValue(title, out var unlockTotal) == true &&
