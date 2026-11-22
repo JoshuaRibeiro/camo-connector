@@ -291,6 +291,18 @@ internal sealed class LocalTracker
             return;
         }
 
+        if (kind == "progress-snapshot" && ProgressFeed.Text(item, "type") == "post-match-unlocks")
+        {
+            if (ProgressFeed.Number(item, "goal") is not int goalValue || goalValue is <= 0 or > 150 ||
+                ProgressFeed.Number(item, "count") is not int observed || observed < 0 || observed > goalValue) return;
+            var unlockKey = weapon.Id + ":weapon-unlocks";
+            Change((next, focus) => {
+                if (observed > (next.GetValueOrDefault(unlockKey)?.Count ?? 0)) next[unlockKey] = new(observed, false);
+                return focus;
+            });
+            return;
+        }
+
         if (kind == "progress-snapshot" && ProgressFeed.Text(item, "type") == "weapon-unlocks")
         {
             var nameOfCamo = ProgressFeed.Text(item, "camo");

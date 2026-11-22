@@ -298,6 +298,17 @@ try {
         throw 'Weapon unlocks must use the catalog threshold and stay separate from weapon levels.'
     }
     [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":"CSG-35"}'
+        '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"CSG-35","type":"post-match-unlocks","count":25,"goal":42}'
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
+        if ($overlay.weapon -eq 'CSG-35' -and $overlay.weaponUnlocks -eq 25) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($overlay.weapon -ne 'CSG-35' -or $overlay.weaponUnlocks -ne 25) { throw 'Post-match unlock total missing.' }
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
         '{"kind":"military-unlock","source":"live","mode":"mp","weapon":"Signal 50","tier":8}'
         '{"kind":"weapon","source":"live","mode":"mp","weapon":"Signal 50"}'
         '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"Signal 50","type":"camo","camo":"Sunburn","count":6,"goal":40}'

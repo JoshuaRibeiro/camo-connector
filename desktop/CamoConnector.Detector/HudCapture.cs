@@ -693,6 +693,26 @@ internal sealed class HudCapture : IDisposable
         return Validate(CamoMenuRecognition.ConfirmCounter(null, tight, corroborating));
     }
 
+    public async Task<(string Weapon, int Count, int Goal)?> ReadPostMatchUnlocksAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null)
+    {
+        var header = await ReadTextAsync(frame, (.054, .084, .117, .032), cancel, pageMode: 7, trace: trace, regionName: "summaryheader");
+        if (!header.Text.Contains("PERFORMING", StringComparison.OrdinalIgnoreCase)) return null;
+        var label = await ReadTextAsync(frame, (.877, .210, .052, .027), cancel, pageMode: 7, trace: trace, regionName: "summarylabel");
+        if (!string.Concat(label.Text.Where(char.IsLetter)).Equals("UNLOCKS", StringComparison.OrdinalIgnoreCase)) return null;
+        var title = await ReadTextAsync(frame, (.050, .128, .36, .054), cancel, pageMode: 7, adjustment: PixelAdjustment.WhiteText, trace: trace, regionName: "summarytitle");
+        var weapon = TrackedCamoRecognition.ReadWeapon(title.Text);
+        if (weapon == null) {
+            var compact = await ReadTextAsync(frame, (.050, .128, .118, .054), cancel, pageMode: 7,
+                adjustment: PixelAdjustment.WhiteText, trace: trace, regionName: "summaryCompactTitle");
+            weapon = TrackedCamoRecognition.ReadWeapon(compact.Text);
+        }
+        if (weapon == null) return null;
+        var current = await ReadTextAsync(frame, (.862, .241, .042, .066), cancel, pageMode: 7, countersOnly: true, adjustment: PixelAdjustment.BrightRedChannel, trace: trace, regionName: "summarycurrent");
+        var maximum = await ReadTextAsync(frame, (.912, .241, .040, .066), cancel, pageMode: 8, countersOnly: true, adjustment: PixelAdjustment.YellowText, trace: trace, regionName: "summarymaximum");
+        return int.TryParse(current.Text.Trim(), out var count) && int.TryParse(maximum.Text.Trim(), out var goal) &&
+            goal is > 0 and <= 150 && count >= 0 && count <= goal ? (weapon, count, goal) : null;
+    }
+
     public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null, bool requireHeading = false)
     {
         // End before the game logo beside CAMO SELECT.
@@ -862,7 +882,7 @@ internal sealed class HudCapture : IDisposable
         return rgb;
     }
 
-    private enum PixelAdjustment { Normal, Contrast, Invert, CyanText, WhiteText, YellowText }
+    private enum PixelAdjustment { BrightRedChannel, Normal, Contrast, Invert, CyanText, WhiteText, YellowText }
 
     private async Task<string[]> ReadAsync(Bitmap frame, (double X, double Y, double W, double H) area,
         CancellationToken cancel, PixelAdjustment adjustment = PixelAdjustment.Normal)
@@ -877,14 +897,14 @@ internal sealed class HudCapture : IDisposable
     {
         var region = new Rectangle((int)Math.Round(area.X * frame.Width), (int)Math.Round(area.Y * frame.Height),
             Math.Max(1, (int)Math.Round(area.W * frame.Width)), Math.Max(1, (int)Math.Round(area.H * frame.Height)));
-        var scale = Math.Min(3.0, 2400.0 / Math.Max(region.Width, region.Height));
+        var scale = adjustment == PixelAdjustment.BrightRedChannel ? 1.0 : Math.Min(3.0, 2400.0 / Math.Max(region.Width, region.Height));
         using var crop = new Bitmap(Math.Max(1, (int)Math.Round(region.Width * scale)),
             Math.Max(1, (int)Math.Round(region.Height * scale)), PixelFormat.Format24bppRgb);
         using (var graphics = Graphics.FromImage(crop))
         {
             graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
             var destination = new Rectangle(Point.Empty, crop.Size);
-            if (adjustment is PixelAdjustment.Normal or PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText)
+            if (adjustment is PixelAdjustment.Normal or PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText or PixelAdjustment.BrightRedChannel)
                 graphics.DrawImage(frame, destination, region, GraphicsUnit.Pixel);
             else
             {
@@ -899,7 +919,7 @@ internal sealed class HudCapture : IDisposable
                 graphics.DrawImage(frame, destination, region.X, region.Y, region.Width, region.Height, GraphicsUnit.Pixel, attributes);
             }
         }
-        if (adjustment is PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText)
+        if (adjustment is PixelAdjustment.CyanText or PixelAdjustment.WhiteText or PixelAdjustment.YellowText or PixelAdjustment.BrightRedChannel)
         {
             var pixels = crop.LockBits(new Rectangle(Point.Empty, crop.Size), ImageLockMode.ReadWrite, crop.PixelFormat);
             try
@@ -913,6 +933,7 @@ internal sealed class HudCapture : IDisposable
                     {
                         var ink = adjustment switch
                         {
+                            PixelAdjustment.BrightRedChannel => row[x + 2] > 205,
                             PixelAdjustment.WhiteText => Math.Min(row[x], Math.Min(row[x + 1], row[x + 2])) >= 205,
                             PixelAdjustment.YellowText => Math.Min(row[x + 1], row[x + 2]) >= 155 &&
                                 Math.Min(row[x + 1], row[x + 2]) - row[x] >= 24,

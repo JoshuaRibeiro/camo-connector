@@ -113,7 +113,7 @@ try
             var menuWeapon = await capture.ReadCamoMenuWeaponAsync(frame, stop.Token, RecordCrop);
             var militaryProgress = menuWeapon == null ? null : await capture.ReadMilitaryMenuCountAsync(frame, stop.Token, RecordCrop);
             var camoProgress = await capture.DetectCamoProgressAsync(frame, menuWeapon, stop.Token, RecordCrop);
-            result = new { source, frame.Width, frame.Height, menuWeapon, militaryProgress, camoProgress, cropDirectory, reads };
+            result = new { source, frame.Width, frame.Height, menuWeapon, militaryProgress, camoProgress, postMatch = (await capture.ReadPostMatchUnlocksAsync(frame, stop.Token, RecordCrop))?.ToString(), cropDirectory, reads };
         }
         var json = JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = saveMenuCrops });
         if (cropDirectory != null) File.WriteAllText(Path.Combine(cropDirectory, "ocr.json"), json);
@@ -316,6 +316,7 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
         var lastChallengeScan = DateTimeOffset.MinValue;
         string? visibleCompletionBanner = null;
         var match = 0;
+        (string Weapon, int Count, int Goal)? previousUnlockSummary = null, publishedUnlockSummary = null;
         var lastLobbyScan = DateTimeOffset.MinValue;
         var lastAkimbo = DateTimeOffset.MinValue;
         var lastLongshot = DateTimeOffset.MinValue;
@@ -351,6 +352,15 @@ static async Task DetectLiveAsync(string dataDirectory, HudCapture capture, Exte
             var menuWeapon = paddedMenu ?? (pollProgress ? await capture.ReadCamoMenuWeaponAsync(frame, cancel, requireHeading: true) : null);
             var scanGameplay = menuWeapon == null;
             var scanLobby = scanGameplay && now - lastLobbyScan >= TimeSpan.FromSeconds(1);
+            if (scanLobby) {
+                var summary = await capture.ReadPostMatchUnlocksAsync(viewport ?? frame, cancel);
+                if (summary is {} unlock && summary == previousUnlockSummary && summary != publishedUnlockSummary) {
+                    await AppendAsync(new { kind = "progress-snapshot", source = "live", mode = "mp", type = "post-match-unlocks",
+                        weapon = unlock.Weapon, count = unlock.Count, goal = unlock.Goal, at = DateTimeOffset.UtcNow });
+                    publishedUnlockSummary = summary;
+                }
+                previousUnlockSummary = summary;
+            }
             var scanChallenge = scanGameplay && now - lastChallengeScan >= TimeSpan.FromMilliseconds(200);
             var lobbyRead = scanLobby ? ReadSnapshotAsync(frame, copy => capture.DetectMatchNoticeAsync(copy, cancel)) : null;
             var challengeRead = scanChallenge ? ReadSnapshotAsync(frame, copy => capture.DetectChallengeBannerAsync(copy, cancel)) : null;
