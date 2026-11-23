@@ -268,12 +268,9 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
   display:block; position:absolute; inset:0; width:100%; height:100%; overflow:visible;
   pointer-events:none; filter:drop-shadow(0 0 2px #ffc45c) drop-shadow(0 0 5px #ef982daa);
 }
-.jabber-edge path {
-  fill:none; stroke:#ffebac; stroke-width:2px; vector-effect:non-scaling-stroke;
-  stroke-linecap:round; stroke-dasharray:10 90;
-  animation:jabber-edge-travel 4s linear infinite;
+.jabber-edge circle { fill: #fff2bf; stroke: #ffbe53; stroke-width: 1px; }
+@media (prefers-reduced-motion: reduce) {
+  .layout-jabber .jabber-edge { display: none; }
 }
-@keyframes jabber-edge-travel { to { stroke-dashoffset:-100 } }
-@media(prefers-reduced-motion:reduce) { .jabber-edge path { animation:none } }
 
 .layout-preview { display: block; width: 100%; border: 0; margin: .45rem 0 .7rem; background: linear-gradient(120deg, #344147, #192226); border-radius: .4rem; pointer-events: none; }
