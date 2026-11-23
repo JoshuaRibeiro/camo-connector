@@ -225,5 +225,13 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .tracker .controls .camo-check:hover { background: #308459; }
 .tracker .controls button:active { transform: translateY(1px); }
 
-.weapon-category > summary { cursor: pointer; padding: .6rem .25rem; font-weight: 700; color: var(--accent); }
-.weapon-category > .weapon-card { margin-bottom: .2rem; }
+#roster .category-toggle { display: flex; align-items: center; gap: .5rem; width: 100%; padding: .6rem .25rem; text-align: left; font-weight: 700; color: var(--accent); background: transparent; border: 0; }
+.category-toggle::before { content: ''; width: .42rem; height: .42rem; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(-45deg); transition: transform 220ms ease; }
+.category-toggle[aria-expanded="true"]::before { transform: rotate(45deg); }
+.category-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 240ms ease-in-out; }
+.category-toggle[aria-expanded="true"] + .category-drawer { grid-template-rows: 1fr; }
+.category-drawer > div { min-height: 0; overflow: hidden; }
+.category-drawer .weapon-card { margin-bottom: .2rem; }
+@media (prefers-reduced-motion: reduce) {
+  .category-drawer, .category-toggle::before { transition: none; }
+}

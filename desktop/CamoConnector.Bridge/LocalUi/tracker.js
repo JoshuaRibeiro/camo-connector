@@ -84,30 +84,66 @@ function choose(id) {
   }
 }
 
-const collapsedCategories = new Set(JSON.parse(sessionStorage.getItem('collapsedCategories') || '[]'));
+let openCategory;
+let searchCategory;
+let lastRosterWeapon;
+let lastRosterQuery;
+const categoryGroups = new Map();
+
+function expandCategory(category) {
+  for (const [name, { button, drawer }] of categoryGroups) {
+    const expanded = name === category;
+    button.setAttribute('aria-expanded', String(expanded));
+    drawer.inert = !expanded;
+  }
+}
 
 function renderRoster() {
   if (!catalog) return;
   const roster = byId('roster');
   const query = byId('search').value.trim().toLowerCase();
-  const entries = [];
-  for (const category of new Set(catalog.weapons.map(weapon => weapon.category))) {
-    const matches = catalog.weapons.filter(weapon => weapon.category === category && weapon.name.toLowerCase().includes(query));
-    if (!matches.length) continue;
-    const group = element('details', null, 'weapon-category');
-    group.open = Boolean(query) || !collapsedCategories.has(category);
-    const summary = element('summary', category);
-    group.append(summary, ...matches.map(weaponCard));
-    group.addEventListener('toggle', () => {
-      if (query || !group.isConnected) return;
-      if (group.open) collapsedCategories.delete(category);
-      else collapsedCategories.add(category);
-      sessionStorage.setItem('collapsedCategories', JSON.stringify([...collapsedCategories]));
-    });
-    entries.push(group);
+  const weapon = catalog.weapons.find(item => item.id === selected);
+  if (selected !== lastRosterWeapon) {
+    openCategory = weapon?.category ?? null;
+    searchCategory = undefined;
+    lastRosterWeapon = selected;
   }
-  if (!query) entries.push(selection('shared', 'Prestige & mastery'));
-  roster.replaceChildren(...entries);
+
+  const matches = Map.groupBy(catalog.weapons.filter(item => item.name.toLowerCase().includes(query)), item => item.category);
+  if (query !== lastRosterQuery || !roster.childElementCount) {
+    categoryGroups.clear();
+    roster.replaceChildren();
+    for (const [name] of matches) {
+      const group = element('section', null, 'weapon-category');
+      const button = element('button', name, 'category-toggle');
+      const drawer = element('div', null, 'category-drawer');
+      const list = element('div');
+      drawer.id = 'weapon-category-' + categoryGroups.size;
+      button.setAttribute('aria-controls', drawer.id);
+      button.addEventListener('click', () => {
+        const next = button.getAttribute('aria-expanded') === 'true' ? null : name;
+        if (query) searchCategory = next;
+        else openCategory = next;
+        expandCategory(next);
+      });
+      drawer.append(list);
+      group.append(button, drawer);
+      roster.append(group);
+      categoryGroups.set(name, { button, drawer, list });
+    }
+    searchCategory = undefined;
+    lastRosterQuery = query;
+  }
+  for (const [name, weapons] of matches) {
+    categoryGroups.get(name).list.replaceChildren(...weapons.map(weaponCard));
+  }
+  if (!query) {
+    roster.querySelector(':scope > button')?.remove();
+    roster.append(selection('shared', 'Prestige & mastery'));
+  }
+  if (query && searchCategory === undefined)
+    searchCategory = matches.has(openCategory) ? openCategory : matches.keys().next().value;
+  expandCategory(query ? searchCategory : openCategory);
 }
 
 function camoStrip(weapon) {
