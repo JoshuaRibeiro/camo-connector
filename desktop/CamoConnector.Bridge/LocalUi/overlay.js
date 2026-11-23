@@ -15,14 +15,18 @@ function render(data) {
   byId('jabber-class').textContent = data.category ?? '';
   const level = byId('weapon-level');
   level.hidden = !data.weapon;
-  level.textContent = data.maxLevel ? 'Weapon level MAX' : data.maximumCamoLevel > 0 && data.minimumLevel >= data.maximumCamoLevel
-    ? 'Weapon level ' + (data.level ?? data.minimumLevel) :
-    data.level != null ? 'Weapon level ' + data.level :
-    data.minimumLevel ? 'Weapon level ' + data.minimumLevel + '+' :
-    data.minimumUnlocks ? 'Weapon unlocks ' + data.minimumUnlocks +
-      (data.weaponUnlocks != null || data.minimumUnlocks === data.maximumCamoUnlocks ? '' : '+') : 'Weapon level —';
-
-  if (jabber) level.textContent = level.textContent.replace('Weapon level ', '↗ LVL ');
+  const prefix = jabber ? '\u2197 LVL ' : 'LVL ';
+  let value = '-';
+  if (data.maxLevel) value = 'MAX';
+  else if (data.level != null) value = data.level;
+  else if (data.minimumLevel) {
+    const confirmed = data.maximumCamoLevel > 0 && data.minimumLevel >= data.maximumCamoLevel;
+    value = data.minimumLevel + (confirmed ? '' : '+');
+  } else if (data.minimumUnlocks || data.weaponUnlocks != null) {
+    const confirmed = data.weaponUnlocks != null || data.minimumUnlocks === data.maximumCamoUnlocks;
+    value = (data.minimumUnlocks ?? data.weaponUnlocks) + (confirmed ? '' : '+');
+  }
+  level.textContent = prefix + value;
   const available = data.rows ?? [];
   const visible = available.length || !data.waiting ? available : [{
     ...data.waiting, objective: data.waiting.unlock

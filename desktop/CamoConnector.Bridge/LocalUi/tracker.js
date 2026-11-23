@@ -220,13 +220,13 @@ function renderOverview() {
   const overview = state.overview;
   const heading = element('div', null, 'featured-weapon');
   heading.append(element('h3', weapon.name), element('p', weapon.category, 'subtitle'), camoStrip(weapon));
-  if (overview.maxLevel) heading.append(element('span', 'Weapon level MAX', 'subtitle'));
+  if (overview.maxLevel) heading.append(element('span', 'LVL MAX', 'subtitle'));
   else if (overview.maximumCamoLevel > 0 && overview.minimumLevel >= overview.maximumCamoLevel)
-    heading.append(element('span', 'Weapon level ' + (overview.level ?? overview.minimumLevel), 'subtitle'));
+    heading.append(element('span', 'LVL ' + (overview.level ?? overview.minimumLevel), 'subtitle'));
   else if (overview.level != null || overview.minimumLevel)
-    heading.append(element('span', 'Weapon level ' + (overview.level ?? overview.minimumLevel + '+'), 'subtitle'));
-  else if (overview.minimumUnlocks)
-    heading.append(element('span', 'Weapon unlocks ' + overview.minimumUnlocks +
+    heading.append(element('span', 'LVL ' + (overview.level ?? overview.minimumLevel + '+'), 'subtitle'));
+  else if (overview.minimumUnlocks || overview.weaponUnlocks != null)
+    heading.append(element('span', 'LVL ' + (overview.minimumUnlocks ?? overview.weaponUnlocks) +
       (overview.weaponUnlocks != null || overview.minimumUnlocks === overview.maximumCamoUnlocks ? '' : '+'), 'subtitle'));
   const index = catalog.weapons.indexOf(weapon);
   const navigation = element('div', null, 'weapon-switch');
