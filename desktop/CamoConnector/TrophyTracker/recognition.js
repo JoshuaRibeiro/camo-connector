@@ -354,7 +354,11 @@ export function createRecognizer({ draw, context, crop, signatures }) {
     const alternate = highlighted
       ? maskPair(lobbyMask(rect, 195, 175, 356, true), lobbyMask(rect, 220, 200, 356, true))
       : null;
-    if (!primary && !alternate) return { kind: 'home' };
+    if (!primary && !alternate) {
+      // Dim digits can merge with the card texture after thresholding.
+      return { kind: 'home', layout: 'events', label: png(header, 3), rawTotal: png(rect, 4),
+        eventsLine: png([rect[0], 488, rect[2], 31], 5) };
+    }
     return { kind: 'home', layout: 'events', label: png(header, 3), rawTotal: png(rect, 4), primary, alternate, templateTotal: primary?.templateTotal ?? null };
   }
 

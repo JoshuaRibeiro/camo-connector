@@ -244,6 +244,13 @@ function observe(kind, value, session, frameTime, corroborated = false, layout =
 }
 
 async function readHomeTotal(body) {
+  if (body.layout === 'events' && body.eventsLine) {
+    const [header, wide, tight] = await Promise.all([
+      readText(body.label, 7), readText(body.rawTotal, 7, true), readText(body.eventsLine, 7, true)
+    ]);
+    const agreed = /\bEVENTS\b/i.test(header) && /^(0|[1-9]\d{0,4})$/.test(wide) && wide === tight;
+    return { value: agreed ? Number(wide) : null, corroborated: agreed };
+  }
   const templateTotal = Number.isInteger(body.templateTotal) && body.templateTotal >= 0 &&
     body.templateTotal <= 99999 ? body.templateTotal : null;
   if (templateTotal !== null && body.layout === 'wager') {

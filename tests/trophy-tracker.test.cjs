@@ -349,3 +349,17 @@ test('Wager matches the captured 3521 at two foreground thresholds', async () =>
   for (const floor of [170, 205])
     assert.equal(classifyTotal(wagerShapes(pixels, 545, 185, floor), digits), 3521);
 });
+
+test('dim Events tile corrects 4155 to 4145 only after corroboration', async () => {
+  const state = { current: 4155, source: 'Lobby', match: null };
+  const context = vm.createContext({ state, readText: async crop => crop, save: change => Object.assign(state, change) });
+  vm.runInContext(source.slice(source.indexOf('function isLargeTotalChange'), source.indexOf('const files =')), context);
+  const tile = { layout: 'events', label: 'EVENTS', eventsLine: '4145', rawTotal: '4145' };
+  for (const conflict of [{ label: 'LIVE' }, { eventsLine: '4155' }])
+    assert.equal((await context.readHomeTotal({ ...tile, ...conflict })).value, null);
+  for (let frame = 1; frame <= 3; frame++) {
+    const read = await context.readHomeTotal(tile);
+    context.observe('home', read.value, 'session', frame * 400, read.corroborated, 'events');
+    assert.equal(state.current, frame === 3 ? 4145 : 4155);
+  }
+});
