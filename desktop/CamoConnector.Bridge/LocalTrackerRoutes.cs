@@ -57,6 +57,7 @@ internal sealed class LocalTrackerRoutes(LocalTracker tracker, ProgressFeed feed
             "/local/tracker.js" => ("tracker.js", "text/javascript"),
             "/local/overlay.js" => ("overlay.js", "text/javascript"),
             "/local/style.css" => ("style.css", "text/css"),
+            "/local/minimal-glow-rim.svg" => ("minimal-glow-rim.svg", "image/svg+xml"),
             _ => (null, null)
         };
         if (read && asset.Item1 != null)

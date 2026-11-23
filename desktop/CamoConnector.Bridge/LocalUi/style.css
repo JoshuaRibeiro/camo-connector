@@ -422,12 +422,12 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .layout-subtle-wave .wave-frame { display:block; position:absolute; z-index:-1; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
 .wave-edge { filter:drop-shadow(0 0 1px #64ffebbd) drop-shadow(0 0 3.5px #25e2d09c); }
 .layout-minimal-glow #overlay-card {
-  --accent:#cba3ed; --bar:linear-gradient(90deg,#ba91de,#c4a2ee);
+  --accent:#cba3ed;
+  --bar:linear-gradient(90deg,#b18de5 0%,#c79af6 23%,#daa8fc 54%,#d3a2fa 77%,#be94ee 89%,#9783c3 100%);
   --glow-rail:.22em; --breath-duration:5.6s;
   padding:.32em .8em .46em .96em;
-  border:1px solid #806a9e; border-left:var(--glow-rail) solid #ba9dce;
+  border:1px solid transparent; border-left-width:var(--glow-rail);
   background:radial-gradient(ellipse at 18% 0%,#83739224,transparent 58%),linear-gradient(115deg,#14151cee,#0c1319f0 56%,#101219eb);
-  box-shadow:0 0 .3em #b38adc52, -.15em 0 .78em #9973c34d, inset .22em 0 .68em -.26em #c7a3e066;
   font-family:"Arial Narrow",Bahnschrift,"Segoe UI",sans-serif;
 }
 .layout-minimal-glow .overlay-heading { row-gap:.22em; }
@@ -438,22 +438,21 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
   background:linear-gradient(90deg,#aeb1be16,#aeb1be38 65%,#aeb1be16);
 }
 .layout-minimal-glow .overlay-unlock p { font-family:inherit; font-size:.9em; letter-spacing:.012em; }
-/* Fade only the light. The glass, artwork and text keep their contrast through the breath. */
-.layout-minimal-glow #overlay-card::before, .layout-minimal-glow #overlay-card::after {
-  content:""; position:absolute; opacity:.72;
-  animation:armoury-breathe var(--breath-duration) ease-in-out infinite;
+.layout-minimal-glow .overlay-meter { gap:1.13em; padding-inline-start:1px; transform:translateY(-.15em); }
+.layout-minimal-glow .overlay-meter span { font-family:Bahnschrift,"Segoe UI",sans-serif; font-weight:600; }
+.layout-minimal-glow .overlay-meter progress { font:inherit; height:.50em; border:0; }
+.layout-minimal-glow progress::-webkit-progress-bar { background:linear-gradient(90deg,#4a485d,#3e3e51); }
+.layout-minimal-glow progress::-webkit-progress-value {
+  background:var(--bar);
+  box-shadow:inset 0 -1px 1px #ebccff2e, 0 0 .22em #b98df239;
 }
+/* The nine slices keep the corners round and the rim fine as objective rows resize the card. */
 .layout-minimal-glow #overlay-card::before {
-  inset:-1px -1px -1px calc(-1 * var(--glow-rail)); border-radius:inherit;
-  box-shadow:0 0 .13em #dfc5ff88, 0 0 .6em .025em #a683d387,
-    -.53em -.04em 1.08em -.14em #bd8cebe6, inset .32em 0 .78em -.24em #dcc0f394;
+  content:""; position:absolute; inset:-1px -1px -1px calc(-1 * var(--glow-rail));
+  border-image: url("minimal-glow-rim.svg") 38 44 / 2.375em 2.75em / 1em 1.3125em 1em 1.375em stretch;
+  opacity:.9; animation:armoury-breathe var(--breath-duration) ease-in-out infinite;
 }
-.layout-minimal-glow #overlay-card::after {
-  top:-.2em; left:4%; width:60%; height:.38em;
-  background:radial-gradient(ellipse closest-side,#f0ddffda,#c39be5a1 42%,transparent);
-  filter:blur(.14em);
-}
-@keyframes armoury-breathe { 0%,100% {opacity:.18} 50% {opacity:1} }
+@keyframes armoury-breathe { 0%,100% {opacity:1} 50% {opacity:.56} }
 .armoury.preview { padding:8px; }
 .overlay.layout-minimal-glow { padding:.94em 1.35em; }
 @media(prefers-reduced-motion:reduce) {

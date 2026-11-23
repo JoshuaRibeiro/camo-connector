@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="392" height="164" viewBox="0 0 392 164">
+  <defs>
+    <rect id="perimeter" x="22.5" y="16.5" width="348" height="131" rx="11"/>
+    <mask id="outside">
+      <rect width="392" height="164" fill="white"/>
+      <use href="#perimeter" fill="black"/>
+    </mask>
+    <filter id="haze" filterUnits="userSpaceOnUse" x="0" y="0" width="392" height="164">
+      <feGaussianBlur stdDeviation="5"/>
+    </filter>
+    <filter id="wide-haze" filterUnits="userSpaceOnUse" x="0" y="0" width="392" height="164">
+      <feGaussianBlur stdDeviation="9"/>
+    </filter>
+    <linearGradient id="rail" gradientUnits="userSpaceOnUse" x1="22" x2="26">
+      <stop stop-color="#bea5d9"/><stop offset=".48" stop-color="#b097cd"/>
+      <stop offset="1" stop-color="#9581ae"/>
+    </linearGradient>
+    <linearGradient id="top" gradientUnits="userSpaceOnUse" x1="33" x2="360">
+      <stop stop-color="#777285"/><stop offset=".15" stop-color="#706b80"/>
+      <stop offset=".30" stop-color="#a596b7"/><stop offset=".46" stop-color="#e7cdef"/>
+      <stop offset=".59" stop-color="#aa98be"/><stop offset=".69" stop-color="#80729b"/>
+      <stop offset=".90" stop-color="#a18cc7"/><stop offset="1" stop-color="#78668e"/>
+    </linearGradient>
+    <linearGradient id="bottom" gradientUnits="userSpaceOnUse" x1="33" x2="360">
+      <stop stop-color="#66596f"/><stop offset=".25" stop-color="#827499"/>
+      <stop offset=".46" stop-color="#c99bee"/><stop offset=".52" stop-color="#f0d7ff"/>
+      <stop offset=".58" stop-color="#cf9eed"/><stop offset=".77" stop-color="#7e6b99"/>
+      <stop offset="1" stop-color="#847497"/>
+    </linearGradient>
+    <radialGradient id="upper-light">
+      <stop stop-color="#e0b4fb" stop-opacity=".91"/><stop offset=".14" stop-color="#b886dc" stop-opacity=".57"/>
+      <stop offset=".52" stop-color="#a575d9" stop-opacity=".21"/><stop offset="1" stop-color="#9164c8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="lower-light">
+      <stop stop-color="#dba9ff"/><stop offset=".15" stop-color="#8a50e8" stop-opacity=".64"/>
+      <stop offset=".48" stop-color="#7545da" stop-opacity=".30"/><stop offset="1" stop-color="#7944cc" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- The broad bloom sits outside the glass. Each horizontal highlight has its own falloff. -->
+  <g mask="url(#outside)">
+    <use href="#perimeter" fill="none" stroke="#8978cc" stroke-opacity=".64" stroke-width="4" filter="url(#haze)"/>
+    <use href="#perimeter" fill="none" stroke="#886acb" stroke-opacity=".75" stroke-width="8" filter="url(#wide-haze)"/>
+    <path d="M42 16.5 H34 Q21 16.5 21 29 V134 Q21 147 34 147 H44"
+          fill="none" stroke="#b48bdf" stroke-width="4" filter="url(#haze)"/>
+    <ellipse cx="183" cy="16.5" rx="124" ry="24" fill="url(#upper-light)"/>
+    <ellipse cx="202" cy="147.5" rx="101" ry="17" fill="url(#lower-light)"/>
+  </g>
+  <ellipse cx="183" cy="16.5" rx="76" ry="2.8" fill="url(#upper-light)" opacity=".53"/>
+  <ellipse cx="202" cy="147.5" rx="78" ry="7.5" fill="url(#lower-light)"/>
+  <use href="#perimeter" fill="none" stroke="#72658f" stroke-width="1.3"/>
+  <path d="M34 16 Q22 16 22 28 V136 Q22 148 34 148 Q26 145 26 135 V29 Q26 19 34 16Z" fill="url(#rail)"/>
+  <path d="M34 16.5 H359" stroke="url(#top)" stroke-width="1.45"/>
+  <path d="M34 147.5 H359" stroke="url(#bottom)" stroke-width="1.45"/>
+</svg>
