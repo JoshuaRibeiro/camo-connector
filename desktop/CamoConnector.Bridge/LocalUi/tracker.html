@@ -13,6 +13,11 @@
   <section id="overlay-settings" aria-labelledby="overlay-heading" hidden>
     <h2 id="overlay-heading">OBS overlays</h2>
     <div class="overlay-options">
+      <article>
+        <h3>Default</h3>
+        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Default overlay preview" src="/local/overlay?preview=default"></iframe>
+        <button data-overlay="default" aria-pressed="true">Use Default</button>
+      </article>
       <article class="custom-option">
         <h3>Jabber</h3>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Jabber overlay preview" src="/local/overlay?preview=jabber"></iframe>
@@ -20,11 +25,6 @@
           <button data-overlay="jabber" aria-pressed="false">Use Jabber</button>
           <a class="twitch-link" href="https://www.twitch.tv/jabberonline" target="_blank" rel="noopener noreferrer">Jabber on Twitch ↗</a>
         </div>
-      </article>
-      <article>
-        <h3>Afterglow</h3>
-        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Afterglow overlay preview" src="/local/overlay?preview=afterglow"></iframe>
-        <button data-overlay="afterglow" aria-pressed="false">Use Afterglow</button>
       </article>
       <article class="custom-option">
         <h3>11annah</h3>
@@ -35,9 +35,9 @@
         </div>
       </article>
       <article>
-        <h3>Default</h3>
-        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Default overlay preview" src="/local/overlay?preview=default"></iframe>
-        <button data-overlay="default" aria-pressed="true">Use Default</button>
+        <h3>Afterglow</h3>
+        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Afterglow overlay preview" src="/local/overlay?preview=afterglow"></iframe>
+        <button data-overlay="afterglow" aria-pressed="false">Use Afterglow</button>
       </article>
       <article>
         <h3>Eclipse</h3>

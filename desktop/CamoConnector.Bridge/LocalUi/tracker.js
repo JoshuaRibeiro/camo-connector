@@ -10,6 +10,28 @@ let state;
 let selected;
 let editing = false;
 
+const gallery = document.querySelector('.overlay-options');
+const cards = Array.from(gallery.children);
+function arrangeGallery() {
+  if (!gallery.clientWidth) return;
+  const style = getComputedStyle(gallery);
+  const gutter = parseFloat(style.columnGap);
+  const minimum = parseFloat(style.getPropertyValue('--preview-min'));
+  const columns = Math.max(1, Math.min(3, Math.floor((gallery.clientWidth + gutter) / (minimum + gutter))));
+  const nextRow = Array(columns).fill(1);
+  const gap = 1.5 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+  const heights = cards.map(card => Math.ceil(card.getBoundingClientRect().height));
+  cards.forEach((card, index) => {
+    const column = index % columns;
+    card.style.gridColumnStart = column + 1;
+    card.style.gridRow = nextRow[column] + ' / span ' + Math.max(1, heights[index]);
+    nextRow[column] += heights[index] + Math.round(gap);
+  });
+}
+const galleryObserver = new ResizeObserver(arrangeGallery);
+galleryObserver.observe(gallery);
+cards.forEach(card => galleryObserver.observe(card));
+
 async function request(path, body) {
   const options = { headers: { Authorization: 'Bearer ' + key } };
   if (body !== undefined) {

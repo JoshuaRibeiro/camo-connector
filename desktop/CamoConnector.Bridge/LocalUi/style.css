@@ -119,7 +119,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .tile-caption span { font-variant-numeric: tabular-nums; }
 .tile-copy progress { display: block; width: 100%; height: .4rem; margin-top: .25rem; }
 #overlay-settings {
-  --preview-max: 960px;
+  --preview-max: 640px;
   --gallery-gap: 1rem;
   box-sizing: content-box;
   width: auto;
@@ -131,16 +131,20 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
   background: #191c1d;
 }
 .overlay-options {
-  columns: 520px 3;
+  display: grid;
+  --preview-min: 520px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--preview-min)), 1fr));
+  grid-auto-rows: 1px;
+  align-items: start;
   column-gap: var(--gallery-gap);
   margin: .75rem 0 1rem;
 }
 .overlay-options article {
   display: flow-root;
-  break-inside: avoid;
+
   width: 100%;
   max-width: var(--preview-max);
-  margin: 0 auto 1.5rem;
+  margin: 0 auto;
 }
 .overlay-options .actions { justify-content: start; }
 #copy-overlay-url { margin-top: .75rem; }
