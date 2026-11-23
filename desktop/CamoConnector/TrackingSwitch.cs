@@ -42,8 +42,7 @@ internal sealed partial class ConnectorWindow
             var thumb = new Rectangle(Checked ? track.Right - inset - thumbWidth : track.Left + inset,
                 track.Top + inset, thumbWidth, knobSize);
             using var thumbPath = new GraphicsPath();
-            var radius = LogicalToDeviceUnits(3);
-            thumbPath.AddRoundedRectangle(thumb, new Size(radius, radius));
+            thumbPath.AddRoundedRectangle(thumb, corners);
             e.Graphics.FillPath(knob, thumbPath);
             if (Focused && ShowFocusCues)
                 ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -1, -1), ink, BackColor);
