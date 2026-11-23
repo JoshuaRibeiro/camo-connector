@@ -781,6 +781,14 @@ internal sealed class HudCapture : IDisposable
         {
             // A locked special shows the level meter on its first row. Once eligible,
             // its challenge can occupy that row instead, sometimes with the same goal.
+            if (frame.Height < 800 && selected?.Goal != requiredLevel)
+            {
+                var (digits, _) = await ReadTextAsync(frame, (.52655, .74662, .03684, .02901), cancel,
+                    countersOnly: true, pageMode: 8, adjustment: PixelAdjustment.PixelDigits, trace: trace, regionName: "compactLevelMeter");
+                if (CamoMenuRecognition.ReadLevelMeter(weapon, requiredLevel, digits) is { } observed &&
+                    observed.Count < requiredLevel && MatchesChallengeBar(frame, observed.Count, requiredLevel, .757, .769, .521))
+                    return observed;
+            }
             var (counter, _) = await ReadTextAsync(frame, (.524, .744, .050, .035), cancel, pageMode: 7,
                 countersOnly: true, trace: trace, regionName: "prerequisiteLevelCounter");
             if (CamoMenuRecognition.ReadLevelMeter(weapon, requiredLevel, counter) is { } level &&
@@ -1103,7 +1111,7 @@ internal sealed class HudCapture : IDisposable
         return rgb;
     }
 
-    private enum PixelAdjustment { CompactDigits, NativeWhite, BadgeGold, BrightGold, BrightRedChannel, Normal, Contrast, Invert, CyanText, WhiteText, YellowText }
+    private enum PixelAdjustment { PixelDigits, CompactDigits, NativeWhite, BadgeGold, BrightGold, BrightRedChannel, Normal, Contrast, Invert, CyanText, WhiteText, YellowText }
 
     private async Task<string[]> ReadAsync(Bitmap frame, (double X, double Y, double W, double H) area,
         CancellationToken cancel, PixelAdjustment adjustment = PixelAdjustment.Normal)
@@ -1118,6 +1126,17 @@ internal sealed class HudCapture : IDisposable
     {
         var region = new Rectangle((int)Math.Round(area.X * frame.Width), (int)Math.Round(area.Y * frame.Height),
             Math.Max(1, (int)Math.Round(area.W * frame.Width)), Math.Max(1, (int)Math.Round(area.H * frame.Height)));
+        if (adjustment == PixelAdjustment.PixelDigits)
+        {
+            using var enlarged = new Bitmap(region.Width * 6, region.Height * 6);
+            using (var graphics = Graphics.FromImage(enlarged))
+            {
+                graphics.InterpolationMode = InterpolationMode.NearestNeighbor;
+                graphics.PixelOffsetMode = PixelOffsetMode.Half;
+                graphics.DrawImage(frame, new Rectangle(Point.Empty, enlarged.Size), region, GraphicsUnit.Pixel);
+            }
+            return await ReadCropAsync(enlarged, cancel, pageMode, countersOnly, positioned, trace, regionName);
+        }
         if (adjustment == PixelAdjustment.CompactDigits)
         {
             using var native = frame.Clone(region, frame.PixelFormat);

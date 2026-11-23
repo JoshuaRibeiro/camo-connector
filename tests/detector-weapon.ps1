@@ -499,3 +499,7 @@ if (![CamoConnector.Detector.SpecialUnlocks]::SupportsArtworkObjective('GET 40 P
     [CamoConnector.Detector.SpecialUnlocks]::SupportsArtworkObjective('GET 50 PLAYER KILLS WHILE MOVING', 'Get 40 Player Kills while moving')) {
     throw 'Banner artwork corroboration must tolerate damaged words and reject conflicting counts.'
 }
+if (![CamoConnector.Detector.CamoMenuRecognition]::IsCamoMenu('GAMU sELELI') -or
+    [CamoConnector.Detector.CamoMenuRecognition]::ReadProgressionWeapon('JOKR PROGRESSION } ODE') -ne 'JOKR') {
+    throw 'Compact JOKR progression menu must resolve to the equipped launcher.'
+}

@@ -17,7 +17,7 @@ public static class CamoMenuRecognition
     private static string Key(string text) => Regex.Replace(text.ToLowerInvariant(), "[^a-z0-9]", "");
 
     public static bool IsCamoMenu(string text) =>
-        Key(text) is "camoselect" or "select" ||
+        Key(text) is "camoselect" or "gamuseleli" or "select" ||
         Regex.IsMatch(text, @"\bCAM[O0]\s+SELECT\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     public static int? ReadMilitaryMenuCount(string text)
@@ -34,7 +34,7 @@ public static class CamoMenuRecognition
     public static string? ReadProgressionWeapon(string text)
     {
         // The short active tab can share a crop with Mode Mastery or stray UI glyphs.
-        var label = Regex.Match(text, @"\bPROGRESSION\b(?=\s*[|=])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        var label = Regex.Match(text, @"\bPROGRESSION\b(?=\s*[|=}])", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         if (label.Success) text = text[..(label.Index + label.Length)];
         // The tab font can make a zero look like an at sign in OCR.
         var key = Key(text.Replace('@', '0'));
