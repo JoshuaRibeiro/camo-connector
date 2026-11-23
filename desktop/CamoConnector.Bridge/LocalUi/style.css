@@ -147,7 +147,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
   margin: 0 auto;
 }
 .overlay-options .actions { justify-content: start; }
-#copy-overlay-url { margin-top: .75rem; }
+.overlay-gallery-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .5rem 1rem; }
 .overlay-options button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
 .twitch-link {
   align-self: center; padding: .44rem .62rem; color: #dbc8ff; text-decoration: none;

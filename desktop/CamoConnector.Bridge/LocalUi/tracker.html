@@ -11,7 +11,10 @@
 <body>
   <p id="status" role="status"></p>
   <section id="overlay-settings" aria-labelledby="overlay-heading" hidden>
-    <h2 id="overlay-heading">OBS overlays</h2>
+    <header class="overlay-gallery-heading">
+      <h2 id="overlay-heading">OBS overlays</h2>
+      <button id="copy-overlay-url">Copy OBS overlay URL</button>
+    </header>
     <div class="overlay-options">
       <article>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Default overlay preview" src="/local/overlay?preview=default"></iframe>
@@ -64,7 +67,6 @@
         </div>
       </article>
     </div>
-    <button id="copy-overlay-url">Copy OBS overlay URL</button>
   </section>
   <div id="tracker-content">
     <aside aria-label="Weapon roster">
