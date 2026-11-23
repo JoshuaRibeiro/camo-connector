@@ -6,11 +6,8 @@ internal sealed partial class ConnectorWindow
 {
     private sealed class TrackingSwitch : CheckBox
     {
-        private readonly bool roundedThumb;
-
-        public TrackingSwitch(bool roundedThumb = false)
+        public TrackingSwitch()
         {
-            this.roundedThumb = roundedThumb;
             Dock = DockStyle.Fill;
             DoubleBuffered = true;
             CheckedChanged += (_, _) => Invalidate();
@@ -41,16 +38,13 @@ internal sealed partial class ConnectorWindow
             var inset = LogicalToDeviceUnits(3);
             var knobSize = track.Height - inset * 2;
             using var knob = new SolidBrush(Checked ? accent : highContrast ? ink : ShellMuted);
-            var thumbWidth = roundedThumb ? track.Width / 2 : knobSize;
+            var thumbWidth = LogicalToDeviceUnits(23);
             var thumb = new Rectangle(Checked ? track.Right - inset - thumbWidth : track.Left + inset,
                 track.Top + inset, thumbWidth, knobSize);
-            if (roundedThumb)
-            {
-                using var thumbPath = new GraphicsPath();
-                thumbPath.AddRoundedRectangle(thumb, corners);
-                e.Graphics.FillPath(knob, thumbPath);
-            }
-            else e.Graphics.FillEllipse(knob, thumb);
+            using var thumbPath = new GraphicsPath();
+            var radius = LogicalToDeviceUnits(3);
+            thumbPath.AddRoundedRectangle(thumb, new Size(radius, radius));
+            e.Graphics.FillPath(knob, thumbPath);
             if (Focused && ShowFocusCues)
                 ControlPaint.DrawFocusRectangle(e.Graphics, Rectangle.Inflate(ClientRectangle, -1, -1), ink, BackColor);
         }

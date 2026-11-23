@@ -48,6 +48,11 @@ if ($reader::ReadHud(@('.58 GS'), $false).Name -ne '.50 GS' -or
     $reader::ReadHud(@('021 .58 GS'), $false) -or $reader::ReadHud(@('.58 GS'), $true)) {
     throw 'The .50 GS HUD fallback accepted an ambiguous read or missed the short label.'
 }
+if ($reader::ReadHud(@('Signal Inferno'), $false).Name -ne 'Signal 50' -or
+    $reader::ReadHud(@('Signal Inferno'), $true) -or $reader::ReadHud(@('Inferno'), $false) -or
+    $reader::ReadHud(@('Pick up Signal Inferno'), $false)) {
+    throw 'Signal Inferno must identify the Signal 50 only in the equipped weapon label.'
+}
 if ($reader::ReadHud(@('Krait P68 Commando'), $false).Name -ne 'Krait P68' -or
     $reader::ReadHud(@('Krait P68 Comm'), $false).Name -ne 'Krait P68' -or
     $reader::ReadHud(@('Krait P68 Commando'), $true) -or

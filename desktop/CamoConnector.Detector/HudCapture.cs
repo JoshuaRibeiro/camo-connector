@@ -707,6 +707,18 @@ internal sealed class HudCapture : IDisposable
                     return new(weapon, title, count, selected.Goal.Value);
             }
         }
+        // Some menus lift the active meter and extend it slightly farther right.
+        // Check its own fill before accepting this alternate row for any named camo.
+        if (!raisedDetails && selected?.Goal is > 1 and <= 100)
+        {
+            var (digits, _) = await ReadTextAsync(frame, (.536, .790, .040, .029), cancel,
+                countersOnly: true, pageMode: 7, adjustment: PixelAdjustment.CompactDigits,
+                trace: trace, regionName: "upperChallengeCounter");
+            var meter = CamoMenuRecognition.ReadLevelMeter(weapon, selected.Goal.Value, digits);
+            if (meter is { Count: > 0 } && meter.Count < meter.Goal &&
+                MatchesChallengeBar(frame, meter.Count, meter.Goal, .798, .814, .531))
+                return new(weapon, title, meter.Count, meter.Goal);
+        }
         var objectivesArea = raisedDetails ? (.313, .455, .342, .159) : (.313, .679, .342, .181);
         var (objectives, _) = await ReadTextAsync(frame, objectivesArea, cancel,
             trace: trace, regionName: "camoObjectives");
@@ -997,12 +1009,12 @@ internal sealed class HudCapture : IDisposable
         return [];
     }
 
-    private static bool MatchesChallengeBar(Bitmap frame, int count, int goal)
+    private static bool MatchesChallengeBar(Bitmap frame, int count, int goal, double top = .822, double bottom = .836, double end = .521)
     {
-        int left = (int)(frame.Width * .347), right = (int)(frame.Width * .521);
+        int left = (int)(frame.Width * .347), right = (int)(frame.Width * end);
         var expected = left + (right - left) * count / (double)goal;
         var tolerance = Math.Max(3, (right - left) * .012);
-        for (var y = (int)(frame.Height * .822); y <= frame.Height * .836; y++)
+        for (var y = (int)(frame.Height * top); y <= frame.Height * bottom; y++)
         {
             int lastBright = left, bright = 0;
             for (var x = left; x < right; x += 2)

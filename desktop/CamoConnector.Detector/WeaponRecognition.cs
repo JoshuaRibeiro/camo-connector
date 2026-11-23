@@ -62,6 +62,7 @@ public static class WeaponRecognition
                 "patrietxmr" or "patrietkmr" => "Patriot XMR",
                 "kg7drillcharge" or "k67drillcharge" or "kg7" or "k67" => "KG-7 Vulcan",
                 "skgfergiean" => "KG-7 Vulcan",
+                "signalinferno" => "Signal 50",
                 "mare" => "Mar-9",
                 "anvil" => "PM-40 Anvil",
                 "kraitp68commando" or "kraitp68comm" => "Krait P68",
