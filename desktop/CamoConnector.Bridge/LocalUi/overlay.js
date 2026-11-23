@@ -10,8 +10,9 @@ let previous;
 
 // Each pose shares its side walls and rounded corners. Only the two long edges flex.
 function sizeWaveFrame() {
-  const frame = document.querySelector('.wave-frame');
-  const { width, height } = frame.getBoundingClientRect();
+  if (!document.body.classList.contains('layout-subtle-wave')) return;
+  // The SVG fills the card's padding box. Draw in local units, before OBS custom CSS zoom.
+  const { clientWidth: width, clientHeight: height } = byId('overlay-card');
   if (width < 24 || height < 24) return;
   const r = Math.min(14, height * .085);
   const left = 2, right = width - 2, top = 3, bottom = height - 3;
@@ -53,10 +54,11 @@ function sizeWaveFrame() {
 }
 const waveMotion = matchMedia('(prefers-reduced-motion: reduce)');
 waveMotion.addEventListener('change', sizeWaveFrame);
-new ResizeObserver(sizeWaveFrame).observe(document.querySelector('.wave-frame'));
+new ResizeObserver(sizeWaveFrame).observe(byId('overlay-card'));
 
 function render(data) {
   const layout = data.overlayLayout ?? legacyLayout;
+  const enteringWave = layout === 'subtle-wave' && !document.body.classList.contains('layout-subtle-wave');
   for (const id of layouts) document.body.classList.toggle('layout-' + id, layout === id);
   byId('overlay-card').hidden = !data.weapon;
   byId('weapon').textContent = data.weapon ?? '';
@@ -124,6 +126,7 @@ function render(data) {
     rows.push(status);
   }
   byId('unlock-rows').replaceChildren(...rows);
+  if (enteringWave) sizeWaveFrame();
 }
 
 async function refresh() {
