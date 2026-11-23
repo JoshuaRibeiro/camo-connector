@@ -45,6 +45,11 @@ function render(data) {
       image.src = row.artwork;
       image.alt = '';
       section.append(image);
+    } else if (row.placeholder) {
+      const tile = document.createElement('span');
+      tile.className = 'camo-artwork preview-swatch';
+      tile.setAttribute('aria-hidden', 'true');
+      section.append(tile);
     }
     const copy = document.createElement('div');
     copy.append(title);
@@ -90,11 +95,22 @@ async function refresh() {
 const preview = new URLSearchParams(location.search).get('preview');
 if (layouts.includes(preview)) {
   document.body.classList.add('preview');
+  const themes = {
+    "default": ["Default", "The OG", "the original camo connector layout", "Lime trim", "A slim green edge frames compact, left-aligned tiles."],
+    "jabber": ["Jabber", "Jabber's Theme", "Jabber's personal touch", "Gold in motion", "Three soft gold highlights travel around the purple-trimmed panel."],
+    "11annah": ["11annah", "11annah's theme", "Camo Connector's first custom theme", "Teal edge", "Large artwork sits beside each objective on a translucent card."],
+    "afterglow": ["Afterglow", "Plum glass", "A plum gradient frames each inset panel.", "Round portraits", "Circular tiles sit on the right, opposite rose-coloured headings."],
+    "scoreboard": ["Eclipse", "Violet trim", "A fine lavender line runs across the top edge.", "Level badge", "A rounded badge balances the weapon name above softly squared tiles."],
+    "filmstrip": ["Ember", "Copper edge", "A warm copper rail anchors the charcoal panel.", "Framed tiles", "Large square swatches sit beside peach-coloured headings."],
+    "blueprint": ["Tide", "Deep teal", "A translucent sea-green panel fades into navy.", "Mint accents", "Inset rows pair a mint rail with artwork on the right."],
+    "field-manual": ["Velvet", "Smoked plum", "Rose headings sit against a soft plum gradient.", "Rose rings", "Fine rings frame the circular tiles beneath a slim divider."]
+  };
+  const [weapon, first, intro, second, detail] = themes[preview];
   render({
-    overlayLayout: preview, weapon: 'JOKR', category: 'Launcher', level: 34,
+    overlayLayout: preview, weapon, category: 'Layout', level: 34,
     rows: [
-      { name: 'Military Camo 7', objective: 'Reach Weapon Level 36', artwork: '/local/artwork/military-camo-7.png', count: 34, goal: 36 },
-      { name: 'Tectonic', objective: 'Get 10 Longshot Kills against Players', artwork: '/local/artwork/tectonic.png', count: 0, goal: 10 }
+      { name: first, objective: intro, placeholder: true, count: 34, goal: 36 },
+      { name: second, objective: detail, placeholder: true, count: 0, goal: 10 }
     ]
   });
   const frame = window.frameElement;

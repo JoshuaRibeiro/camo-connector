@@ -14,50 +14,54 @@
     <h2 id="overlay-heading">OBS overlays</h2>
     <div class="overlay-options">
       <article>
-        <h3>Default</h3>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Default overlay preview" src="/local/overlay?preview=default"></iframe>
-        <button data-overlay="default" aria-pressed="true">Use Default</button>
+        <div class="layout-controls">
+          <button data-overlay="default" aria-pressed="true" aria-label="Apply Default">Apply</button>
+        </div>
       </article>
-      <article class="custom-option">
-        <h3>Jabber</h3>
+      <article>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Jabber overlay preview" src="/local/overlay?preview=jabber"></iframe>
-        <div class="actions">
-          <button data-overlay="jabber" aria-pressed="false">Use Jabber</button>
-          <a class="twitch-link" href="https://www.twitch.tv/jabberonline" target="_blank" rel="noopener noreferrer">Jabber on Twitch ↗</a>
+        <div class="layout-controls">
+          <button data-overlay="jabber" aria-pressed="false" aria-label="Apply Jabber">Apply</button>
+          <a class="twitch-link" href="https://www.twitch.tv/jabberonline" target="_blank" rel="noopener noreferrer" aria-label="Jabber on Twitch"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M11.57 4.72h1.67v5.01h-1.67zm4.59 0h1.67v5.01h-1.67zM6.15 0 1.98 4.17v15.02h5.01V24l4.8-4.81h3.75l6.48-6.48V0zm14.2 11.88-3.75 3.75h-3.76l-3.34 3.34v-3.34H6.15V1.67h14.2z"/></svg></a>
         </div>
       </article>
-      <article class="custom-option">
-        <h3>11annah</h3>
+      <article>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="11annah overlay preview" src="/local/overlay?preview=11annah"></iframe>
-        <div class="actions">
-          <button data-overlay="11annah" aria-pressed="false">Use 11annah</button>
-          <a class="twitch-link" href="https://www.twitch.tv/11annah" target="_blank" rel="noopener noreferrer">11annah on Twitch ↗</a>
+        <div class="layout-controls">
+          <button data-overlay="11annah" aria-pressed="false" aria-label="Apply 11annah">Apply</button>
+          <a class="twitch-link" href="https://www.twitch.tv/11annah" target="_blank" rel="noopener noreferrer" aria-label="11annah on Twitch"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M11.57 4.72h1.67v5.01h-1.67zm4.59 0h1.67v5.01h-1.67zM6.15 0 1.98 4.17v15.02h5.01V24l4.8-4.81h3.75l6.48-6.48V0zm14.2 11.88-3.75 3.75h-3.76l-3.34 3.34v-3.34H6.15V1.67h14.2z"/></svg></a>
         </div>
       </article>
       <article>
-        <h3>Afterglow</h3>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Afterglow overlay preview" src="/local/overlay?preview=afterglow"></iframe>
-        <button data-overlay="afterglow" aria-pressed="false">Use Afterglow</button>
+        <div class="layout-controls">
+          <button data-overlay="afterglow" aria-pressed="false" aria-label="Apply Afterglow">Apply</button>
+        </div>
       </article>
       <article>
-        <h3>Eclipse</h3>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Eclipse overlay preview" src="/local/overlay?preview=scoreboard"></iframe>
-        <button data-overlay="scoreboard" aria-pressed="false">Use Eclipse</button>
+        <div class="layout-controls">
+          <button data-overlay="scoreboard" aria-pressed="false" aria-label="Apply Eclipse">Apply</button>
+        </div>
       </article>
       <article>
-        <h3>Ember</h3>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Ember overlay preview" src="/local/overlay?preview=filmstrip"></iframe>
-        <button data-overlay="filmstrip" aria-pressed="false">Use Ember</button>
+        <div class="layout-controls">
+          <button data-overlay="filmstrip" aria-pressed="false" aria-label="Apply Ember">Apply</button>
+        </div>
       </article>
       <article>
-        <h3>Tide</h3>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Tide overlay preview" src="/local/overlay?preview=blueprint"></iframe>
-        <button data-overlay="blueprint" aria-pressed="false">Use Tide</button>
+        <div class="layout-controls">
+          <button data-overlay="blueprint" aria-pressed="false" aria-label="Apply Tide">Apply</button>
+        </div>
       </article>
       <article>
-        <h3>Velvet</h3>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Velvet overlay preview" src="/local/overlay?preview=field-manual"></iframe>
-        <button data-overlay="field-manual" aria-pressed="false">Use Velvet</button>
+        <div class="layout-controls">
+          <button data-overlay="field-manual" aria-pressed="false" aria-label="Apply Velvet">Apply</button>
+        </div>
       </article>
     </div>
     <button id="copy-overlay-url">Copy OBS overlay URL</button>
