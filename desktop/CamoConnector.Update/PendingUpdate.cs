@@ -17,13 +17,20 @@ public static class PendingUpdate
 #endif
 
     private static string Folder(string root) => Path.Combine(root, "Data", "PendingUpdate");
-    private static string ArchivePath(string root) => Path.Combine(Folder(root), "update.zip");
+    // Existing installations use the base directory. Switch slots only after all
+    // three files are ready so an interrupted refresh preserves the previous release.
+    private static string ActiveFolder(string root) => File.Exists(Path.Combine(Folder(root), "alternate.active"))
+        ? Path.Combine(Folder(root), "alternate") : Folder(root);
 
     public static async Task DownloadAsync(string root, GitHubRelease releases, GitHubRelease.SignedRelease release,
         CancellationToken cancel)
     {
-        var directory = Directory.CreateDirectory(Folder(root)).FullName;
-        var archive = ArchivePath(root);
+        var folder = Directory.CreateDirectory(Folder(root)).FullName;
+        using var lease = new FileStream(Path.Combine(folder, "download.lock"), FileMode.OpenOrCreate, FileAccess.Write, FileShare.None);
+        var alternate = ActiveFolder(root) == Folder(root);
+        var directory = alternate ? Directory.CreateDirectory(Path.Combine(folder, "alternate")).FullName : folder;
+        var archive = Path.Combine(directory, "update.zip");
+        var marker = Path.Combine(folder, "alternate.active");
         var partial = archive + ".partial";
         try
         {
@@ -33,6 +40,11 @@ public static class PendingUpdate
             File.WriteAllBytes(Path.Combine(directory, "manifest.json"), release.Metadata);
             File.WriteAllBytes(Path.Combine(directory, "manifest.sig"), release.Signature);
             File.Move(partial, archive, overwrite: true);
+            if (alternate)
+            {
+                using var active = File.Create(marker);
+            }
+            else File.Delete(marker);
         }
         finally { File.Delete(partial); }
     }
@@ -41,8 +53,9 @@ public static class PendingUpdate
         out ReleaseVerification.Manifest? manifest)
     {
         manifest = null;
-        if (!File.Exists(ArchivePath(root))) return null;
-        var directory = Folder(root);
+        var directory = ActiveFolder(root);
+        var path = Path.Combine(directory, "update.zip");
+        if (!File.Exists(path)) return null;
         try
         {
             var metadata = ReadBounded(Path.Combine(directory, "manifest.json"), 16384);
@@ -51,7 +64,7 @@ public static class PendingUpdate
             if (!json.RootElement.TryGetProperty("version", out var version) || version.ValueKind != JsonValueKind.String)
                 return null;
             var verified = ReleaseVerification.VerifyManifest(metadata, signature, publicKey, "v" + version.GetString(), installed, Package);
-            var archive = File.OpenRead(ArchivePath(root));
+            var archive = File.OpenRead(path);
             try { ReleaseVerification.VerifyArchive(archive, verified); }
             catch { archive.Dispose(); throw; }
             manifest = verified;
@@ -63,7 +76,11 @@ public static class PendingUpdate
         }
     }
 
-    public static void Discard(string root) => File.Delete(ArchivePath(root));
+    public static void Discard(string root)
+    {
+        foreach (var directory in new[] { Folder(root), Path.Combine(Folder(root), "alternate") })
+            if (Directory.Exists(directory)) File.Delete(Path.Combine(directory, "update.zip"));
+    }
 
     private static byte[] ReadBounded(string path, int limit)
     {

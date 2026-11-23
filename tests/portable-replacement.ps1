@@ -127,6 +127,45 @@ try {
     if ([CamoConnector.Update.PendingUpdate]::Open($root, [version]'2.0.0', $key, [ref]$cached)) {
         throw 'A modified staged archive was accepted.'
     }
+    # Refresh a legacy cache through the real downloader, without contacting GitHub.
+    Add-Type -TypeDefinition @"
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+public class ArchiveFixture : HttpMessageHandler {
+    public byte[] Bytes = new byte[0];
+    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancel) =>
+        Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Bytes) });
+}
+"@
+    $content[0] = $content[0] -bxor 1
+    [IO.File]::WriteAllBytes($archivePath, $content)
+    $handler = [ArchiveFixture]::new()
+    $http = [Net.Http.HttpClient]::new($handler)
+    $signer = [Security.Cryptography.RSA]::Create(2048)
+    try {
+        $key = $signer.ExportSubjectPublicKeyInfoPem()
+        $signature = $signer.SignData($metadata, 'SHA256', [Security.Cryptography.RSASignaturePadding]::Pss)
+        [IO.File]::WriteAllBytes((Join-Path $pending 'manifest.sig'), $signature)
+        $releases = [CamoConnector.Update.GitHubRelease]::new($http)
+        foreach ($version in '2.2.0', '2.3.0') {
+            $bytes = [Text.Encoding]::UTF8.GetBytes(([Text.Encoding]::UTF8.GetString($metadata)).Replace('2.1.0', $version))
+            $sig = $signer.SignData($bytes, 'SHA256', [Security.Cryptography.RSASignaturePadding]::Pss)
+            $manifest = [CamoConnector.Update.ReleaseVerification]::VerifyManifest($bytes,$sig,$key,"v$version",[version]'2.0.0','win-x64')
+            $release = [CamoConnector.Update.GitHubRelease+SignedRelease]::new($manifest,$bytes,$sig)
+            $handler.Bytes = $content
+            [CamoConnector.Update.PendingUpdate]::DownloadAsync($root,$releases,$release,[Threading.CancellationToken]::None).GetAwaiter().GetResult()
+            $handler.Bytes = [byte[]]@(1)
+            try {
+                [CamoConnector.Update.PendingUpdate]::DownloadAsync($root,$releases,$release,[Threading.CancellationToken]::None).GetAwaiter().GetResult()
+                throw 'Invalid download unexpectedly succeeded.'
+            } catch [IO.InvalidDataException] { }
+            $opened = [CamoConnector.Update.PendingUpdate]::Open($root,[version]'2.0.0',$key,[ref]$cached)
+            if (!$opened -or $cached.Version -ne $version) { throw 'Refresh lost the latest verified update.' }
+            $opened.Dispose()
+        }
+    } finally { $signer.Dispose(); $http.Dispose() }
     'Passed portable recovery, standard update preservation and runtime pack isolation.'
 } finally {
     if (Test-Path -LiteralPath $root) { [IO.Directory]::Delete($root, $true) }

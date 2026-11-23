@@ -11,6 +11,7 @@ internal sealed partial class ConnectorWindow
 
     private async Task UpdateAsync()
     {
+        if (checkingUpdate) return;
         if (available == null)
         {
             await CheckForUpdateAsync(manual: true);
@@ -32,7 +33,7 @@ internal sealed partial class ConnectorWindow
     private async Task CheckForUpdateAsync(bool manual)
     {
         var key = updateKey;
-        if (checkingUpdate || available != null || closing.IsCancellationRequested) return;
+        if (checkingUpdate || closing.IsCancellationRequested) return;
         if (key == null)
         {
             if (manual) updateStatus.Text = "This build has no desktop update key.";
@@ -40,6 +41,7 @@ internal sealed partial class ConnectorWindow
         }
         checkingUpdate = true;
         update.Enabled = false;
+        if (installUpdate != null) installUpdate.Enabled = false;
         var cancel = closing.Token;
         if (manual) updateStatus.Text = "Checking for updates…";
         try
@@ -51,27 +53,24 @@ internal sealed partial class ConnectorWindow
                 return manifest;
             }, cancel);
             if (cancel.IsCancellationRequested) return;
-            if (cached == null)
+            available = cached;
+            using var http = new HttpClient();
+            var releases = new GitHubRelease(http);
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            var baseline = cached == null ? installed : Version.Parse(cached.Version);
+            var release = await releases.CheckSignedAsync(baseline, key, timeout.Token);
+            if (release != null)
             {
-                using var http = new HttpClient();
-                var releases = new GitHubRelease(http);
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancel);
-                timeout.CancelAfter(TimeSpan.FromSeconds(30));
-                var release = await releases.CheckSignedAsync(installed, key, timeout.Token);
-                if (release != null)
-                {
-                    updateStatus.Text = $"Downloading v{release.Manifest.Version} in the background…";
-                    await Task.Run(() => PendingUpdate.DownloadAsync(root, releases, release, cancel), cancel);
-                    cached = release.Manifest;
-                }
+                updateStatus.Text = $"Downloading v{release.Manifest.Version} in the background.";
+                await Task.Run(() => PendingUpdate.DownloadAsync(root, releases, release, cancel), cancel);
+                cached = release.Manifest;
             }
             if (cancel.IsCancellationRequested) return;
             available = cached;
             if (available != null)
             {
                 updateStatus.Text = $"v{available.Version} is downloaded and ready to install.";
-                update.Text = "Install update and restart";
-                if (installUpdate != null) installUpdate.Visible = true;
             }
             else if (manual) updateStatus.Text = "Desktop is up to date.";
         }
@@ -80,7 +79,9 @@ internal sealed partial class ConnectorWindow
         {
             if (!cancel.IsCancellationRequested)
             {
-                if (manual || updateStatus.Text.StartsWith("Downloading", StringComparison.Ordinal))
+                if (available != null)
+                    updateStatus.Text = $"Could not refresh updates. v{available.Version} is ready to install.";
+                else if (manual || updateStatus.Text.StartsWith("Downloading", StringComparison.Ordinal))
                     updateStatus.Text = "Could not prepare the update. Check again to retry.";
                 LogLine(bridgeMessages, "Background update: " + error.Message);
             }
@@ -88,7 +89,16 @@ internal sealed partial class ConnectorWindow
         finally
         {
             checkingUpdate = false;
-            if (!cancel.IsCancellationRequested) update.Enabled = true;
+            if (!cancel.IsCancellationRequested)
+            {
+                update.Enabled = true;
+                update.Text = available == null ? "Check for updates" : "Install update and restart";
+                if (installUpdate != null)
+                {
+                    installUpdate.Visible = available != null;
+                    installUpdate.Enabled = true;
+                }
+            }
             if (releaseNoticePending)
             {
                 releaseNoticePending = false;
