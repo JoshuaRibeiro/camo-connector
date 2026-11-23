@@ -355,7 +355,20 @@ const server = http.createServer(async (request, response) => {
     if (request.method === 'GET') {
       const page = request.url.split('?')[0];
       if (page === '/api/instance') return json(process.env.TROPHY_INSTANCE);
-      if (page === '/api/state') return json(publicState());
+      if (page === '/api/state') {
+        const now = new Date();
+        const day = londonDay(now);
+        const visible = publicState(day);
+        const goal = 10000;
+        // All scheduled event days use London standard time.
+        const start = Date.parse(day + 'T04:00:00Z');
+        const previousDay = new Date(start - 86400000).toISOString().slice(0, 10);
+        const previous = scheduledTarget(previousDay) ?? 0;
+        const daily = Math.min(goal, visible.target);
+        const fraction = Math.min(1, Math.max(0, (now - start) / 86400000));
+        const pace = day < firstScheduledDay ? 0 : previous + (daily - previous) * fraction;
+        return json({ ...visible, goal, pace, neededToday: Math.max(0, daily - visible.current) });
+      }
       if (page === '/api/version') return json({
         recognition: assetVersion('recognition.js', 'signatures.json'),
         overlay: assetVersion('overlay.html', 'progress.js')
