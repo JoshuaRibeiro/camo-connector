@@ -375,13 +375,38 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .armoury #overlay-card::before,.armoury #overlay-card::after { pointer-events:none; }
 .layout-glow-accent #overlay-card { border-left:.25em solid #22dfd5; box-shadow:-.16em 0 .55em #13cbb736; animation:armoury-pulse 4s ease-in-out infinite; }
 @keyframes armoury-pulse { 50% { box-shadow:-.22em 0 .85em #15d9d866; } }
-.layout-gradient-edge-sweep #overlay-card { --accent:#ff819b; --bar:linear-gradient(90deg,#ffb275,#ff66a6); }
-.layout-gradient-edge-sweep #overlay-card::before,.layout-gradient-edge-sweep #overlay-card::after {
-  content:""; position:absolute; inset:-1px; padding:2px; border-radius:inherit;
-  background:repeating-conic-gradient(from var(--jabber-angle),#a64b66 0deg,#ff7997 58deg,#ffb092 83deg,#fff3ca 90deg,#ff808c 98deg,#95526e 140deg,#a64b66 180deg);
-  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude; animation:jabber-edge 12s linear infinite;
+.sweep-frame { display:none; }
+.layout-gradient-edge-sweep #overlay-card {
+  --accent:#ff819b; --bar:linear-gradient(90deg,#ffb275,#ff66a6);
+  border-color:transparent;
+  background:linear-gradient(155deg,#1c1822eb,#101118ed 54%,#131017eb);
 }
-.layout-gradient-edge-sweep #overlay-card::after { inset:-3px; padding:4px; opacity:.45; filter:blur(1px); }
+.layout-gradient-edge-sweep #overlay-card::before {
+  content:""; position:absolute; inset:-1px; padding:1px; border-radius:inherit;
+  background:conic-gradient(from 0deg,#bf695e,#8d4958 20%,#db816f 37%,#a54777 53%,#777fa6 67%,#ff5299 78%,#ffc2b7 84%,#bf695e);
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude;
+}
+@property --sweep-angle { syntax:"<angle>"; inherits:true; initial-value:6deg; }
+.layout-gradient-edge-sweep .sweep-frame {
+  --sweep-light:conic-gradient(from var(--sweep-angle),
+    #fff9df, #ffd1a9 4deg, #ff866a 14deg, #f75a6600 40deg,
+    #fa489500 79deg, #ff6cae 102deg, #ffd6ef 111deg, #fff3ff 115deg,
+    #ffc9e8 119deg, #ff62a9 129deg, #fa489500 151deg,
+    #f75a6600 320deg, #ff866a 346deg, #ffd1a9 356deg, #fff9df);
+  display:block; position:absolute; inset:-1px; border-radius:inherit; pointer-events:none;
+  animation:armoury-edge-sweep 12s linear infinite;
+}
+.sweep-frame > span, .sweep-frame > span::before, .sweep-frame::after {
+  position:absolute; inset:0; border-radius:inherit;
+}
+/* Blur the masked light on its own layer so the halo reaches both sides of the rim. */
+.sweep-frame > span::before, .sweep-frame::after {
+  content:""; padding:var(--sweep-width,1px); background:var(--sweep-light);
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude;
+}
+.sweep-frame .sweep-bloom { --sweep-width:.48em; inset:-.20em; filter:blur(.32em) saturate(1.8); }
+.sweep-frame .sweep-flare { --sweep-width:.20em; inset:-.065em; filter:blur(.09em); }
+@keyframes armoury-edge-sweep { to { --sweep-angle:366deg; } }
 .layout-corner-accents #overlay-card { --accent:#ff9275; border-color:#777b8170; }
 .layout-corner-accents #overlay-card::before,.layout-corner-accents #overlay-card::after {
   content:""; position:absolute; box-sizing:border-box; width:1.25em; height:1.25em;
@@ -400,6 +425,6 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 @keyframes armoury-breathe { 50% {box-shadow:0 0 .85em #bb8bf999,inset 0 0 .3em #bb8bf92a} }
 .armoury.preview { padding:8px; }
 @media(prefers-reduced-motion:reduce) {
-  .armoury #overlay-card,.armoury #overlay-card::before,.armoury #overlay-card::after {animation:none}
+  .layout-gradient-edge-sweep .sweep-frame,.armoury #overlay-card,.armoury #overlay-card::before,.armoury #overlay-card::after {animation:none}
   .layout-corner-accents #overlay-card::after {opacity:.8}
 }

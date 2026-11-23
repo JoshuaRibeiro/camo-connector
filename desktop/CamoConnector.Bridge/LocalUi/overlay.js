@@ -158,7 +158,7 @@ if (layouts.includes(preview)) {
     "blueprint": ["Tide", "Deep teal", "A translucent sea-green panel fades into navy.", "Mint accents", "Inset rows pair a mint rail with artwork on the right."],
     "field-manual": ["Velvet", "Smoked plum", "Rose headings sit against a soft plum gradient.", "Rose rings", "Fine rings frame the circular tiles beneath a slim divider."],
     "glow-accent": ["Glow Accent", "Cyan pulse", "Light swells and fades along the left edge.", "Cool glass", "Mint headings and progress bars sit on translucent charcoal."],
-    "gradient-edge-sweep": ["Gradient Edge Sweep", "Travelling light", "A pale highlight sweeps clockwise around the rim.", "Sunset gradient", "The progress fill blends from apricot to pink."],
+    "gradient-edge-sweep": ["Gradient Edge Sweep", "Travelling light", "Peach and pink flares sweep clockwise along a fine rose rim.", "Sunset gradient", "The progress fill blends from apricot to pink."],
     "corner-accents": ["Corner Accents", "Corner loop", "The top-left and bottom-right brackets pulse in turn.", "Warm highlights", "Peach headings and progress bars echo the corners."],
     "subtle-wave": ["Subtle Wave", "Twin waves", "Teal waves drift along the top and bottom in opposite directions.", "Seafoam trim", "A fine teal outline echoes the colour of the progress bars."],
     "minimal-glow": ["Minimal Glow", "Breathing light", "A violet halo slowly brightens and fades around the card.", "Lavender details", "A fine border frames soft purple headings and progress bars."]
