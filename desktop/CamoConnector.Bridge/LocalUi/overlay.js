@@ -10,6 +10,9 @@ function render(data) {
   document.body.classList.toggle('layout-11annah', (data.overlayLayout ?? legacyLayout) === '11annah');
   byId('overlay-card').hidden = !data.weapon;
   byId('weapon').textContent = data.weapon ?? '';
+  const jabber = (data.overlayLayout ?? legacyLayout) === 'jabber';
+  document.body.classList.toggle('layout-jabber', jabber);
+  byId('jabber-class').textContent = data.category ?? '';
   const level = byId('weapon-level');
   level.hidden = !data.weapon;
   level.textContent = data.maxLevel ? 'Weapon level MAX' : data.maximumCamoLevel > 0 && data.minimumLevel >= data.maximumCamoLevel
@@ -19,6 +22,7 @@ function render(data) {
     data.minimumUnlocks ? 'Weapon unlocks ' + data.minimumUnlocks +
       (data.weaponUnlocks != null || data.minimumUnlocks === data.maximumCamoUnlocks ? '' : '+') : 'Weapon level —';
 
+  if (jabber) level.textContent = level.textContent.replace('Weapon level ', '↗ LVL ');
   const available = data.rows ?? [];
   const visible = available.length || !data.waiting ? available : [{
     ...data.waiting, objective: data.waiting.unlock

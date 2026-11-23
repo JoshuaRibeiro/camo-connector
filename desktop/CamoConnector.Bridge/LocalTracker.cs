@@ -76,7 +76,7 @@ internal sealed class LocalTracker
 
     public bool SetOverlayLayout(string? layout)
     {
-        if (layout is not ("default" or "11annah")) return false;
+        if (layout is not ("default" or "11annah" or "jabber")) return false;
         lock (gate)
         {
             if (state.OverlayLayout != layout) SaveState(state with { OverlayLayout = layout });
@@ -165,7 +165,7 @@ internal sealed class LocalTracker
                 }).ToArray();
             var next = rows.Length == 0 ? remaining.FirstOrDefault() : null;
             var prerequisite = next == null ? null : CompletionGate(next);
-            return new { weapon = weapon.Name, level,
+            return new { weapon = weapon.Name, category = weapon.Category, level,
                 maxLevel, minimumLevel = knownLevel, weaponUnlocks, minimumUnlocks, maximumCamoLevel, maximumCamoUnlocks, rows, state.OverlayLayout,
                 waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock, count = prerequisite?.Count, goal = prerequisite?.Goal },
                 complete = remaining.Length == 0 };

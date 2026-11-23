@@ -118,8 +118,8 @@ internal sealed partial class ConnectorWindow
             core.NewWindowRequested += (_, args) =>
             {
                 args.Handled = true;
-                const string channel = "https://www.twitch.tv/11annah";
-                if (!args.IsUserInitiated || !string.Equals(args.Uri, channel, StringComparison.Ordinal)) return;
+                var channel = args.Uri;
+                if (!args.IsUserInitiated || channel is not ("https://www.twitch.tv/11annah" or "https://www.twitch.tv/jabberonline")) return;
                 try
                 {
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(channel)
@@ -129,7 +129,7 @@ internal sealed partial class ConnectorWindow
                 }
                 catch (System.ComponentModel.Win32Exception)
                 {
-                    trackerMessage.Text = "Could not open 11annah’s Twitch channel.";
+                    trackerMessage.Text = "Could not open the Twitch channel.";
                 }
             };
             core.NavigationCompleted += (_, args) =>

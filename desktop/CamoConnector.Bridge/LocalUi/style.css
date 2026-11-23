@@ -247,3 +247,28 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 @media (max-width: 680px) {
   .tracker #tracker-content:not([hidden]) { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 34%) minmax(0, 1fr); }
 }
+
+#jabber-class, #jabber-brand { display: none; }
+.layout-jabber #overlay-card {
+  position: relative; isolation: isolate; --accent: #a0cabb;
+  background: linear-gradient(120deg,#0b0e13f5,#090b10ed); border: 1px solid #55504a;
+  border-left: .28em solid #9759df; border-radius: .45em; padding: .85em 1em;
+}
+.layout-jabber .overlay-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.15em .6em; align-items:center }
+.layout-jabber #weapon { text-transform:uppercase }
+.layout-jabber #jabber-class { display:block; justify-self:end; padding:.16em .65em; border-radius:2em; background:#ffffff20; font-size:.76em; text-transform:uppercase }
+.layout-jabber #jabber-brand { display:block; font-size:.73em; font-weight:700; letter-spacing:.04em; color:#b4acbb }
+.layout-jabber .camo-artwork { width:4.5em; height:4.5em; border-radius:.3em }
+.layout-jabber .overlay-unlock { gap:.75em; border-color:#ffffff16 }
+.layout-jabber .overlay-unlock h2 { color:var(--accent) }
+.layout-jabber .overlay-unlock:first-child { border-top:0 }
+.layout-jabber progress { accent-color:var(--accent) }
+@property --jabber-angle { syntax:"<angle>"; inherits:false; initial-value:310deg }
+.layout-jabber #overlay-card::after {
+  content:""; position:absolute; inset:-1px -1px -1px 0; border-radius:inherit; pointer-events:none;
+  padding:2px; background:conic-gradient(from var(--jabber-angle),transparent 0deg 329deg,#e7b85b66 344deg,#ffe5a6 354deg,transparent);
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude;
+  clip-path:inset(0 0 0 2px); animation:jabber-edge 9s linear infinite;
+}
+@keyframes jabber-edge { to { --jabber-angle:670deg } }
+@media(prefers-reduced-motion:reduce) { .layout-jabber #overlay-card::after { animation:none } }
