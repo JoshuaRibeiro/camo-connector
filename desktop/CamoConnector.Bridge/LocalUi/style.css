@@ -296,36 +296,32 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .overlay.preview { padding: 0; overflow: hidden; }
 .overlay.preview #overlay-card { max-width: none; }
 
-/* Field Manual: warm paper, ink rules and square specimen swatches. */
-.layout-field-manual #overlay-card { --accent: #79401f; color: #28261e; background: #ece4d1d9; border: 1px solid #746c58; border-radius: 3px; }
-.layout-field-manual .overlay-heading { border-bottom: 3px double #746c58; }
-.layout-field-manual h1, .layout-field-manual h2 { font-family: Georgia, serif; }
-.layout-field-manual p { color: #403d32; }
-.layout-field-manual .overlay-unlock { border: 0; }
-.layout-field-manual .camo-artwork { border: 2px solid #fff9ea; border-radius: 0; box-shadow: 0 1px 3px #34261255; }
-
 /* Afterglow: inset challenge panels with the artwork on the trailing edge. */
 .layout-afterglow #overlay-card { --accent: #ffc0df; background: linear-gradient(125deg,#382449c9,#1b1529c9); border: 1px solid #936788; border-radius: 1em; }
 .layout-afterglow .overlay-unlock { flex-direction: row-reverse; padding: .6em; margin-top: .35em; background: #160f2259; border: 0; border-radius: .65em; }
 .layout-afterglow .camo-artwork { border-radius: 50%; }
 
-/* Scoreboard: broadcast header with a separate level plate. */
-.layout-scoreboard #overlay-card { --accent: #ffd749; background: #15171bc9; border: 0; border-radius: .2em; padding: 0; overflow: hidden; }
-.layout-scoreboard .overlay-heading { background: #ffda4ca6; color: #15171b; padding: .28em .65em; align-items: center; }
-.layout-scoreboard #weapon { text-transform: uppercase; font-style: italic; }
-.layout-scoreboard #weapon-level { background: #15171b; color: #fff; padding: .15em .55em; white-space: nowrap; }
-.layout-scoreboard #unlock-rows { margin: 0; padding: 0 .75em .55em; }
-.layout-scoreboard .overlay-meter span { font-weight: 800; color: var(--accent); }
+/* Keep the original preset keys so saved selections load their successor. */
+/* Eclipse */
+.layout-scoreboard #overlay-card { --accent: #c7bdff; background: linear-gradient(125deg,#23223dcc,#12121dcc); border: 1px solid #817aa26b; border-top: 2px solid #b0a0da; border-radius: .8em; }
+.layout-scoreboard #weapon-level { color: var(--accent); background: #c3acff18; padding: .15em .65em; border-radius: 2em; white-space: nowrap; }
+.layout-scoreboard .overlay-unlock { align-items: center; border-color: #a89bc533; }
+.layout-scoreboard .camo-artwork { width: 3.4em; height: 3.4em; border-radius: .8em; }
 
-/* Blueprint: ruled drafting grid and outlined square samples. */
-.layout-blueprint #overlay-card { --accent: #a4eaff; border: 1px solid #77b5d2; border-radius: 0; background-color: #11344cc9; background-image: linear-gradient(#a4eaff0d 1px, transparent 1px), linear-gradient(90deg,#a4eaff0d 1px, transparent 1px); background-size: 1em 1em; }
-.layout-blueprint .overlay-heading, .layout-blueprint .overlay-meter span { font-family: Consolas, monospace; }
-.layout-blueprint .overlay-unlock { border-top: 1px dashed #89bed3; }
-.layout-blueprint .camo-artwork { border-radius: 0; outline: 1px solid #a4eaff; outline-offset: 2px; margin: 3px; }
+/* Ember */
+.layout-filmstrip #overlay-card { --accent: #ffc597; background: linear-gradient(100deg,#33251ecc,#171518c7); border: 1px solid #ad816346; border-left: .22em solid #da9468; border-radius: .45em; }
+.layout-filmstrip .overlay-heading { align-items: center; }
+.layout-filmstrip .overlay-unlock { padding-block: .55em; border-color: #efbe8c29; }
+.layout-filmstrip .camo-artwork { width: 3.6em; height: 3.6em; border-radius: .28em; box-shadow: 0 0 0 1px #efbe8c40; }
 
-/* Filmstrip: side-by-side objective frames that wrap on narrow sources. */
-.layout-filmstrip #overlay-card { --accent: #ffc58e; background: #211c19c9; border: 0; border-block: .25em dotted #b7a899; border-radius: .2em; }
-.layout-filmstrip #unlock-rows { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,12em),1fr)); gap: .6em; }
-.layout-filmstrip .overlay-unlock { display: block; padding: .5em; background: #100e0e59; border: 1px solid #54483e; }
-.layout-filmstrip .camo-artwork { width: 100%; height: 2.8em; border-radius: 0; }
+/* Tide */
+.layout-blueprint #overlay-card { --accent: #99e6de; background: linear-gradient(155deg,#103137c9,#101c29cc); border: 1px solid #81c5ca66; border-radius: .9em; }
+.layout-blueprint .overlay-unlock { flex-direction: row-reverse; align-items: center; background: #14253166; padding: .55em .7em; margin-top: .4em; border: 0; border-left: 2px solid #80bfb1; border-radius: .45em; }
+.layout-blueprint .camo-artwork { width: 3.2em; height: 3.2em; border-radius: .55em; }
+
+/* Velvet */
+.layout-field-manual #overlay-card { --accent: #efb9ce; background: linear-gradient(135deg,#34222ecc,#19151bc7); border: 1px solid #bc829858; border-radius: .8em; }
+.layout-field-manual .overlay-heading { padding-bottom: .35em; border-bottom: 1px solid #edb1cd55; }
+.layout-field-manual .overlay-unlock { align-items: center; border: 0; }
+.layout-field-manual .camo-artwork { width: 3em; height: 3em; border-radius: 50%; box-shadow: 0 0 0 2px #d595af66; }
 .overlay-meter progress { min-width: 0; }

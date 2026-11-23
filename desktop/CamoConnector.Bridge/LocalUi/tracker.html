@@ -13,11 +13,6 @@
   <section id="overlay-settings" aria-labelledby="overlay-heading" hidden>
     <h2 id="overlay-heading">OBS overlays</h2>
     <div class="overlay-options">
-      <article>
-        <h3>Default</h3>
-        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Default overlay preview" src="/local/overlay?preview=default"></iframe>
-        <button data-overlay="default" aria-pressed="true">Use Default</button>
-      </article>
       <article class="custom-option">
         <h3>Jabber</h3>
         <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Jabber overlay preview" src="/local/overlay?preview=jabber"></iframe>
@@ -25,6 +20,11 @@
           <button data-overlay="jabber" aria-pressed="false">Use Jabber</button>
           <a class="twitch-link" href="https://www.twitch.tv/jabberonline" target="_blank" rel="noopener noreferrer">Jabber on Twitch ↗</a>
         </div>
+      </article>
+      <article>
+        <h3>Afterglow</h3>
+        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Afterglow overlay preview" src="/local/overlay?preview=afterglow"></iframe>
+        <button data-overlay="afterglow" aria-pressed="false">Use Afterglow</button>
       </article>
       <article class="custom-option">
         <h3>11annah</h3>
@@ -35,29 +35,29 @@
         </div>
       </article>
       <article>
-        <h3>Field Manual</h3>
-        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Field Manual overlay preview" src="/local/overlay?preview=field-manual"></iframe>
-        <button data-overlay="field-manual" aria-pressed="false">Use Field Manual</button>
+        <h3>Default</h3>
+        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Default overlay preview" src="/local/overlay?preview=default"></iframe>
+        <button data-overlay="default" aria-pressed="true">Use Default</button>
       </article>
       <article>
-        <h3>Afterglow</h3>
-        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Afterglow overlay preview" src="/local/overlay?preview=afterglow"></iframe>
-        <button data-overlay="afterglow" aria-pressed="false">Use Afterglow</button>
+        <h3>Eclipse</h3>
+        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Eclipse overlay preview" src="/local/overlay?preview=scoreboard"></iframe>
+        <button data-overlay="scoreboard" aria-pressed="false">Use Eclipse</button>
       </article>
       <article>
-        <h3>Scoreboard</h3>
-        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Scoreboard overlay preview" src="/local/overlay?preview=scoreboard"></iframe>
-        <button data-overlay="scoreboard" aria-pressed="false">Use Scoreboard</button>
+        <h3>Ember</h3>
+        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Ember overlay preview" src="/local/overlay?preview=filmstrip"></iframe>
+        <button data-overlay="filmstrip" aria-pressed="false">Use Ember</button>
       </article>
       <article>
-        <h3>Blueprint</h3>
-        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Blueprint overlay preview" src="/local/overlay?preview=blueprint"></iframe>
-        <button data-overlay="blueprint" aria-pressed="false">Use Blueprint</button>
+        <h3>Tide</h3>
+        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Tide overlay preview" src="/local/overlay?preview=blueprint"></iframe>
+        <button data-overlay="blueprint" aria-pressed="false">Use Tide</button>
       </article>
       <article>
-        <h3>Filmstrip</h3>
-        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Filmstrip overlay preview" src="/local/overlay?preview=filmstrip"></iframe>
-        <button data-overlay="filmstrip" aria-pressed="false">Use Filmstrip</button>
+        <h3>Velvet</h3>
+        <iframe class="layout-preview" loading="lazy" tabindex="-1" title="Velvet overlay preview" src="/local/overlay?preview=field-manual"></iframe>
+        <button data-overlay="field-manual" aria-pressed="false">Use Velvet</button>
       </article>
     </div>
     <button id="copy-overlay-url">Copy OBS overlay URL</button>
