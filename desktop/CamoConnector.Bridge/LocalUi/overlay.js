@@ -17,7 +17,6 @@ function sizeWaveFrame() {
   const left = 2, right = width - 2, top = 3, bottom = height - 3;
   const start = left + r, end = right - r;
   const leftWall = `Q ${left} ${bottom} ${left} ${bottom-r} V ${top+r} Q ${left} ${top} ${start} ${top}`;
-  byId('wave-spine').setAttribute('d', `M ${start} ${bottom} ${leftWall}`);
 
   function edge(from, to, baseline, phase) {
     const steps = 8, step = (to - from) / steps;
@@ -47,7 +46,7 @@ function sizeWaveFrame() {
   if (waveMotion.matches) return;
   const motion = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
   motion.setAttribute('attributeName', 'd');
-  motion.setAttribute('dur', '12s');
+  motion.setAttribute('dur', '6s');
   motion.setAttribute('repeatCount', 'indefinite');
   motion.setAttribute('values', Array.from({length: 13}, (_, n) => outline(n*Math.PI/6)).join(';'));
   path.append(motion);
@@ -158,7 +157,7 @@ if (layouts.includes(preview)) {
     "glow-accent": ["Glow Accent", "Cyan pulse", "Light swells and fades along the left edge.", "Cool glass", "Mint headings and progress bars sit on translucent charcoal."],
     "gradient-edge-sweep": ["Gradient Edge Sweep", "Travelling light", "A pale highlight sweeps clockwise around the rim.", "Sunset gradient", "The progress fill blends from apricot to pink."],
     "corner-accents": ["Corner Accents", "Corner loop", "The top-left and bottom-right brackets pulse in turn.", "Warm highlights", "Peach headings and progress bars echo the corners."],
-    "subtle-wave": ["Subtle Wave", "Twin waves", "Teal waves drift along the top and bottom in opposite directions.", "Seafoam trim", "A steady left edge picks up the colour of the progress bars."],
+    "subtle-wave": ["Subtle Wave", "Twin waves", "Teal waves drift along the top and bottom in opposite directions.", "Seafoam trim", "A fine teal outline echoes the colour of the progress bars."],
     "minimal-glow": ["Minimal Glow", "Breathing light", "A violet halo slowly brightens and fades around the card.", "Lavender details", "A fine border frames soft purple headings and progress bars."]
   };
   const [weapon, first, intro, second, detail] = themes[preview];
