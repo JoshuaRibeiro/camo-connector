@@ -608,6 +608,12 @@ internal sealed class HudCapture : IDisposable
         var lines = details?.Select(Compact).Where(text => text.Length > 0).ToArray() ?? [];
         var matchingObjectives = all.Where(entry => entry.Objective is { Length: > 0 } objective &&
             lines.Any(line => line.Contains(Compact(objective), StringComparison.Ordinal))).ToArray();
+        // Similar objective banners can differ by a single number. A close match to
+        // recorded artwork on the equipped weapon independently identifies its camo.
+        if (weapon != null && catalog.TryGetValue(weapon, out var equipped) &&
+            MatchBannerArtwork(all.Where(entry => entry.BannerRgb != null), 12) is { } observed &&
+            equipped.Any(entry => entry.Name == observed) && ResolveUnique(observed) is { } verified)
+            return verified;
         var candidates = matchingObjectives.Length == 0 ? all : matchingObjectives;
         if (weapon != null && catalog.TryGetValue(weapon, out var weaponEntries))
         {
