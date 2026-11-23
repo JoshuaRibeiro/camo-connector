@@ -268,7 +268,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
   content:""; position:absolute; inset:-1px -1px -1px 0; border-radius:inherit; pointer-events:none;
   padding:2px; background:repeating-conic-gradient(from var(--jabber-angle), transparent 0deg 89deg, #e7b85b66 104deg, #ffe5a6 114deg, transparent 120deg);
   mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude;
-  clip-path:inset(0 0 0 2px); animation:jabber-edge 9s linear infinite;
+  clip-path:inset(0 0 0 2px); animation:jabber-edge 18s linear infinite;
 }
 @keyframes jabber-edge { to { --jabber-angle:670deg } }
 @media(prefers-reduced-motion:reduce) { .layout-jabber #overlay-card::after { animation:none } }
