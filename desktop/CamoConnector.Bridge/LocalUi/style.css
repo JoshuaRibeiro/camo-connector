@@ -219,7 +219,11 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 }
 .tracker .controls .camo-increment:hover { background: #424d50; border-color: var(--accent); }
 .tracker .controls .camo-check {
-  width: 2.25rem; background: #257249; border-color: #49966a; color: white; font-size: 1.18rem;
+  display: inline-grid; place-items: center; padding: 0; width: 2.25rem; background: #257249; border-color: #49966a; color: white; font-size: 1.18rem;
+}
+.tracker .controls .camo-check::before {
+  content: ""; width: 1rem; height: .8rem; background: currentColor;
+  clip-path: polygon(0 52%, 13% 36%, 39% 67%, 86% 0, 100% 13%, 40% 100%);
 }
 .tracker .controls .camo-check[aria-pressed="true"] { background: #18452f; border-color: #79bc94; }
 .tracker .controls .camo-check:hover { background: #308459; }

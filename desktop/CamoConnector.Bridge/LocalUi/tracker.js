@@ -375,7 +375,7 @@ function camoRow(rule, weapon, overview) {
     });
     controls.append(input, element('span', '/ ' + rule.goal));
   }
-  const done = element('button', '\u2713', 'camo-check');
+  const done = element('button', null, 'camo-check');
   done.setAttribute('aria-label', (current.done ? 'Undo ' : 'Mark complete: ') + rule.name);
   done.title = done.getAttribute('aria-label');
   done.setAttribute('aria-pressed', String(current.done));
