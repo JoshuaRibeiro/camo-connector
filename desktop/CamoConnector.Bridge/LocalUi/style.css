@@ -355,52 +355,52 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
   border:1px solid #87939675; border-radius:.7em;
   background:linear-gradient(140deg,#141b22d9,#0b1017d4); color:#f2f2f4;
 }
-.armoury .overlay-heading { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.25em .5em; }
-.armoury #weapon { grid-column:span 2; font-size:1.25em; text-transform:uppercase; }
+.armoury .overlay-heading { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:.35em .6em; }
+.armoury #weapon { grid-column:span 2; font-size:1.2em; letter-spacing:.015em; text-transform:uppercase; }
 .armoury #jabber-class { display:block; justify-self:end; font-size:.65em; font-weight:700; text-transform:uppercase; border-radius:2em; background:#ffffff16; padding:.2em .65em; }
 .armoury #jabber-brand { display:block; font-size:.68em; font-weight:600; }
 .armoury .armoury-icons { display:flex; align-items:center; justify-content:space-evenly; gap:.25em; color:#c9cbd1; font-size:.8em; }
 .armoury-icons svg { width:1.1em; height:1.1em; fill:currentColor; }
 .armoury-gear { font-family:"Segoe UI Symbol",sans-serif; }
 .armoury #weapon-level { font-size:.72em; margin:0; border-left:1px solid #ffffff35; padding-left:.65em; }
-.armoury .overlay-unlock { border-color:#ffffff26; align-items:center; }
+.armoury .overlay-unlock { border-color:#ffffff26; align-items:center; gap:.75em; padding-top:.45em; }
+.armoury #unlock-rows { margin-top:.38em; }
 .armoury .camo-artwork { width:3.7em; height:3.7em; border-radius:.25em; }
 .armoury .overlay-unlock h2 { margin:0; font-size:.96em; }
-.armoury .overlay-unlock p { font-size:.87em; }
+.armoury .overlay-unlock p { font:400 .85em/1.24 "Segoe UI",sans-serif; color:#e3e3e7; }
 .armoury .overlay-meter { font-size:.82em; }
 .armoury progress { appearance:none; height:.42em; }
 .armoury progress::-webkit-progress-bar { background:#72738266; border-radius:1em; }
 .armoury progress::-webkit-progress-value { background:var(--bar, var(--accent)); border-radius:1em; }
 .armoury #overlay-card::before,.armoury #overlay-card::after { pointer-events:none; }
-.layout-glow-accent #overlay-card { border-left:.28em solid #20e1dc; animation:armoury-pulse 4s ease-in-out infinite; }
+.layout-glow-accent #overlay-card { border-left:.25em solid #22dfd5; box-shadow:-.16em 0 .55em #13cbb736; animation:armoury-pulse 4s ease-in-out infinite; }
 @keyframes armoury-pulse { 50% { box-shadow:-.22em 0 .85em #15d9d866; } }
 .layout-gradient-edge-sweep #overlay-card { --accent:#ff819b; --bar:linear-gradient(90deg,#ffb275,#ff66a6); }
-.layout-gradient-edge-sweep #overlay-card::before {
+.layout-gradient-edge-sweep #overlay-card::before,.layout-gradient-edge-sweep #overlay-card::after {
   content:""; position:absolute; inset:-1px; padding:2px; border-radius:inherit;
-  background:conic-gradient(from var(--jabber-angle),#ee667e,#ffcaaa,#ff557e 35%,#ffebd2 38%,#944767 44%,#ff94cb 74%,#fff0ed 78%,#ee667e);
+  background:repeating-conic-gradient(from var(--jabber-angle),#a64b66 0deg,#ff7997 58deg,#ffb092 83deg,#fff3ca 90deg,#ff808c 98deg,#95526e 140deg,#a64b66 180deg);
   mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude; animation:jabber-edge 12s linear infinite;
 }
-.layout-corner-accents #overlay-card { --accent:#ff967c; }
+.layout-gradient-edge-sweep #overlay-card::after { inset:-3px; padding:4px; opacity:.45; filter:blur(1px); }
+.layout-corner-accents #overlay-card { --accent:#ff9275; border-color:#777b8170; }
 .layout-corner-accents #overlay-card::before,.layout-corner-accents #overlay-card::after {
-  content:""; position:absolute; inset:3px; border-radius:.5em; border:3px solid var(--accent);
-  mask:linear-gradient(#000 0 0) left top / 1.15em 1.15em no-repeat,linear-gradient(#000 0 0) right bottom / 1.15em 1.15em no-repeat;
-  filter:drop-shadow(0 0 2px coral); animation:armoury-corners 6s ease-in-out infinite alternate;
+  content:""; position:absolute; box-sizing:border-box; width:1.25em; height:1.25em;
+  border:0 solid #ff9a7a; filter:drop-shadow(0 0 .15em #ff744e);
+  animation:armoury-corners 5s ease-in-out infinite;
 }
-.layout-corner-accents #overlay-card::after { transform:scaleX(-1); animation-direction:alternate-reverse; }
-@keyframes armoury-corners { 0%,20% {opacity:1} 80%,100% {opacity:0} }
-.layout-subtle-wave #overlay-card { --accent:#5ce2c7; border-left:.22em solid #4dc8b7; }
-.wave-defs { position:absolute; }
-.wave-line { display:none; }
-.layout-subtle-wave .wave-line { display:block; position:absolute; left:0; width:100%; height:8px; overflow:hidden; pointer-events:none; filter:drop-shadow(0 0 2px #56dfd2); }
-.wave-top { top:-4px; }
-.wave-bottom { bottom:-4px; }
-.wave-line rect { width:calc(100% + 200px); animation:armoury-wave 10s linear infinite; }
-.wave-bottom rect { animation-direction:reverse; }
-@keyframes armoury-wave { to {transform:translateX(-200px)} }
+.layout-corner-accents #overlay-card::before { left:3px; top:3px; border-width:3px 0 0 3px; border-top-left-radius:.47em; }
+.layout-corner-accents #overlay-card::after { right:3px; bottom:3px; border-width:0 3px 3px 0; border-bottom-right-radius:.47em; animation-delay:-2.5s; }
+@keyframes armoury-corners { 0%,100% {opacity:1} 50% {opacity:.26} }
+.wave-frame { display:none; }
+.layout-subtle-wave #overlay-card { --accent:#57deca; background:transparent; border-color:transparent; }
+.layout-subtle-wave .wave-frame { display:block; position:absolute; z-index:-1; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
+.wave-surface { fill:url(#wave-face); stroke:url(#wave-rim); stroke-width:1.2; }
+.wave-halo { fill:none; stroke:url(#wave-rim); stroke-width:3.5; filter:blur(3px); opacity:.65; }
+#wave-spine { fill:none; stroke:#49cfbd; stroke-width:3; stroke-linecap:round; }
 .layout-minimal-glow #overlay-card { --accent:#c9a1f8; border-color:#b289d7; border-left:.22em solid #c3a2dd; box-shadow:0 0 .25em #bf8dfa44; animation:armoury-breathe 7s ease-in-out infinite; }
 @keyframes armoury-breathe { 50% {box-shadow:0 0 .85em #bb8bf999,inset 0 0 .3em #bb8bf92a} }
 .armoury.preview { padding:8px; }
 @media(prefers-reduced-motion:reduce) {
-  .wave-line rect,.armoury #overlay-card,.armoury #overlay-card::before,.armoury #overlay-card::after {animation:none}
-  .layout-corner-accents #overlay-card::after {opacity:0}
+  .armoury #overlay-card,.armoury #overlay-card::before,.armoury #overlay-card::after {animation:none}
+  .layout-corner-accents #overlay-card::after {opacity:.8}
 }

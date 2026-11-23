@@ -8,6 +8,54 @@ const armouryLayouts = ['glow-accent', 'gradient-edge-sweep', 'corner-accents', 
 const layouts = [...armouryLayouts, 'default', 'jabber', '11annah', 'field-manual', 'afterglow', 'scoreboard', 'blueprint', 'filmstrip'];
 let previous;
 
+// Each pose shares its side walls and rounded corners. Only the two long edges flex.
+function sizeWaveFrame() {
+  const frame = document.querySelector('.wave-frame');
+  const { width, height } = frame.getBoundingClientRect();
+  if (width < 24 || height < 24) return;
+  const r = Math.min(14, height * .085);
+  const left = 2, right = width - 2, top = 3, bottom = height - 3;
+  const start = left + r, end = right - r;
+  const leftWall = `Q ${left} ${bottom} ${left} ${bottom-r} V ${top+r} Q ${left} ${top} ${start} ${top}`;
+  byId('wave-spine').setAttribute('d', `M ${start} ${bottom} ${leftWall}`);
+
+  function edge(from, to, baseline, phase) {
+    const steps = 8, step = (to - from) / steps;
+    const heights = Array.from({length: steps + 1}, (_, n) => {
+      const t = n / steps;
+      return baseline + 2.65 * Math.sin(Math.PI * t) ** 2 * Math.sin(3 * Math.PI * t + phase);
+    });
+    function tangent(n) {
+      return n === 0 || n === steps ? 0 : (heights[n + 1] - heights[n - 1]) / 2;
+    }
+    let path = '';
+    for (let n = 1; n <= steps; n++) {
+      const x = from + n * step;
+      path += ` C ${x - 2 * step / 3} ${heights[n - 1] + tangent(n - 1) / 3}`
+        + ` ${x - step / 3} ${heights[n] - tangent(n) / 3} ${x} ${heights[n]}`;
+    }
+    return path;
+  }
+  function outline(phase) {
+    return `M ${start} ${top}` + edge(start, end, top, phase)
+      + ` Q ${right} ${top} ${right} ${top+r} V ${bottom-r} Q ${right} ${bottom} ${end} ${bottom}`
+      + edge(end, start, bottom, phase + 1) + ' ' + leftWall + ' Z';
+  }
+  const path = byId('wave-outline');
+  path.setAttribute('d', outline(0));
+  path.replaceChildren();
+  if (waveMotion.matches) return;
+  const motion = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+  motion.setAttribute('attributeName', 'd');
+  motion.setAttribute('dur', '12s');
+  motion.setAttribute('repeatCount', 'indefinite');
+  motion.setAttribute('values', Array.from({length: 13}, (_, n) => outline(n*Math.PI/6)).join(';'));
+  path.append(motion);
+}
+const waveMotion = matchMedia('(prefers-reduced-motion: reduce)');
+waveMotion.addEventListener('change', sizeWaveFrame);
+new ResizeObserver(sizeWaveFrame).observe(document.querySelector('.wave-frame'));
+
 function render(data) {
   const layout = data.overlayLayout ?? legacyLayout;
   for (const id of layouts) document.body.classList.toggle('layout-' + id, layout === id);
@@ -109,7 +157,7 @@ if (layouts.includes(preview)) {
     "field-manual": ["Velvet", "Smoked plum", "Rose headings sit against a soft plum gradient.", "Rose rings", "Fine rings frame the circular tiles beneath a slim divider."],
     "glow-accent": ["Glow Accent", "Cyan pulse", "Light swells and fades along the left edge.", "Cool glass", "Mint headings and progress bars sit on translucent charcoal."],
     "gradient-edge-sweep": ["Gradient Edge Sweep", "Travelling light", "A pale highlight sweeps clockwise around the rim.", "Sunset gradient", "The progress fill blends from apricot to pink."],
-    "corner-accents": ["Corner Accents", "Corner loop", "Opposite pairs of coral brackets take turns lighting up.", "Warm highlights", "Peach headings and progress bars echo the corners."],
+    "corner-accents": ["Corner Accents", "Corner loop", "The top-left and bottom-right brackets pulse in turn.", "Warm highlights", "Peach headings and progress bars echo the corners."],
     "subtle-wave": ["Subtle Wave", "Twin waves", "Teal waves drift along the top and bottom in opposite directions.", "Seafoam trim", "A steady left edge picks up the colour of the progress bars."],
     "minimal-glow": ["Minimal Glow", "Breathing light", "A violet halo slowly brightens and fades around the card.", "Lavender details", "A fine border frames soft purple headings and progress bars."]
   };
