@@ -4,15 +4,6 @@ const key = location.hash.slice(1);
 const byId = id => document.getElementById(id);
 const legacyLayout = new URLSearchParams(location.search).get('layout');
 
-const edge = document.querySelector('.jabber-edge');
-new ResizeObserver(([entry]) => {
-  const { width, height } = entry.contentRect;
-  if (!width || !height) return;
-  const radius = Math.min(8, width / 2, height / 2);
-  byId('jabber-route').setAttribute('d',
-    `M0 0 H${width - radius} Q${width} 0 ${width} ${radius} V${height - radius} Q${width} ${height} ${width - radius} ${height} H0`);
-}).observe(edge);
-
 let previous;
 
 function render(data) {

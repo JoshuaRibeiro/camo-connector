@@ -263,14 +263,14 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .layout-jabber .overlay-unlock h2 { color:var(--accent) }
 .layout-jabber .overlay-unlock:first-child { border-top:0 }
 .layout-jabber progress { accent-color:var(--accent) }
-.jabber-edge { display:none }
-.layout-jabber .jabber-edge {
-  display:block; position:absolute; inset:0; width:100%; height:100%; overflow:visible;
-  pointer-events:none; filter:drop-shadow(0 0 2px #ffc45c) drop-shadow(0 0 5px #ef982daa);
+@property --jabber-angle{ syntax:"<angle>"; inherits:false; initial-value:310deg }
+.layout-jabber #overlay-card::after {
+  content:""; position:absolute; inset:-1px -1px -1px 0; border-radius:inherit; pointer-events:none;
+  padding:2px; background:repeating-conic-gradient(from var(--jabber-angle), transparent 0deg 89deg, #e7b85b66 104deg, #ffe5a6 114deg, transparent 120deg);
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude;
+  clip-path:inset(0 0 0 2px); animation:jabber-edge 9s linear infinite;
 }
-.jabber-edge circle { fill: #fff2bf; stroke: #ffbe53; stroke-width: 1px; }
-@media (prefers-reduced-motion: reduce) {
-  .layout-jabber .jabber-edge { display: none; }
-}
+@keyframes jabber-edge { to { --jabber-angle:670deg } }
+@media(prefers-reduced-motion:reduce) { .layout-jabber #overlay-card::after { animation:none } }
 
 .layout-preview { display: block; width: 100%; border: 0; margin: .45rem 0 .7rem; background: linear-gradient(120deg, #344147, #192226); border-radius: .4rem; pointer-events: none; }
