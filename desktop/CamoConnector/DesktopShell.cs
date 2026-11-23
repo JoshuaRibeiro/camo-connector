@@ -96,12 +96,23 @@ internal sealed partial class ConnectorWindow
         using var navigationIcon = new Icon(Icon!, iconSize, iconSize);
         using var appBitmap = navigationIcon.ToBitmap();
         var trackerIcon = new Bitmap(appBitmap, iconSize, iconSize);
+        for (var y = 0; y < trackerIcon.Height; y++)
+        for (var x = 0; x < trackerIcon.Width; x++)
+        {
+            var alpha = trackerIcon.GetPixel(x, y).A;
+            trackerIcon.SetPixel(x, y, Color.FromArgb(alpha, 245, 101, 104));
+        }
         Disposed += (_, _) => trackerIcon.Dispose();
         foreach (var (page, glyph) in entries)
         {
             var button = new Button { Height = 40, Margin = new Padding(0, 0, 0, 4), AccessibleName = page.Text };
             button.Paint += (_, args) =>
             {
+                var iconColor = page == trophyPage ? Color.Gold :
+                    page == helpPage ? Color.DeepSkyBlue :
+                    page == overlayPage ? Color.MediumTurquoise :
+                    page == capturePage ? Color.Plum :
+                    page == logsPage ? Color.SandyBrown : button.ForeColor;
                 var iconArea = new Rectangle(0, 0, railExpanded ? LogicalToDeviceUnits(42) : button.Width, button.Height);
                 if (page == localTrackerPage)
                     args.Graphics.DrawImageUnscaled(trackerIcon,
@@ -113,7 +124,7 @@ internal sealed partial class ConnectorWindow
                     args.Graphics.TranslateTransform((iconArea.Width - cupSize) / 2f, (iconArea.Height - cupSize) / 2f);
                     args.Graphics.ScaleTransform(cupSize / 20f, cupSize / 20f);
                     args.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-                    using var pen = new Pen(button.ForeColor, 1.35f) { LineJoin = LineJoin.Round };
+                    using var pen = new Pen(iconColor, 1.35f) { LineJoin = LineJoin.Round };
                     args.Graphics.DrawLines(pen, [new Point(5, 3), new(15, 3), new(15, 9), new(12, 12), new(8, 12), new(5, 9), new(5, 3)]);
                     args.Graphics.DrawLines(pen, [new Point(5, 5), new(2, 5), new(2, 8), new(5, 10)]);
                     args.Graphics.DrawLines(pen, [new Point(15, 5), new(18, 5), new(18, 8), new(15, 10)]);
@@ -126,7 +137,7 @@ internal sealed partial class ConnectorWindow
                     var unit = LogicalToDeviceUnits(1);
                     var x = (iconArea.Width - 19 * unit) / 2;
                     var y = (iconArea.Height - 16 * unit) / 2;
-                    using var pen = new Pen(button.ForeColor, unit);
+                    using var pen = new Pen(iconColor, unit);
                     args.Graphics.DrawRectangle(pen, x, y, 15 * unit, 11 * unit);
                     args.Graphics.DrawLines(pen, [
                         new Point(x + 18 * unit, y + 4 * unit),
@@ -135,7 +146,7 @@ internal sealed partial class ConnectorWindow
                     ]);
                 }
                 else
-                    TextRenderer.DrawText(args.Graphics, glyph, icons, iconArea, button.ForeColor,
+                    TextRenderer.DrawText(args.Graphics, glyph, icons, iconArea, iconColor,
                         TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPadding);
             };
             button.Click += (_, _) => pages.SelectedTab = page;
