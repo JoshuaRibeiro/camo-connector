@@ -292,3 +292,37 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .layout-preview { display: block; width: 100%; border: 0; margin: .45rem 0 .7rem; pointer-events: none; }
 .overlay.preview { padding: 0; overflow: hidden; }
 .overlay.preview #overlay-card { max-width: none; }
+
+/* Field Manual: warm paper, ink rules and square specimen swatches. */
+.layout-field-manual #overlay-card { --accent: #79401f; color: #28261e; background: #ece4d1; border: 1px solid #746c58; border-radius: 3px; }
+.layout-field-manual .overlay-heading { border-bottom: 3px double #746c58; }
+.layout-field-manual h1, .layout-field-manual h2 { font-family: Georgia, serif; }
+.layout-field-manual p { color: #403d32; }
+.layout-field-manual .overlay-unlock { border: 0; }
+.layout-field-manual .camo-artwork { border: 2px solid #fff9ea; border-radius: 0; box-shadow: 0 1px 3px #34261255; }
+
+/* Afterglow: inset challenge panels with the artwork on the trailing edge. */
+.layout-afterglow #overlay-card { --accent: #ffc0df; background: linear-gradient(125deg,#382449f5,#1b1529f5); border: 1px solid #936788; border-radius: 1em; }
+.layout-afterglow .overlay-unlock { flex-direction: row-reverse; padding: .6em; margin-top: .35em; background: #160f22b8; border: 0; border-radius: .65em; }
+.layout-afterglow .camo-artwork { border-radius: 50%; }
+
+/* Scoreboard: broadcast header with a separate level plate. */
+.layout-scoreboard #overlay-card { --accent: #ffd749; background: #15171bf5; border: 0; border-radius: .2em; padding: 0; overflow: hidden; }
+.layout-scoreboard .overlay-heading { background: #ffda4c; color: #15171b; padding: .28em .65em; align-items: center; }
+.layout-scoreboard #weapon { text-transform: uppercase; font-style: italic; }
+.layout-scoreboard #weapon-level { background: #15171b; color: #fff; padding: .15em .55em; white-space: nowrap; }
+.layout-scoreboard #unlock-rows { margin: 0; padding: 0 .75em .55em; }
+.layout-scoreboard .overlay-meter span { font-weight: 800; color: var(--accent); }
+
+/* Blueprint: ruled drafting grid and outlined square samples. */
+.layout-blueprint #overlay-card { --accent: #a4eaff; border: 1px solid #77b5d2; border-radius: 0; background-color: #11344cf5; background-image: linear-gradient(#a4eaff0d 1px, transparent 1px), linear-gradient(90deg,#a4eaff0d 1px, transparent 1px); background-size: 1em 1em; }
+.layout-blueprint .overlay-heading, .layout-blueprint .overlay-meter span { font-family: Consolas, monospace; }
+.layout-blueprint .overlay-unlock { border-top: 1px dashed #89bed3; }
+.layout-blueprint .camo-artwork { border-radius: 0; outline: 1px solid #a4eaff; outline-offset: 2px; margin: 3px; }
+
+/* Filmstrip: side-by-side objective frames that wrap on narrow sources. */
+.layout-filmstrip #overlay-card { --accent: #ffc58e; background: #211c19f5; border: 0; border-block: .25em dotted #b7a899; border-radius: .2em; }
+.layout-filmstrip #unlock-rows { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,12em),1fr)); gap: .6em; }
+.layout-filmstrip .overlay-unlock { display: block; padding: .5em; background: #100e0e; border: 1px solid #54483e; }
+.layout-filmstrip .camo-artwork { width: 100%; height: 2.8em; border-radius: 0; }
+.overlay-meter progress { min-width: 0; }

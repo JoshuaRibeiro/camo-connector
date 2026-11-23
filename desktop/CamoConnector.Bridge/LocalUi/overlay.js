@@ -4,14 +4,15 @@ const key = location.hash.slice(1);
 const byId = id => document.getElementById(id);
 const legacyLayout = new URLSearchParams(location.search).get('layout');
 
+const layouts = ['default', 'jabber', '11annah', 'field-manual', 'afterglow', 'scoreboard', 'blueprint', 'filmstrip'];
 let previous;
 
 function render(data) {
-  document.body.classList.toggle('layout-11annah', (data.overlayLayout ?? legacyLayout) === '11annah');
+  const layout = data.overlayLayout ?? legacyLayout;
+  for (const id of layouts) document.body.classList.toggle('layout-' + id, layout === id);
   byId('overlay-card').hidden = !data.weapon;
   byId('weapon').textContent = data.weapon ?? '';
-  const jabber = (data.overlayLayout ?? legacyLayout) === 'jabber';
-  document.body.classList.toggle('layout-jabber', jabber);
+  const jabber = layout === 'jabber';
   byId('jabber-class').textContent = data.category ?? '';
   const level = byId('weapon-level');
   level.hidden = !data.weapon;
@@ -87,7 +88,7 @@ async function refresh() {
   }
 }
 const preview = new URLSearchParams(location.search).get('preview');
-if (['default', 'jabber', '11annah'].includes(preview)) {
+if (layouts.includes(preview)) {
   document.body.classList.add('preview');
   render({
     overlayLayout: preview, weapon: 'JOKR', category: 'Launcher', level: 34,

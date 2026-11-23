@@ -76,7 +76,7 @@ internal sealed class LocalTracker
 
     public bool SetOverlayLayout(string? layout)
     {
-        if (layout is not ("default" or "11annah" or "jabber")) return false;
+        if (layout is not ("default" or "11annah" or "jabber" or "field-manual" or "afterglow" or "scoreboard" or "blueprint" or "filmstrip")) return false;
         lock (gate)
         {
             if (state.OverlayLayout != layout) SaveState(state with { OverlayLayout = layout });
