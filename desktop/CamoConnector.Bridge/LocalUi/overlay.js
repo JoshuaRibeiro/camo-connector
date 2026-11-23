@@ -19,7 +19,7 @@ function sizeWaveFrame() {
   if (lastWaveSize?.width === width && lastWaveSize.height === height && lastWaveSize.reducedMotion === reducedMotion) return;
   lastWaveSize = {width, height, reducedMotion};
   const r = Math.min(14, height * .085);
-  const depth = Math.min(7, width * .011, height * .04);
+  const depth = .8 * Math.min(7, width * .011, height * .04);
   const left = 2, right = width - 2, top = 3, bottom = height - 3;
   const start = left + r, end = right - r;
   const wall = 1.6;
@@ -53,7 +53,8 @@ function sizeWaveFrame() {
     const x1 = left + inset, x2 = right - inset, y1 = top + inset, y2 = bottom - inset;
     return `M ${start} ${y1}` + edge(start, end, top, phase - 1.15, inner ? 1 : 0)
       + ` Q ${x2} ${y1} ${x2} ${top+r} V ${bottom-r} Q ${x2} ${y2} ${end} ${y2}`
-      + edge(end, start, bottom, phase + 2.2, inner ? -1 : 0)
+      // The bottom path runs right to left, so reverse its phase to match the top's motion.
+      + edge(end, start, bottom, 2.2 - phase, inner ? -1 : 0)
       + ` Q ${x1} ${y2} ${x1} ${bottom-r} V ${top+r} Q ${x1} ${y1} ${start} ${y1} Z`;
   }
   for (const id of ['wave-outline', 'wave-inner']) {
@@ -177,7 +178,7 @@ if (layouts.includes(preview)) {
     "glow-accent": ["Glow Accent", "Cyan pulse", "Light swells and fades along the left edge.", "Cool glass", "Mint headings and progress bars sit on translucent charcoal."],
     "gradient-edge-sweep": ["Gradient Edge Sweep", "Travelling light", "Peach and pink flares sweep clockwise along a fine rose rim.", "Sunset gradient", "The progress fill blends from apricot to pink."],
     "corner-accents": ["Corner Accents", "Corner loop", "The top-left and bottom-right brackets pulse in turn.", "Warm highlights", "Peach headings and progress bars echo the corners."],
-    "subtle-wave": ["Subtle Wave", "Twin waves", "Teal waves drift along the top and bottom in opposite directions.", "Seafoam glow", "Bright crests taper to a fine line around the dark glass."],
+    "subtle-wave": ["Subtle Wave", "Twin waves", "Teal waves drift left along the top and bottom edges.", "Seafoam glow", "Bright crests taper to a fine line around the dark glass."],
     "minimal-glow": ["Minimal Glow", "Breathing light", "A violet halo slowly brightens and fades around the card.", "Lavender details", "A fine border frames soft purple headings and progress bars."]
   };
   const [weapon, first, intro, second, detail] = themes[preview];
