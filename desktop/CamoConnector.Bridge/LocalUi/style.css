@@ -275,3 +275,5 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 }
 @keyframes jabber-edge-travel { to { stroke-dashoffset:-100 } }
 @media(prefers-reduced-motion:reduce) { .jabber-edge path { animation:none } }
+
+.layout-preview { display: block; width: 100%; border: 0; margin: .45rem 0 .7rem; background: linear-gradient(120deg, #344147, #192226); border-radius: .4rem; pointer-events: none; }

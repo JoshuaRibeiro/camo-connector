@@ -82,4 +82,22 @@ async function refresh() {
     setTimeout(refresh, 300);
   }
 }
-void refresh();
+const preview = new URLSearchParams(location.search).get('preview');
+if (['default', 'jabber', '11annah'].includes(preview)) {
+  render({
+    overlayLayout: preview, weapon: 'JOKR', category: 'Launcher', level: 34,
+    rows: [
+      { name: 'Military Camo 7', objective: 'Reach Weapon Level 36', artwork: '/local/artwork/military-camo-7.png', count: 34, goal: 36 },
+      { name: 'Tectonic', objective: 'Get 10 Longshot Kills against Players', artwork: '/local/artwork/tectonic.png', count: 0, goal: 10 }
+    ]
+  });
+  const frame = window.frameElement;
+  if (frame) {
+    const card = byId('overlay-card');
+    new ResizeObserver(() => {
+      if (card.offsetHeight) frame.height = Math.ceil(card.getBoundingClientRect().height + 24);
+    }).observe(card);
+  }
+} else {
+  void refresh();
+}
