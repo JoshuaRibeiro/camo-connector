@@ -306,8 +306,8 @@ try {
         Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body ($edit | ConvertTo-Json) | Out-Null
     }
     $overlay = Check-Events 200 $overlayHeaders 'local/overlay-state'
-    if ($overlay.minimumLevel -ne 46 -or $null -ne $overlay.level) {
-        throw 'A completed level-gated Special camo must establish a minimum above an older exact level.'
+    if ($overlay.minimumLevel -ne 30 -or $overlay.level -ne 30) {
+        throw 'A saved camo must not replace the measured launcher level with its unlock threshold.'
     }
     [IO.File]::AppendAllLines($eventLog, [string[]]@(
         '{"kind":"weapon-level-max","source":"live","mode":"mp","weapon":"Pila"}'

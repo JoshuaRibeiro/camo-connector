@@ -98,7 +98,7 @@ internal sealed class LocalTracker
 
             var level = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-level")?.Count;
             var maxLevel = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-level")?.Done == true;
-            var knownLevel = Math.Max(level ?? 0, ConfirmedRequirement(IsLevelRule));
+            var knownLevel = level ?? ConfirmedRequirement(IsLevelRule);
             var observedUnlocks = state.Progress.GetValueOrDefault(weapon.Id + ":weapon-unlocks")?.Count;
             var minimumUnlocks = Math.Max(observedUnlocks ?? 0, ConfirmedRequirement(IsWeaponUnlockRule));
             var weaponUnlocks = minimumUnlocks == observedUnlocks ? observedUnlocks : null;
@@ -165,7 +165,7 @@ internal sealed class LocalTracker
                 }).ToArray();
             var next = rows.Length == 0 ? remaining.FirstOrDefault() : null;
             var prerequisite = next == null ? null : CompletionGate(next);
-            return new { weapon = weapon.Name, level = knownLevel == level ? level : null,
+            return new { weapon = weapon.Name, level,
                 maxLevel, minimumLevel = knownLevel, weaponUnlocks, minimumUnlocks, maximumCamoLevel, maximumCamoUnlocks, rows, state.OverlayLayout,
                 waiting = next == null ? null : new { next.Id, next.Name, next.Artwork, next.Unlock, count = prerequisite?.Count, goal = prerequisite?.Goal },
                 complete = remaining.Length == 0 };
