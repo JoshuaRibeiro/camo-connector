@@ -202,7 +202,7 @@ if (layouts.includes(preview)) {
     "gradient-edge-sweep": ["Gradient Edge Sweep", "Travelling light", "Peach and pink flares sweep clockwise along a fine rose rim.", "Sunset gradient", "The progress fill blends from apricot to pink."],
     "corner-accents": ["Corner Accents", "Corner loop", "The top-left and bottom-right brackets pulse in turn.", "Warm highlights", "Peach headings and progress bars echo the corners."],
     "subtle-wave": ["Subtle Wave", "Twin waves", "Two shallow teal waves drift left with different crest spacing.", "Seafoam glow", "Bright crests taper to a fine line around the dark glass."],
-    "minimal-glow": ["Minimal Glow", "Breathing light", "A violet halo slowly brightens and fades around the card.", "Lavender details", "A fine border frames soft purple headings and progress bars."]
+    "minimal-glow": ["Minimal Glow", "Breathing light", "A violet halo swells and fades along the lavender rim.", "Smoked glass", "Soft purple headings and bars sit on a dark glass panel."]
   };
   const [weapon, first, intro, second, detail] = themes[preview];
   render({
@@ -214,10 +214,10 @@ if (layouts.includes(preview)) {
   });
   const frame = window.frameElement;
   if (frame) {
-    const card = byId('overlay-card');
     new ResizeObserver(() => {
-      if (card.offsetHeight) frame.height = Math.ceil(card.getBoundingClientRect().height + (armouryLayouts.includes(preview) ? 16 : 0));
-    }).observe(card);
+      const height = Math.ceil(document.body.getBoundingClientRect().height);
+      if (height && frame.height !== String(height)) frame.height = height;
+    }).observe(document.body, {box:'border-box'});
   }
 } else {
   void refresh();
