@@ -263,12 +263,15 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .layout-jabber .overlay-unlock h2 { color:var(--accent) }
 .layout-jabber .overlay-unlock:first-child { border-top:0 }
 .layout-jabber progress { accent-color:var(--accent) }
-@property --jabber-angle { syntax:"<angle>"; inherits:false; initial-value:310deg }
-.layout-jabber #overlay-card::after {
-  content:""; position:absolute; inset:-1px -1px -1px 0; border-radius:inherit; pointer-events:none;
-  padding:2px; background:conic-gradient(from var(--jabber-angle),transparent 0deg 329deg,#e7b85b66 344deg,#ffe5a6 354deg,transparent);
-  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude;
-  clip-path:inset(0 0 0 2px); animation:jabber-edge 9s linear infinite;
+.jabber-edge { display:none }
+.layout-jabber .jabber-edge {
+  display:block; position:absolute; inset:0; width:100%; height:100%; overflow:visible;
+  pointer-events:none; filter:drop-shadow(0 0 2px #ffc45c) drop-shadow(0 0 5px #ef982daa);
 }
-@keyframes jabber-edge { to { --jabber-angle:670deg } }
-@media(prefers-reduced-motion:reduce) { .layout-jabber #overlay-card::after { animation:none } }
+.jabber-edge path {
+  fill:none; stroke:#ffebac; stroke-width:2px; vector-effect:non-scaling-stroke;
+  stroke-linecap:round; stroke-dasharray:10 90;
+  animation:jabber-edge-travel 4s linear infinite;
+}
+@keyframes jabber-edge-travel { to { stroke-dashoffset:-100 } }
+@media(prefers-reduced-motion:reduce) { .jabber-edge path { animation:none } }
