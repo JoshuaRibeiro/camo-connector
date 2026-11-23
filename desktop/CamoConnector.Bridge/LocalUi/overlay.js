@@ -88,6 +88,7 @@ async function refresh() {
 }
 const preview = new URLSearchParams(location.search).get('preview');
 if (['default', 'jabber', '11annah'].includes(preview)) {
+  document.body.classList.add('preview');
   render({
     overlayLayout: preview, weapon: 'JOKR', category: 'Launcher', level: 34,
     rows: [
@@ -99,7 +100,7 @@ if (['default', 'jabber', '11annah'].includes(preview)) {
   if (frame) {
     const card = byId('overlay-card');
     new ResizeObserver(() => {
-      if (card.offsetHeight) frame.height = Math.ceil(card.getBoundingClientRect().height + 24);
+      if (card.offsetHeight) frame.height = Math.ceil(card.getBoundingClientRect().height);
     }).observe(card);
   }
 } else {

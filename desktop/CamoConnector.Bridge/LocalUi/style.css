@@ -93,7 +93,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
   .camo-row { align-items: start; flex-direction: column; }
 }
 
-.collection, #overlay-settings {
+.collection {
   margin: 1rem clamp(.85rem, 3vw, 2rem); padding: 1rem;
   border: 1px solid #31434c; border-radius: .9rem;
   background: linear-gradient(120deg, #1c3032, #17212a 65%);
@@ -105,7 +105,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .collection h2, #overlay-settings h2 { font-size: 1.15rem; }
 #overall-count, .weapon-count { font-variant-numeric: tabular-nums; }
 #overall-meter { display: block; width: 100%; margin: .55rem 0 .85rem; height: .48rem; }
-.mastery-tiles, .overlay-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
+.mastery-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .55rem; }
 .mastery-tile {
   position: relative; isolation: isolate; overflow: hidden; display: flex; align-items: end; min-height: 5.6rem;
   border: 1px solid #526163; border-radius: .55rem; background: #243237;
@@ -118,10 +118,17 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .tile-caption h3 { font-size: inherit; }
 .tile-caption span { font-variant-numeric: tabular-nums; }
 .tile-copy progress { display: block; width: 100%; height: .4rem; margin-top: .25rem; }
-.overlay-options { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: .65rem; }
-.overlay-options article { padding: .8rem; border: 1px solid #405156; border-radius: .65rem; background: #172126; }
-.overlay-options .custom-option { border-top-color: #62bca4; }
-.overlay-options p { margin: .3rem 0 .65rem; color: #9eb3c1; font-size: .86rem; }
+#overlay-settings { margin: 1rem; }
+.overlay-options {
+  --preview-min: 320px;
+  --preview-max: 640px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--preview-min)), 1fr));
+  align-items: start;
+  gap: 1.5rem 1rem;
+  margin: .75rem 0 1rem;
+}
+.overlay-options article { width: 100%; max-width: var(--preview-max); min-width: 0; }
 .overlay-options .actions { justify-content: start; }
 #copy-overlay-url { margin-top: .75rem; }
 .overlay-options button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
@@ -142,11 +149,10 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .weapon-level-editor input { width: 4.4rem; padding: .18rem .3rem; }
 .tracker .controls button { padding: .3rem .48rem; }
 @media (max-width: 640px) {
-  .mastery-tiles, .overlay-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mastery-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tracker .camo-row { gap: .35rem; }
 }
 @media (max-width: 400px) {
-  .overlay-options { grid-template-columns: 1fr; }
 }
 
 #roster .weapon-card { display: grid; gap: .42rem; width: 100%; padding: .65rem; text-align: left; }
@@ -205,7 +211,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .tracker .roster-group[data-type="Military"] .strip-tile { flex: 0 0 1.65rem; width: 1.65rem; }
 .tracker .roster-group[data-type="Military"] .strip-tile + .strip-tile { margin-left: -.72rem; }
 .tracker .next-label { font-size: .66rem; }
-.tracker .camo-row, .tracker .overlay-options article { background: #202325; border-color: #404442; border-radius: .35rem; }
+.tracker .camo-row { background: #202325; border-color: #404442; border-radius: .35rem; }
 .tracker .camo-complete { border-left: 3px solid #89d9b1; }
 
 .tracker .camo-row { flex-wrap: wrap; }
@@ -273,4 +279,6 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 @keyframes jabber-edge { to { --jabber-angle:670deg } }
 @media(prefers-reduced-motion:reduce) { .layout-jabber #overlay-card::after { animation:none } }
 
-.layout-preview { display: block; width: 100%; border: 0; margin: .45rem 0 .7rem; background: linear-gradient(120deg, #344147, #192226); border-radius: .4rem; pointer-events: none; }
+.layout-preview { display: block; width: 100%; border: 0; margin: .45rem 0 .7rem; pointer-events: none; }
+.overlay.preview { padding: 0; overflow: hidden; }
+.overlay.preview #overlay-card { max-width: none; }
