@@ -20,6 +20,18 @@ public static class SpecialUnlocks
         if (text.Contains("50PLAYERKILLSWHILEUSINGAKIMBO", StringComparison.Ordinal)) return "menu-space-time";
         return null;
     }
+    public static bool SupportsArtworkObjective(string? text, string objective)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return false;
+        var words = Regex.Matches(objective.ToUpperInvariant(), "[A-Z]{4,}")
+            .Select(match => match.Value).Distinct().ToArray();
+        var read = Regex.Replace(text.ToUpperInvariant(), "[^A-Z0-9]", "");
+        var numbers = Regex.Matches(text, @"\b\d+\b").Select(match => match.Value);
+        var expected = Regex.Matches(objective, @"\b\d+\b").Select(match => match.Value).ToArray();
+        if (numbers.Except(expected).Any()) return false;
+        return words.Length >= 3 && words.Count(word => read.Contains(word, StringComparison.Ordinal))
+            >= Math.Max(3, words.Length - 1);
+    }
     public static string? ReadNamedBanner(string[]? lines, IEnumerable<CamoReference> catalog)
     {
         if (lines == null) return null;

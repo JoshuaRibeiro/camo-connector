@@ -495,3 +495,7 @@ $brushstrokeWide = $menuReader::CheckObjectiveGoal($brushstrokeWide, 10, $brushs
 if ($menuReader::ConfirmCounter($brushstrokeWide, $brushstrokeTight, $null).Count -ne 1) {
     throw 'Brushstroke OCR reads must agree after goal correction.'
 }
+if (![CamoConnector.Detector.SpecialUnlocks]::SupportsArtworkObjective('GET 40 PLAYER KILLS WHILE MOMING', 'Get 40 Player Kills while moving') -or
+    [CamoConnector.Detector.SpecialUnlocks]::SupportsArtworkObjective('GET 50 PLAYER KILLS WHILE MOVING', 'Get 40 Player Kills while moving')) {
+    throw 'Banner artwork corroboration must tolerate damaged words and reject conflicting counts.'
+}

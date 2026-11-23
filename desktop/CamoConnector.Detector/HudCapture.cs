@@ -24,6 +24,7 @@ internal sealed class HudCapture : IDisposable
     private readonly Dictionary<string, Dictionary<string, int>> unlockRequirements = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> pointBlankWeapons = new(StringComparer.OrdinalIgnoreCase);
 
+    private readonly (string Name, double[]? Palette)[] generatedBannerArt;
     public HudCapture(string runtime)
     {
         ocr = Path.Combine(runtime, "tesseract.exe");
@@ -44,6 +45,15 @@ internal sealed class HudCapture : IDisposable
                     camo.TryGetProperty("goal", out var goal) && goal.ValueKind == JsonValueKind.Number && goal.TryGetInt32(out var goalNumber) ? goalNumber : null,
                     camo.TryGetProperty("bannerArtworkRGB12", out var banner) && banner.ValueKind == JsonValueKind.String
                     ? Convert.FromBase64String(banner.GetString()!) : null)).ToArray());
+        generatedBannerArt = catalog.Values.SelectMany(entries => entries).DistinctBy(entry => entry.Name)
+            .Select(entry =>
+            {
+                var slug = System.Text.RegularExpressions.Regex.Replace(entry.Name.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+                using var source = typeof(HudCapture).Assembly.GetManifestResourceStream($"BannerArt/{slug}.png");
+                if (source == null) return (entry.Name, (double[]?)null);
+                using var artwork = new Bitmap(source);
+                return (entry.Name, BannerPalette(artwork, 0, 0, 1, 1));
+            }).ToArray();
         using var objectivesStream = typeof(HudCapture).Assembly.GetManifestResourceStream("CamoConnector.MultiplayerCatalog")
             ?? throw new InvalidDataException("The multiplayer objective catalogue is missing.");
         using var objectives = JsonDocument.Parse(objectivesStream);
@@ -504,7 +514,10 @@ internal sealed class HudCapture : IDisposable
                 .Select(entry => (entry.Key, Score: StrokeScore(frame, entry.Value)))
                 .OrderByDescending(entry => entry.Score).Take(2).ToArray();
             if (scores[0].Score >= .77 && scores[0].Score - scores[1].Score >= .045)
-                return (null, true, [scores[0].Key], null);
+            {
+                var printed = await ReadBannerText((.33, .299, .34, .024), "printedCompletionObjective");
+                return (null, true, [printed, scores[0].Key], null);
+            }
         }
         var warmPixels = 0;
         for (var y = 0; y < 5; y++)
@@ -606,6 +619,20 @@ internal sealed class HudCapture : IDisposable
         static string Compact(string value) =>
             System.Text.RegularExpressions.Regex.Replace(value.ToUpperInvariant(), "[^A-Z0-9]", "");
         var lines = details?.Select(Compact).Where(text => text.Length > 0).ToArray() ?? [];
+        if (!bannerArtworkOnly)
+        {
+            var palette = BannerPalette(frame, .471, .148, .058, .102);
+            var closest = generatedBannerArt.Where(entry => entry.Palette != null)
+                .Select(entry => (entry.Name, Error: palette.Zip(entry.Palette!, (a, b) => Math.Abs(a - b)).Sum()))
+                .OrderBy(entry => entry.Error).Take(2).ToArray();
+            if (closest.Length == 2 && closest[0].Error < .85 && closest[1].Error - closest[0].Error > .08 &&
+                ResolveUnique(closest[0].Name) is { } artworkUnlock &&
+                (weapon == null || weapon == artworkUnlock.Weapon) &&
+                (all.Any(entry => entry.Name == artworkUnlock.Challenge && entry.Objective is { } objective &&
+                    SpecialUnlocks.SupportsArtworkObjective(details?.FirstOrDefault(), objective)) ||
+                 weapon == artworkUnlock.Weapon && closest[0].Error < .48 && closest[1].Error - closest[0].Error > .16))
+                return artworkUnlock;
+        }
         var matchingObjectives = all.Where(entry => entry.Objective is { Length: > 0 } objective &&
             lines.Any(line => line.Contains(Compact(objective), StringComparison.Ordinal))).ToArray();
         // Similar objective banners can differ by a single number. A close match to
@@ -1036,6 +1063,20 @@ internal sealed class HudCapture : IDisposable
         return false;
     }
 
+    // Compare colour proportions independently of the pattern's position and tile size.
+    private static double[] BannerPalette(Bitmap image, double x, double y, double width, double height)
+    {
+        var bins = new double[81];
+        for (var row = 0; row < 32; row++)
+        for (var col = 0; col < 32; col++)
+        {
+            var pixel = image.GetPixel((int)((x + width * (.2 + .6 * col / 32)) * image.Width),
+                (int)((y + height * (.2 + .6 * row / 32)) * image.Height));
+            var total = Math.Max(1, pixel.R + pixel.G + pixel.B);
+            bins[(pixel.R * 8 / total) * 9 + pixel.G * 8 / total] += 1.0 / 1024;
+        }
+        return bins;
+    }
     private static byte[]? Sample(Bitmap frame, double top, (double X, double W, double H, double Offset) thumbnail)
     {
         var (x, w, h, offset) = thumbnail;

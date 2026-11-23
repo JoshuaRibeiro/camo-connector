@@ -13,6 +13,7 @@
   </PropertyGroup>
   <ItemGroup>
     <EmbeddedResource Include="banner-strokes.json" LogicalName="CamoConnector.BannerStrokes" />
+    <EmbeddedResource Include="../CamoConnector.Bridge/CamoArtwork/*.png" LogicalName="BannerArt/%(Filename).png" />
     <Compile Include="../GameWindows.cs" Link="GameWindows.cs" />
     <EmbeddedResource Include="../CamoConnector.Bridge/multiplayer-catalog.json" LogicalName="CamoConnector.MultiplayerCatalog" />
     <EmbeddedResource Include="../../special-catalog.json" LogicalName="CamoConnector.Detector.SpecialCatalog" />
