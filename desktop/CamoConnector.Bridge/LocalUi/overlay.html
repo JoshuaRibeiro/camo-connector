@@ -17,15 +17,24 @@
     <svg class="wave-frame" aria-hidden="true">
       <defs>
         <linearGradient id="wave-face" x2=".8" y2="1" gradientUnits="objectBoundingBox">
-          <stop stop-color="#10272a" stop-opacity=".87"/><stop offset=".48" stop-color="#0d151a" stop-opacity=".88"/><stop offset="1" stop-color="#090f15" stop-opacity=".86"/>
+          <stop stop-color="#10252a" stop-opacity=".93"/><stop offset=".48" stop-color="#0d151b" stop-opacity=".92"/><stop offset="1" stop-color="#090f15" stop-opacity=".91"/>
         </linearGradient>
         <linearGradient id="wave-rim">
-          <stop stop-color="#58e4cd"/><stop offset=".12" stop-color="#307e78"/><stop offset=".25" stop-color="#69ecdc"/><stop offset=".5" stop-color="#31625f"/><stop offset=".78" stop-color="#80fae6"/><stop offset="1" stop-color="#335656"/>
+          <stop stop-color="#39dcca"/><stop offset=".13" stop-color="#36958d"/>
+          <stop offset=".22" stop-color="#6af5e7"/><stop offset=".38" stop-color="#418b85"/>
+          <stop offset=".60" stop-color="#7ef8eb"/><stop offset=".77" stop-color="#69eadd"/>
+          <stop offset="1" stop-color="#38867f" stop-opacity=".45"/>
         </linearGradient>
         <path id="wave-outline"/>
+        <mask id="wave-cutout" x="-5%" y="-10%" width="110%" height="120%" maskUnits="userSpaceOnUse">
+          <rect x="-5%" y="-10%" width="110%" height="120%" fill="white"/>
+          <path id="wave-inner" fill="black"/>
+        </mask>
       </defs>
-      <use class="wave-halo" href="#wave-outline"/>
-      <use class="wave-surface" href="#wave-outline"/>
+      <use href="#wave-outline" fill="url(#wave-face)"/>
+      <g class="wave-edge">
+        <use href="#wave-outline" fill="url(#wave-rim)" mask="url(#wave-cutout)"/>
+      </g>
     </svg>
     <div class="overlay-heading">
       <h1 id="weapon"></h1>

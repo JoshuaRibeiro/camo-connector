@@ -417,10 +417,10 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .layout-corner-accents #overlay-card::after { right:3px; bottom:3px; border-width:0 3px 3px 0; border-bottom-right-radius:.47em; animation-delay:-2.5s; }
 @keyframes armoury-corners { 0%,100% {opacity:1} 50% {opacity:.26} }
 .wave-frame { display:none; }
-.layout-subtle-wave #overlay-card { --accent:#57deca; background:transparent; border-color:transparent; }
+.layout-subtle-wave #overlay-card { --accent:#57deca; background:transparent; border-color:transparent; font-family:"Arial Narrow",Bahnschrift,"Segoe UI",sans-serif; }
+.layout-subtle-wave .overlay-unlock p { font-family:inherit; }
 .layout-subtle-wave .wave-frame { display:block; position:absolute; z-index:-1; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
-.wave-surface { fill:url(#wave-face); stroke:url(#wave-rim); stroke-width:1.6; }
-.wave-halo { fill:none; stroke:url(#wave-rim); stroke-width:3.5; filter:blur(3px); opacity:.65; }
+.wave-edge { filter:drop-shadow(0 0 1px #64ffebbd) drop-shadow(0 0 3.5px #25e2d09c); }
 .layout-minimal-glow #overlay-card { --accent:#c9a1f8; border-color:#b289d7; border-left:.22em solid #c3a2dd; box-shadow:0 0 .25em #bf8dfa44; animation:armoury-breathe 7s ease-in-out infinite; }
 @keyframes armoury-breathe { 50% {box-shadow:0 0 .85em #bb8bf999,inset 0 0 .3em #bb8bf92a} }
 .armoury.preview { padding:8px; }

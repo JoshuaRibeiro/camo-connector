@@ -7,23 +7,35 @@ const legacyLayout = new URLSearchParams(location.search).get('layout');
 const armouryLayouts = ['glow-accent', 'gradient-edge-sweep', 'corner-accents', 'subtle-wave', 'minimal-glow'];
 const layouts = [...armouryLayouts, 'default', 'jabber', '11annah', 'field-manual', 'afterglow', 'scoreboard', 'blueprint', 'filmstrip'];
 let previous;
+let lastWaveSize;
 
-// Each pose shares its side walls and rounded corners. Only the two long edges flex.
+// Both contours share the same wave. Their separation is the visible width of the rim.
 function sizeWaveFrame() {
   if (!document.body.classList.contains('layout-subtle-wave')) return;
   // The SVG fills the card's padding box. Draw in local units, before OBS custom CSS zoom.
   const { clientWidth: width, clientHeight: height } = byId('overlay-card');
   if (width < 24 || height < 24) return;
+  const reducedMotion = waveMotion.matches;
+  if (lastWaveSize?.width === width && lastWaveSize.height === height && lastWaveSize.reducedMotion === reducedMotion) return;
+  lastWaveSize = {width, height, reducedMotion};
   const r = Math.min(14, height * .085);
+  const depth = Math.min(7, width * .011, height * .04);
   const left = 2, right = width - 2, top = 3, bottom = height - 3;
   const start = left + r, end = right - r;
-  const leftWall = `Q ${left} ${bottom} ${left} ${bottom-r} V ${top+r} Q ${left} ${top} ${start} ${top}`;
+  const wall = 1.6;
+  const steps = 24;
 
-  function edge(from, to, baseline, phase) {
-    const steps = 8, step = (to - from) / steps;
+  function edge(from, to, baseline, phase, inset) {
+    const step = (to - from) / steps;
     const heights = Array.from({length: steps + 1}, (_, n) => {
       const t = n / steps;
-      return baseline + 2.65 * Math.sin(Math.PI * t) ** 2 * Math.sin(3 * Math.PI * t + phase);
+      // Ease into each corner with a horizontal tangent and the same width as its wall.
+      const ramp = Math.min(1, 7 * t, 7 * (1 - t));
+      const envelope = ramp * ramp * (3 - 2 * ramp);
+      const angle = 4.8 * Math.PI * t + phase;
+      const crest = (1 + Math.sin(angle)) / 2;
+      const thickness = wall + envelope * (.8 + 2.3 * crest ** 2 - wall);
+      return baseline + depth * envelope * Math.sin(angle) + inset * thickness;
     });
     function tangent(n) {
       return n === 0 || n === steps ? 0 : (heights[n + 1] - heights[n - 1]) / 2;
@@ -31,26 +43,32 @@ function sizeWaveFrame() {
     let path = '';
     for (let n = 1; n <= steps; n++) {
       const x = from + n * step;
-      path += ` C ${x - 2 * step / 3} ${heights[n - 1] + tangent(n - 1) / 3}`
-        + ` ${x - step / 3} ${heights[n] - tangent(n) / 3} ${x} ${heights[n]}`;
+      path += ` C ${(x - 2 * step / 3).toFixed(2)} ${(heights[n - 1] + tangent(n - 1) / 3).toFixed(2)}`
+        + ` ${(x - step / 3).toFixed(2)} ${(heights[n] - tangent(n) / 3).toFixed(2)} ${x.toFixed(2)} ${heights[n].toFixed(2)}`;
     }
     return path;
   }
-  function outline(phase) {
-    return `M ${start} ${top}` + edge(start, end, top, phase)
-      + ` Q ${right} ${top} ${right} ${top+r} V ${bottom-r} Q ${right} ${bottom} ${end} ${bottom}`
-      + edge(end, start, bottom, phase + 1) + ' ' + leftWall + ' Z';
+  function outline(phase, inner) {
+    const inset = inner ? wall : 0;
+    const x1 = left + inset, x2 = right - inset, y1 = top + inset, y2 = bottom - inset;
+    return `M ${start} ${y1}` + edge(start, end, top, phase - 1.15, inner ? 1 : 0)
+      + ` Q ${x2} ${y1} ${x2} ${top+r} V ${bottom-r} Q ${x2} ${y2} ${end} ${y2}`
+      + edge(end, start, bottom, phase + 2.2, inner ? -1 : 0)
+      + ` Q ${x1} ${y2} ${x1} ${bottom-r} V ${top+r} Q ${x1} ${y1} ${start} ${y1} Z`;
   }
-  const path = byId('wave-outline');
-  path.setAttribute('d', outline(0));
-  path.replaceChildren();
-  if (waveMotion.matches) return;
-  const motion = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
-  motion.setAttribute('attributeName', 'd');
-  motion.setAttribute('dur', '6s');
-  motion.setAttribute('repeatCount', 'indefinite');
-  motion.setAttribute('values', Array.from({length: 13}, (_, n) => outline(n*Math.PI/6)).join(';'));
-  path.append(motion);
+  for (const id of ['wave-outline', 'wave-inner']) {
+    const path = byId(id);
+    const inner = id === 'wave-inner';
+    path.setAttribute('d', outline(0, inner));
+    path.replaceChildren();
+    if (reducedMotion) continue;
+    const motion = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
+    motion.setAttribute('attributeName', 'd');
+    motion.setAttribute('dur', '6s');
+    motion.setAttribute('repeatCount', 'indefinite');
+    motion.setAttribute('values', Array.from({length: 13}, (_, n) => outline(n*Math.PI/6, inner)).join(';'));
+    path.append(motion);
+  }
 }
 const waveMotion = matchMedia('(prefers-reduced-motion: reduce)');
 waveMotion.addEventListener('change', sizeWaveFrame);
@@ -58,7 +76,6 @@ new ResizeObserver(sizeWaveFrame).observe(byId('overlay-card'));
 
 function render(data) {
   const layout = data.overlayLayout ?? legacyLayout;
-  const enteringWave = layout === 'subtle-wave' && !document.body.classList.contains('layout-subtle-wave');
   for (const id of layouts) document.body.classList.toggle('layout-' + id, layout === id);
   byId('overlay-card').hidden = !data.weapon;
   byId('weapon').textContent = data.weapon ?? '';
@@ -126,7 +143,7 @@ function render(data) {
     rows.push(status);
   }
   byId('unlock-rows').replaceChildren(...rows);
-  if (enteringWave) sizeWaveFrame();
+  if (layout === 'subtle-wave') sizeWaveFrame();
 }
 
 async function refresh() {
@@ -160,7 +177,7 @@ if (layouts.includes(preview)) {
     "glow-accent": ["Glow Accent", "Cyan pulse", "Light swells and fades along the left edge.", "Cool glass", "Mint headings and progress bars sit on translucent charcoal."],
     "gradient-edge-sweep": ["Gradient Edge Sweep", "Travelling light", "Peach and pink flares sweep clockwise along a fine rose rim.", "Sunset gradient", "The progress fill blends from apricot to pink."],
     "corner-accents": ["Corner Accents", "Corner loop", "The top-left and bottom-right brackets pulse in turn.", "Warm highlights", "Peach headings and progress bars echo the corners."],
-    "subtle-wave": ["Subtle Wave", "Twin waves", "Teal waves drift along the top and bottom in opposite directions.", "Seafoam trim", "A fine teal outline echoes the colour of the progress bars."],
+    "subtle-wave": ["Subtle Wave", "Twin waves", "Teal waves drift along the top and bottom in opposite directions.", "Seafoam glow", "Bright crests taper to a fine line around the dark glass."],
     "minimal-glow": ["Minimal Glow", "Breathing light", "A violet halo slowly brightens and fades around the card.", "Lavender details", "A fine border frames soft purple headings and progress bars."]
   };
   const [weapon, first, intro, second, detail] = themes[preview];
