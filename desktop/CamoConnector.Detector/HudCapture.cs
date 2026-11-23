@@ -535,7 +535,11 @@ internal sealed class HudCapture : IDisposable
             if (WeaponRecognition.ReadLevelUp(levelHeading, name, number) == null) {
                 if (WeaponRecognition.ReadLevelName(name) == null)
                     name = await ReadBannerText((.435, .309, .130, .028), "wideLevelName");
+                if (WeaponRecognition.ReadLevelName(name) == null)
+                    name = await ReadBannerText((.462, .312, .075, .021), "levelNamePlate");
                 if (WeaponRecognition.ReadLevelName(name) == null) name = await ReadBannerText((.4781, .3111, .04375, .02292), "levelNameTight");
+                if (WeaponRecognition.ReadLevelUp(levelHeading, name, number) is { } recovered)
+                    return (null, false, null, recovered);
                 var maxLabel = await ReadBannerText((.471, .334, .058, .047), "weaponLevelMax", PixelAdjustment.BrightGold);
                 if (WeaponRecognition.ReadLevelUp(levelHeading, name, maxLabel) is { IsMax: true } maximum)
                     return (null, false, null, maximum);
@@ -824,12 +828,13 @@ internal sealed class HudCapture : IDisposable
         return Validate(CamoMenuRecognition.ConfirmCounter(null, tight, corroborating));
     }
 
-    public async Task<(string Weapon, int Count, int Goal)?> ReadPostMatchUnlocksAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null)
+    public async Task<(string Weapon, int Count, int Goal, bool IsLevel)?> ReadPostMatchProgressAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null)
     {
         var header = await ReadTextAsync(frame, (.054, .084, .117, .032), cancel, pageMode: 7, trace: trace, regionName: "summaryheader");
         if (!header.Text.Contains("PERFORMING", StringComparison.OrdinalIgnoreCase)) return null;
         var label = await ReadTextAsync(frame, (.877, .210, .052, .027), cancel, pageMode: 7, trace: trace, regionName: "summarylabel");
-        if (!string.Concat(label.Text.Where(char.IsLetter)).Equals("UNLOCKS", StringComparison.OrdinalIgnoreCase)) return null;
+        var labelText = string.Concat(label.Text.Where(char.IsLetter)).ToUpperInvariant();
+        if (labelText is not ("LEVEL" or "UNLOCKS")) return null;
         var title = await ReadTextAsync(frame, (.050, .128, .36, .054), cancel, pageMode: 7, adjustment: PixelAdjustment.WhiteText, trace: trace, regionName: "summarytitle");
         var weapon = TrackedCamoRecognition.ReadWeapon(title.Text);
         if (weapon == null) {
@@ -846,7 +851,7 @@ internal sealed class HudCapture : IDisposable
         var current = await ReadTextAsync(frame, (.862, .241, .042, .066), cancel, pageMode: 7, countersOnly: true, adjustment: PixelAdjustment.BrightRedChannel, trace: trace, regionName: "summarycurrent");
         var maximum = await ReadTextAsync(frame, (.912, .241, .040, .066), cancel, pageMode: 8, countersOnly: true, adjustment: PixelAdjustment.YellowText, trace: trace, regionName: "summarymaximum");
         return int.TryParse(current.Text.Trim(), out var count) && int.TryParse(maximum.Text.Trim(), out var goal) &&
-            goal is > 0 and <= 150 && count >= 0 && count <= goal ? (weapon, count, goal) : null;
+            goal is > 0 and <= 150 && count >= 0 && count <= goal ? (weapon, count, goal, labelText == "LEVEL") : null;
     }
 
     public async Task<string?> ReadCamoMenuWeaponAsync(Bitmap frame, CancellationToken cancel, Action<string, string, Bitmap>? trace = null, bool requireHeading = false)

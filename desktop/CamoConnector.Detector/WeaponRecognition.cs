@@ -79,7 +79,8 @@ public static class WeaponRecognition
 
     internal static WeaponRead? ReadLevelName(string text)
     {
-        var exact = Read([text], false);
+        if (Key(text) == "pm48anvil") return new("PM-40 Anvil", false);
+        var exact = Read([text.Replace('@', '0')], false);
         if (exact != null) return exact;
         // The wide nameplate crop can include a stray glyph beyond its right edge.
         var trimmed = Regex.Replace(text.Trim(), @"\s*[\p{Pd}|]\s*[a-z0-9]\z", "", RegexOptions.IgnoreCase);
