@@ -51,6 +51,7 @@ internal sealed class LocalTrackerRoutes(LocalTracker tracker, ProgressFeed feed
         {
             "/local/tracker" => ("tracker.html", "text/html"),
             "/local/overlay" => ("overlay.html", "text/html"),
+            "/local/progress.js" => ("progress.js", "text/javascript"),
             "/local/tracker.js" => ("tracker.js", "text/javascript"),
             "/local/overlay.js" => ("overlay.js", "text/javascript"),
             "/local/style.css" => ("style.css", "text/css"),

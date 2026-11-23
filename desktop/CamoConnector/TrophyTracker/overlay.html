@@ -30,6 +30,7 @@
 </style>
 <output id="count"></output>
 <progress id="progress" aria-label="Progress toward the trophy goal" hidden></progress>
+<script src="/progress.js"></script>
 <script>
   const count = document.getElementById('count');
   const progress = document.getElementById('progress');
@@ -56,8 +57,7 @@
         const { current, target } = await response.json();
         const caption = 'Trophy Goal: ' + current + ' / ' + target;
         if (count.textContent !== caption) count.textContent = caption;
-        progress.max = target;
-        progress.value = Math.min(current, target);
+        updateProgress(progress, 'trophy', current, target);
         progress.hidden = false;
       }
     } catch {

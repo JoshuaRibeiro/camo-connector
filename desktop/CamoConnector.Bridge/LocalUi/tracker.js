@@ -29,10 +29,9 @@ function element(tag, text, className) {
   return node;
 }
 
-function progressMeter(label, count, total) {
+function progressMeter(label, count, total, metric = label) {
   const meter = element('progress');
-  meter.max = total || 1;
-  meter.value = count;
+  updateProgress(meter, metric, count, total);
   meter.setAttribute('aria-label', label);
   return meter;
 }
@@ -47,8 +46,7 @@ function renderCollection() {
     sum + completedCount(weapon.id, weapon.camos), 0);
   byId('overall-count').textContent = done + ' / ' + total + ' camos unlocked';
   const overall = byId('overall-meter');
-  overall.max = total || 1;
-  overall.value = done;
+  updateProgress(overall, 'overall', done, total);
 
   const tiers = new Map();
   for (const weapon of catalog.weapons) {
@@ -86,6 +84,8 @@ function choose(id) {
   }
 }
 
+const collapsedCategories = new Set(JSON.parse(sessionStorage.getItem('collapsedCategories') || '[]'));
+
 function renderRoster() {
   if (!catalog) return;
   const roster = byId('roster');
@@ -94,8 +94,17 @@ function renderRoster() {
   for (const category of new Set(catalog.weapons.map(weapon => weapon.category))) {
     const matches = catalog.weapons.filter(weapon => weapon.category === category && weapon.name.toLowerCase().includes(query));
     if (!matches.length) continue;
-    entries.push(element('h2', category));
-    for (const weapon of matches) entries.push(weaponCard(weapon));
+    const group = element('details', null, 'weapon-category');
+    group.open = Boolean(query) || !collapsedCategories.has(category);
+    const summary = element('summary', category);
+    group.append(summary, ...matches.map(weaponCard));
+    group.addEventListener('toggle', () => {
+      if (query || !group.isConnected) return;
+      if (group.open) collapsedCategories.delete(category);
+      else collapsedCategories.add(category);
+      sessionStorage.setItem('collapsedCategories', JSON.stringify([...collapsedCategories]));
+    });
+    entries.push(group);
   }
   if (!query) entries.push(selection('shared', 'Prestige & mastery'));
   roster.replaceChildren(...entries);
@@ -124,34 +133,13 @@ function weaponCard(weapon) {
   const total = weapon.camos.length;
   const heading = element('span', null, 'weapon-card-heading');
   const ring = element('span', null, 'weapon-ring');
-  ring.style.setProperty('--completion', (total ? count / total * 100 : 0) + '%');
+  updateProgress(ring, 'ring:' + weapon.id, count, total, true);
   ring.setAttribute('aria-hidden', 'true');
   const identity = element('span', null, 'roster-identity');
   identity.append(element('strong', weapon.name), element('small', weapon.category));
   heading.append(element('span', '+', 'roster-open'), identity, ring, element('span', count + '/' + total, 'weapon-count'));
-  const tiles = element('span', null, 'roster-tiles');
-  const groups = Map.groupBy(weapon.camos, rule => rule.type);
-  for (const [type, rules] of groups) {
-    const group = element('span', null, 'roster-group');
-    group.dataset.type = type;
-    group.append(camoStrip({ ...weapon, camos: rules }));
-    if (type === 'Military') group.append(element('small', completedCount(weapon.id, rules) + '/' + rules.length));
-    tiles.append(group);
-  }
-  button.append(heading, tiles);
-  const next = weapon.camos.find(rule => !state.progress[weapon.id + ':' + rule.id]?.done);
-  if (next) {
-    const preview = element('span', null, 'weapon-next');
-    const caption = element('span', null, 'next-caption');
-    caption.append(element('strong', next.name));
-    if (next.unlock || next.objective) caption.append(element('small', next.unlock || next.objective));
-    preview.append(element('small', 'Next camo', 'next-label'));
-    const row = element('span', null, 'next-preview');
-    row.append(camoStrip({ ...weapon, camos: [next] }), caption);
-    preview.append(row);
-    button.append(preview);
-  }
-    if (weapon.id === selected) button.setAttribute('aria-current', 'true');
+  button.append(heading);
+  if (weapon.id === selected) button.setAttribute('aria-current', 'true');
   button.addEventListener('click', () => choose(weapon.id));
   return button;
 }
@@ -204,7 +192,7 @@ function renderOverview() {
     copy.append(element('p', waiting.unlock ?? 'Complete the prerequisite camos to unlock this challenge.', 'prerequisite'));
     if (waiting.count != null && waiting.goal != null) {
       const progress = element('div', null, 'overview-meter');
-      progress.append(progressMeter(waiting.name + ' prerequisite progress', waiting.count, waiting.goal),
+      progress.append(progressMeter(waiting.name + ' prerequisite progress', waiting.count, waiting.goal, weapon.id + ":waiting:" + waiting.name),
         element('span', waiting.count + '/' + waiting.goal));
       copy.append(progress);
     }
@@ -300,7 +288,7 @@ function camoRow(rule, weapon, overview) {
     rule.unlock.replace(/\bmore\s+/i, ''), 'prerequisite'));
   const controls = element('div', null, 'controls');
   if (overview && !current.done && overview.count != null && overview.goal != null) {
-    const meter = progressMeter(rule.name + ' progress', overview.count, overview.goal);
+    const meter = progressMeter(rule.name + ' progress', overview.count, overview.goal, weapon + ":overview:" + rule.id);
     const progress = element('div', null, 'overview-meter');
     progress.append(meter, element('span', overview.count + ' / ' + overview.goal));
     copy.append(progress);
@@ -316,7 +304,7 @@ function camoRow(rule, weapon, overview) {
   if (!overview && rule.goal != null) {
     if (!current.done && current.count > 0) {
       const progress = element('div', null, 'overview-meter');
-      progress.append(progressMeter(rule.name + ' progress', current.count, rule.goal));
+      progress.append(progressMeter(rule.name + ' progress', current.count, rule.goal, weapon + ":detail:" + rule.id));
       copy.append(progress);
     }
     const input = element('input');

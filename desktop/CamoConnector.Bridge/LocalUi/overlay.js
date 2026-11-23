@@ -45,8 +45,7 @@ function render(data) {
       const meter = document.createElement('div');
       meter.className = 'overlay-meter';
       const progress = document.createElement('progress');
-      progress.max = row.goal;
-      progress.value = row.count;
+      updateProgress(progress, data.weapon + ':' + row.name + ':' + row.objective, row.count, row.goal);
       progress.setAttribute('aria-label', row.name);
       const count = document.createElement('span');
       count.textContent = row.count + '/' + row.goal;

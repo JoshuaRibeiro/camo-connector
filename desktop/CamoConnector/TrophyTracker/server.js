@@ -313,6 +313,7 @@ async function readHomeTotal(body) {
 
 const files = {
   '/': ['control.html', 'text/html; charset=utf-8'],
+  '/progress.js': ['progress.js', 'text/javascript; charset=utf-8'],
   '/capture.js': ['capture.js', 'text/javascript; charset=utf-8'],
   '/recognition.js': ['recognition.js', 'text/javascript; charset=utf-8'],
   '/overlay': ['overlay.html', 'text/html; charset=utf-8'],
@@ -350,13 +351,13 @@ const server = http.createServer(async (request, response) => {
       if (page === '/api/state') return json(publicState());
       if (page === '/api/version') return json({
         recognition: assetVersion('recognition.js', 'signatures.json'),
-        overlay: assetVersion('overlay.html')
+        overlay: assetVersion('overlay.html', 'progress.js')
       });
       const file = files[page];
       if (!file) return json({ error: 'Page missing.' }, 404);
       let content = fs.readFileSync(path.join(__dirname, file[0]));
       if (page === '/overlay') {
-        const version = createHash('sha256').update(content).digest('hex');
+        const version = assetVersion('overlay.html', 'progress.js');
         content = content.toString('utf8').replace('__OVERLAY_VERSION__', version);
       }
       response.writeHead(200, { 'Content-Type': file[1], 'Cache-Control': 'no-store' });

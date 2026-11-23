@@ -49,8 +49,7 @@ function show(state) {
   get('goal').textContent = state.target;
   get('source').textContent = state.source;
   const meter = get('trophy-meter');
-  meter.max = state.target;
-  meter.value = Math.min(state.current, state.target);
+  updateProgress(meter, 'trophy', state.current, state.target);
   const target = get('target');
   const followingSavedTarget = target.value === target.defaultValue || target.valueAsNumber === state.target;
   if (followingSavedTarget) target.value = state.target;

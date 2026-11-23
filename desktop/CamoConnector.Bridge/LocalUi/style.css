@@ -224,3 +224,6 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .tracker .controls .camo-check[aria-pressed="true"] { background: #18452f; border-color: #79bc94; }
 .tracker .controls .camo-check:hover { background: #308459; }
 .tracker .controls button:active { transform: translateY(1px); }
+
+.weapon-category > summary { cursor: pointer; padding: .6rem .25rem; font-weight: 700; color: var(--accent); }
+.weapon-category > .weapon-card { margin-bottom: .2rem; }
