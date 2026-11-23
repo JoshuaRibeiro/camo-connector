@@ -349,7 +349,6 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 }
 @media (prefers-reduced-motion: reduce) { .layout-controls { transition: none; } }
 
-.armoury-caption { display:block; text-align:center; padding:.5em; font-size:.75rem; letter-spacing:.15em; text-transform:uppercase; }
 .armoury-icons { display:none; }
 .armoury #overlay-card {
   --accent:#69e7dc; position:relative; isolation:isolate; padding:.45em .85em .6em;
