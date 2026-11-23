@@ -23,7 +23,7 @@ internal sealed class LocalTracker
     }
     internal sealed record Weapon(string Id, string Name, string Category, Rule[] Camos);
     internal sealed record Catalog(Weapon[] Weapons, Rule[] Shared);
-    internal sealed record Entry(int Count, bool Done);
+    internal sealed record Entry(int Count, bool Done, bool FromLevel = false);
     internal sealed record State(string? Focus, Dictionary<string, Entry> Progress, string? OverlayLayout = null,
         string? PinnedWeapon = null);
     internal sealed record Edit(string? Weapon, string? Camo, int? Count, bool? Done, int? Increment = null);
@@ -429,12 +429,21 @@ internal sealed class LocalTracker
             {
                 var prefix = weapon.Id + ":";
                 var platinum = next.GetValueOrDefault(prefix + "platinum")?.Done == true;
-                if (!platinum && next.GetValueOrDefault(prefix + "gold")?.Done != true) continue;
+                var gold = platinum || next.GetValueOrDefault(prefix + "gold")?.Done == true;
+                var level = next.GetValueOrDefault(prefix + "weapon-level")?.Count ?? 0;
                 foreach (var camo in weapon.Camos)
                 {
-                    if (camo.Type is not ("Military" or "Special") && !(platinum && camo.Id == "gold")) continue;
                     var key = prefix + camo.Id;
-                    if (next.GetValueOrDefault(key)?.Done != true) ApplyProgress(next, key, 0, true);
+                    var entry = next.GetValueOrDefault(key);
+                    if ((gold && camo.Type is ("Military" or "Special")) || (platinum && camo.Id == "gold"))
+                    {
+                        if (entry?.Done != true || entry.FromLevel) ApplyProgress(next, key, 0, true);
+                    }
+                    else if (camo.Type == "Military" && IsLevelRule(camo) && camo.UnlockTotal is > 0 && camo.Goal == null)
+                    {
+                        if (level >= camo.UnlockTotal && entry?.Done != true) next[key] = new(0, true, FromLevel: true);
+                        else if (level < camo.UnlockTotal && entry?.FromLevel == true) next.Remove(key);
+                    }
                 }
             }
             if (focus == state.Focus && next.Count == state.Progress.Count &&

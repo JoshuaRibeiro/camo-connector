@@ -47,7 +47,7 @@ public static class CamoMenuRecognition
         var name = key[..^suffix.Length];
         // Exact confusions observed in the progression tab at lower capture resolutions.
         if (name == "signal58") return "Signal 50";
-        if (name == "pm48anvil") return "PM-40 Anvil";
+        if (Regex.IsMatch(name, @"\Ap[mh]4[08]anvil\z")) return "PM-40 Anvil";
         if (name == "tsonightshade") return "ISO Nightshade";
         if (name is "fsscarbonedge1695" or "fsscarbonedge1895") return "FSS Carbon Edge 1095";
         if (name == "58gs") return ".50 GS";

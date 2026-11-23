@@ -137,7 +137,7 @@ try {
         throw 'The overlay missed the PM-40 weapon-level snapshot.'
     }
     $levelUp = '{"kind":"weapon-level-up","source":"live","mode":"mp","weapon":"PM-40 Anvil","level":'
-    foreach ($expected in @(@{ Level = 10; Rows = 1 }, @{ Level = 16; Rows = 2 }, @{ Level = 31; Rows = 3 })) {
+    foreach ($expected in @(@{ Level = 10; Rows = 1; Next = 2 }, @{ Level = 16; Rows = 2; Next = 4 }, @{ Level = 21; Rows = 2; Next = 5 }, @{ Level = 31; Rows = 3; Next = 7 })) {
         [IO.File]::AppendAllLines($eventLog, [string[]]@(($levelUp + $expected.Level + '}'), $snapshot))
         $deadline = [DateTime]::UtcNow.AddSeconds(5)
         do {
@@ -145,7 +145,7 @@ try {
             if ($overlay.level -eq $expected.Level) { break }
             Start-Sleep -Milliseconds 100
         } while ([DateTime]::UtcNow -lt $deadline)
-        if ($overlay.rows.Count -ne $expected.Rows -or $overlay.rows[0].name -ne 'Military Camo 2' -or
+        if ($overlay.rows.Count -ne $expected.Rows -or $overlay.rows[0].name -ne "Military Camo $($expected.Next)" -or
             ($expected.Level -ge 16 -and $overlay.rows[1].artwork -ne $nightSnow.artwork) -or
             ($expected.Level -ge 31 -and $overlay.rows[2].name -ne 'Recursive')) {
             throw "The overlay listed the wrong challenges at weapon level $($expected.Level)."
