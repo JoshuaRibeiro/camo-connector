@@ -86,8 +86,8 @@ internal sealed partial class ConnectorWindow
         footer.Controls.Add(version);
         var toggle = navigationToggle = new Button { Height = 38, AccessibleName = "Expand navigation", Margin = new Padding(0, 0, 0, 8) };
         menu.Controls.Add(toggle);
-        var entries = new[] { (localTrackerPage, ""), (overlayPage, ""), (capturePage, "\uE7F8"),
-            (trophyPage, ""), (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
+        var entries = new[] { (localTrackerPage, ""), (trophyPage, ""), (overlayPage, ""),
+            (capturePage, "\uE7F8"), (helpPage, "\uE897"), (settingsPage, "\uE713"), (logsPage, "\uE9F9") };
         var icons = ShellFont("Segoe MDL2 Assets", 14);
         var hints = new ToolTip();
         Disposed += (_, _) => { hints.Dispose(); logsPage.Dispose(); };
@@ -109,10 +109,7 @@ internal sealed partial class ConnectorWindow
             button.Paint += (_, args) =>
             {
                 var iconColor = page == trophyPage ? Color.Gold :
-                    page == helpPage ? Color.DeepSkyBlue :
-                    page == overlayPage ? Color.MediumTurquoise :
-                    page == capturePage ? Color.Plum :
-                    page == logsPage ? Color.SandyBrown : button.ForeColor;
+                    page == overlayPage ? Color.MediumTurquoise : ShellMuted;
                 var iconArea = new Rectangle(0, 0, railExpanded ? LogicalToDeviceUnits(42) : button.Width, button.Height);
                 if (page == localTrackerPage)
                     args.Graphics.DrawImageUnscaled(trackerIcon,
