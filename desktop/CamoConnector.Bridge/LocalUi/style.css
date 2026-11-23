@@ -394,7 +394,7 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .wave-frame { display:none; }
 .layout-subtle-wave #overlay-card { --accent:#57deca; background:transparent; border-color:transparent; }
 .layout-subtle-wave .wave-frame { display:block; position:absolute; z-index:-1; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; }
-.wave-surface { fill:url(#wave-face); stroke:url(#wave-rim); stroke-width:1.2; }
+.wave-surface { fill:url(#wave-face); stroke:url(#wave-rim); stroke-width:1.6; }
 .wave-halo { fill:none; stroke:url(#wave-rim); stroke-width:3.5; filter:blur(3px); opacity:.65; }
 .layout-minimal-glow #overlay-card { --accent:#c9a1f8; border-color:#b289d7; border-left:.22em solid #c3a2dd; box-shadow:0 0 .25em #bf8dfa44; animation:armoury-breathe 7s ease-in-out infinite; }
 @keyframes armoury-breathe { 50% {box-shadow:0 0 .85em #bb8bf999,inset 0 0 .3em #bb8bf92a} }
