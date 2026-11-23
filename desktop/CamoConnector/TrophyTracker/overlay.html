@@ -69,7 +69,7 @@
       if (response.ok) {
         const { current, goal, pace, neededToday } = await response.json();
         count.textContent = format.format(current);
-        document.getElementById('daily').textContent = format.format(neededToday) + ' needed today';
+        document.getElementById('daily').textContent = neededToday <= 0 ? 'Daily target hit!' : format.format(neededToday) + ' needed today';
         card.style.setProperty('--progress', Math.min(100, current / goal * 100) + '%');
         document.getElementById('pace').style.left = Math.min(100, pace / goal * 100) + '%';
         document.querySelector('.rail').setAttribute('aria-valuenow', Math.min(goal, current));
