@@ -9,6 +9,23 @@ const layouts = [...armouryLayouts, 'default', 'jabber', '11annah', 'field-manua
 let previous;
 let lastWaveSize;
 
+// Left-to-right samples of the reference rim at 24 equal intervals across its 307 px span.
+// Each pair is [centre offset, line width] in CSS pixels. Extra samples join the ends offscreen.
+const waveSteps = 24;
+const topWave = [
+  [-2, .9], [-2.3, 1.4], [-1.9, 1.6], [-1, 1.3], [-.5, 1.9], [-.4, 2.1],
+  [-.5, 1.8], [-1.4, 1.8], [-1.9, 1.4], [-1.8, 1.6], [-1, 1.8], [.3, 2],
+  [1.5, 2.1], [2.3, 1.6], [2.8, 1.6], [2.4, 1.7], [1.5, 1.9], [.2, 1.9],
+  [-1.1, 2.1], [-2.3, 2.2], [-2.6, 2], [-2.4, 1.7], [-2, 1.3], [-1, .9],
+  [0, 1], [.3, 1.2], [-.4, 1.2], [-1.3, 1]
+];
+const bottomWave = [
+  [2.1, 1], [1.9, 1.3], [1, 1.1], [.3, 1.7], [.1, 2.3], [0, 1.9],
+  [-.6, 1.6], [-1.6, 1.4], [-2.2, 1.4], [-2.4, 1.7], [-2, 1.3], [-1.1, 1.8],
+  [.2, 2.3], [1.2, 2], [1.8, 2], [1.6, 2.1], [.7, 2.2], [-.6, 2],
+  [-1.7, 1.5], [-2.3, 1.6], [-2, 1.1], [-.6, 1.3], [1.2, 1.8], [2, 1.6], [2, 1]
+];
+
 // Both contours share the same wave. Their separation is the visible width of the rim.
 function sizeWaveFrame() {
   if (!document.body.classList.contains('layout-subtle-wave')) return;
@@ -18,25 +35,25 @@ function sizeWaveFrame() {
   const reducedMotion = waveMotion.matches;
   if (lastWaveSize?.width === width && lastWaveSize.height === height && lastWaveSize.reducedMotion === reducedMotion) return;
   lastWaveSize = {width, height, reducedMotion};
-  const r = Math.min(14, height * .085);
-  const depth = .8 * Math.min(7, width * .011, height * .04);
+  const r = Math.min(14, height * .085, (width - 4) / 4);
   const left = 2, right = width - 2, top = 3, bottom = height - 3;
   const start = left + r, end = right - r;
-  const wall = 1.6;
-  const steps = 24;
+  const scale = Math.min((end - start) / 307, height / 118, 1.5);
 
-  function edge(from, to, baseline, phase, inset) {
-    const step = (to - from) / steps;
-    const heights = Array.from({length: steps + 1}, (_, n) => {
-      const t = n / steps;
-      // Ease into each corner with a horizontal tangent and the same width as its wall.
-      const ramp = Math.min(1, 7 * t, 7 * (1 - t));
-      const envelope = ramp * ramp * (3 - 2 * ramp);
-      const angle = 4.8 * Math.PI * t + phase;
-      const crest = (1 + Math.sin(angle)) / 2;
-      const thickness = wall + envelope * (.8 + 2.3 * crest ** 2 - wall);
-      return baseline + depth * envelope * Math.sin(angle) + inset * thickness;
+  function contour(profile, baseline, turn, side) {
+    return Array.from({length: waveSteps + 1}, (_, n) => {
+      // Advancing both profiles in screen coordinates carries their crests to the left.
+      const position = n + turn * profile.length;
+      const index = Math.floor(position);
+      const fraction = position - index;
+      const [y0, w0] = profile[index % profile.length];
+      const [y1, w1] = profile[(index + 1) % profile.length];
+      const centre = baseline + (y0 + fraction * (y1 - y0)) * scale;
+      return centre + side * (w0 + fraction * (w1 - w0)) / 2;
     });
+  }
+  function edge(from, to, heights) {
+    const steps = heights.length - 1, step = (to - from) / steps;
     function tangent(n) {
       return n === 0 || n === steps ? 0 : (heights[n + 1] - heights[n - 1]) / 2;
     }
@@ -48,14 +65,18 @@ function sizeWaveFrame() {
     }
     return path;
   }
-  function outline(phase, inner) {
-    const inset = inner ? wall : 0;
-    const x1 = left + inset, x2 = right - inset, y1 = top + inset, y2 = bottom - inset;
-    return `M ${start} ${y1}` + edge(start, end, top, phase - 1.15, inner ? 1 : 0)
-      + ` Q ${x2} ${y1} ${x2} ${top+r} V ${bottom-r} Q ${x2} ${y2} ${end} ${y2}`
-      // The bottom path runs right to left, so reverse its phase to match the top's motion.
-      + edge(end, start, bottom, 2.2 - phase, inner ? -1 : 0)
-      + ` Q ${x1} ${y2} ${x1} ${bottom-r} V ${top+r} Q ${x1} ${y1} ${start} ${y1} Z`;
+  function outline(turn, inner) {
+    const side = inner ? 1 : -1;
+    const upper = contour(topWave, top, turn, side);
+    const lower = contour(bottomWave, bottom, turn, -side);
+    const x1 = left + (inner ? 3.2 : 0), x2 = right - (inner ? 1 : 0);
+    const radius = r - (inner ? 1 : 0);
+    const topLeft = upper[0], topRight = upper[waveSteps];
+    const bottomLeft = lower[0], bottomRight = lower[waveSteps];
+    return `M ${start} ${topLeft}` + edge(start, end, upper)
+      + ` Q ${x2} ${topRight} ${x2} ${topRight+radius} V ${bottomRight-radius} Q ${x2} ${bottomRight} ${end} ${bottomRight}`
+      + edge(end, start, lower.reverse())
+      + ` Q ${x1} ${bottomLeft} ${x1} ${bottomLeft-radius} V ${topLeft+radius} Q ${x1} ${topLeft} ${start} ${topLeft} Z`;
   }
   for (const id of ['wave-outline', 'wave-inner']) {
     const path = byId(id);
@@ -65,10 +86,12 @@ function sizeWaveFrame() {
     if (reducedMotion) continue;
     const motion = document.createElementNS('http://www.w3.org/2000/svg', 'animate');
     motion.setAttribute('attributeName', 'd');
-    motion.setAttribute('dur', '6s');
+    motion.setAttribute('dur', '14s');
+    motion.setAttribute('begin', 'indefinite');
     motion.setAttribute('repeatCount', 'indefinite');
-    motion.setAttribute('values', Array.from({length: 13}, (_, n) => outline(n*Math.PI/6, inner)).join(';'));
+    motion.setAttribute('values', Array.from({length: 29}, (_, n) => outline(n / 28, inner)).join(';'));
     path.append(motion);
+    motion.beginElement();
   }
 }
 const waveMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -178,7 +201,7 @@ if (layouts.includes(preview)) {
     "glow-accent": ["Glow Accent", "Cyan pulse", "Light swells and fades along the left edge.", "Cool glass", "Mint headings and progress bars sit on translucent charcoal."],
     "gradient-edge-sweep": ["Gradient Edge Sweep", "Travelling light", "Peach and pink flares sweep clockwise along a fine rose rim.", "Sunset gradient", "The progress fill blends from apricot to pink."],
     "corner-accents": ["Corner Accents", "Corner loop", "The top-left and bottom-right brackets pulse in turn.", "Warm highlights", "Peach headings and progress bars echo the corners."],
-    "subtle-wave": ["Subtle Wave", "Twin waves", "Teal waves drift left along the top and bottom edges.", "Seafoam glow", "Bright crests taper to a fine line around the dark glass."],
+    "subtle-wave": ["Subtle Wave", "Twin waves", "Two shallow teal waves drift left with different crest spacing.", "Seafoam glow", "Bright crests taper to a fine line around the dark glass."],
     "minimal-glow": ["Minimal Glow", "Breathing light", "A violet halo slowly brightens and fades around the card.", "Lavender details", "A fine border frames soft purple headings and progress bars."]
   };
   const [weapon, first, intro, second, detail] = themes[preview];
