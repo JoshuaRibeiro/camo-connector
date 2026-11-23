@@ -84,15 +84,15 @@ function choose(id) {
   }
 }
 
-let openCategory;
-let searchCategory;
+const openCategories = new Set();
+const searchCategories = new Set();
 let lastRosterWeapon;
 let lastRosterQuery;
 const categoryGroups = new Map();
 
-function expandCategory(category) {
+function expandCategories(categories) {
   for (const [name, { button, drawer }] of categoryGroups) {
-    const expanded = name === category;
+    const expanded = categories.has(name);
     button.setAttribute('aria-expanded', String(expanded));
     drawer.inert = !expanded;
   }
@@ -101,11 +101,16 @@ function expandCategory(category) {
 function renderRoster() {
   if (!catalog) return;
   const roster = byId('roster');
-  const query = byId('search').value.trim().toLowerCase();
+  const search = byId('search');
+  let query = search.value.trim().toLowerCase();
   const weapon = catalog.weapons.find(item => item.id === selected);
-  if (selected !== lastRosterWeapon) {
-    openCategory = weapon?.category ?? null;
-    searchCategory = undefined;
+  const changedWeapon = selected !== lastRosterWeapon;
+  if (changedWeapon) {
+    if (weapon) {
+      openCategories.add(weapon.category);
+      if (query && !weapon.name.toLowerCase().includes(query)) search.value = query = '';
+      searchCategories.add(weapon.category);
+    }
     lastRosterWeapon = selected;
   }
 
@@ -121,17 +126,18 @@ function renderRoster() {
       drawer.id = 'weapon-category-' + categoryGroups.size;
       button.setAttribute('aria-controls', drawer.id);
       button.addEventListener('click', () => {
-        const next = button.getAttribute('aria-expanded') === 'true' ? null : name;
-        if (query) searchCategory = next;
-        else openCategory = next;
-        expandCategory(next);
+        const categories = query ? searchCategories : openCategories;
+        if (categories.has(name)) categories.delete(name);
+        else categories.add(name);
+        expandCategories(categories);
       });
       drawer.append(list);
       group.append(button, drawer);
       roster.append(group);
       categoryGroups.set(name, { button, drawer, list });
     }
-    searchCategory = undefined;
+    searchCategories.clear();
+    if (query) for (const name of matches.keys()) searchCategories.add(name);
     lastRosterQuery = query;
   }
   for (const [name, weapons] of matches) {
@@ -141,9 +147,23 @@ function renderRoster() {
     roster.querySelector(':scope > button')?.remove();
     roster.append(selection('shared', 'Prestige & mastery'));
   }
-  if (query && searchCategory === undefined)
-    searchCategory = matches.has(openCategory) ? openCategory : matches.keys().next().value;
-  expandCategory(query ? searchCategory : openCategory);
+  expandCategories(query ? searchCategories : openCategories);
+  if (changedWeapon && weapon) {
+    const group = categoryGroups.get(weapon.category);
+    requestAnimationFrame(async () => {
+      await Promise.allSettled(group.drawer.getAnimations().map(animation => animation.finished));
+      if (selected !== weapon.id || group.drawer.inert || !group.drawer.isConnected) return;
+      const row = group.list.querySelector('[aria-current="true"]');
+      if (!row) return;
+      const bounds = roster.getBoundingClientRect();
+      const card = row.getBoundingClientRect();
+      if (card.top >= bounds.top && card.bottom <= bounds.bottom) return;
+      roster.scrollTo({
+        top: roster.scrollTop + card.top - bounds.top - (roster.clientHeight - card.height) / 2,
+        behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'
+      });
+    });
+  }
 }
 
 function camoStrip(weapon) {
