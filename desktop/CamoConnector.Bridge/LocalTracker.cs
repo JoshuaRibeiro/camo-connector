@@ -373,7 +373,8 @@ internal sealed class LocalTracker
             Change((next, focus) =>
             {
                 var key = weapon.Id + ":" + rule.Id;
-                if (key == "signal-50:sp-3" && kind == "progress-snapshot" &&
+                if (kind == "progress-snapshot" &&
+                    (key == "signal-50:sp-3" || (ProgressFeed.Text(item, "identity") == "name" && next.GetValueOrDefault(key)?.Done != true)) &&
                     ProgressFeed.Text(item, "context") == "camo-menu" && count is int menuCount && menuCount < rule.Goal)
                     next[key] = new(menuCount, false);
                 else

@@ -779,6 +779,13 @@ internal sealed class HudCapture : IDisposable
             if (candidate != null && candidate.Count == candidate.Goal) return null;
             return CamoMenuRecognition.CheckObjectiveGoal(candidate, catalogGoal, objectives);
         }
+        // In compact captures the active counter can sit just above the standard row.
+        if (!raisedDetails && frame.Height < 800 && reference?.Objective is { } objective &&
+            CamoMenuRecognition.MatchesCamoObjective(objectives, objective))
+        {
+            var compact = await ReadCounter((.5304, .7786, .0267, .0263), PixelAdjustment.CompactDigits, "compactChallengeCounter");
+            if (compact?.Count == 0 && (progress == null || progress.Count == 0)) return Validate(compact);
+        }
         // Keep the progress bar out of the first OCR pass for the standard layout.
         // When the objective crop already supplied a value, the tight crop can confirm it.
         CamoProgress? tight = null;
@@ -1032,7 +1039,7 @@ internal sealed class HudCapture : IDisposable
         return rgb;
     }
 
-    private enum PixelAdjustment { NativeWhite, BadgeGold, BrightGold, BrightRedChannel, Normal, Contrast, Invert, CyanText, WhiteText, YellowText }
+    private enum PixelAdjustment { CompactDigits, NativeWhite, BadgeGold, BrightGold, BrightRedChannel, Normal, Contrast, Invert, CyanText, WhiteText, YellowText }
 
     private async Task<string[]> ReadAsync(Bitmap frame, (double X, double Y, double W, double H) area,
         CancellationToken cancel, PixelAdjustment adjustment = PixelAdjustment.Normal)
@@ -1047,6 +1054,12 @@ internal sealed class HudCapture : IDisposable
     {
         var region = new Rectangle((int)Math.Round(area.X * frame.Width), (int)Math.Round(area.Y * frame.Height),
             Math.Max(1, (int)Math.Round(area.W * frame.Width)), Math.Max(1, (int)Math.Round(area.H * frame.Height)));
+        if (adjustment == PixelAdjustment.CompactDigits)
+        {
+            using var native = frame.Clone(region, frame.PixelFormat);
+            using var enlarged = new Bitmap(native, new Size(region.Width * 6, region.Height * 6));
+            return await ReadCropAsync(enlarged, cancel, pageMode, countersOnly, positioned, trace, regionName);
+        }
         var scale = adjustment is PixelAdjustment.BrightRedChannel or PixelAdjustment.BrightGold or PixelAdjustment.NativeWhite or PixelAdjustment.BadgeGold ? 1.0 : Math.Min(3.0, 2400.0 / Math.Max(region.Width, region.Height));
         using var crop = new Bitmap(Math.Max(1, (int)Math.Round(region.Width * scale)),
             Math.Max(1, (int)Math.Round(region.Height * scale)), PixelFormat.Format24bppRgb);
@@ -1100,10 +1113,16 @@ internal sealed class HudCapture : IDisposable
             }
             finally { crop.UnlockBits(pixels); }
         }
+        return await ReadCropAsync(crop, cancel, pageMode, countersOnly, positioned, trace, regionName);
+    }
+
+    private async Task<(string Text, int Height)> ReadCropAsync(Bitmap crop, CancellationToken cancel, int pageMode,
+        bool countersOnly, bool positioned, Action<string, string, Bitmap>? trace, string regionName)
+    {
         using var encoded = new MemoryStream();
         // The in-process decoder consumes these pixels immediately; PNG compression
         // only saves bandwidth on the pipe used by the CLI fallback.
-        crop.Save(encoded, persistentOcr == null ? ImageFormat.Png : ImageFormat.Bmp);
+        crop.Save(encoded, persistentOcr == null || Image.IsAlphaPixelFormat(crop.PixelFormat) ? ImageFormat.Png : ImageFormat.Bmp);
         if (persistentOcr != null && encoded.TryGetBuffer(out var image))
         {
             var text = await persistentOcr.ReadAsync(image, pageMode, cancel,

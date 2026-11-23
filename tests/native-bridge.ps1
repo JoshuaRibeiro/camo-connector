@@ -383,6 +383,22 @@ try {
     if ($overlay.weapon -ne 'Signal 50' -or $sunburn.count -ne 3) {
         throw 'The confirmed Sunburn menu count did not correct the overlay to 3/40.'
     }
+    $resetDigital = @{ weapon = 'pila'; camo = 'sp-3'; count = 8; done = $false } | ConvertTo-Json
+    Invoke-RestMethod -NoProxy -Uri $editUrl -Method Post -Headers $native -ContentType 'application/json' -Body $resetDigital | Out-Null
+    $digitalFall = '{"kind":"progress-snapshot","source":"live","mode":"mp","weapon":"Pila","camo":"Digital Fall","type":"camo","identity":"name","goal":30,"count":8}'
+    [IO.File]::AppendAllLines($eventLog, [string[]]@(
+        '{"kind":"weapon","source":"live","mode":"mp","weapon":"Pila"}'
+        $digitalFall
+        ($digitalFall.Replace('"count":8', '"count":0,"context":"camo-menu"'))
+    ))
+    $deadline = [DateTime]::UtcNow.AddSeconds(5)
+    do {
+        $tracker = Check-Events 200 $native 'local/state'
+        $digital = $tracker.overview.rows | Where-Object name -eq 'Digital Fall'
+        if ($tracker.focus -eq 'pila' -and $digital -and $digital.count -eq 0) { break }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($tracker.focus -ne 'pila' -or !$digital -or $digital.count -ne 0) { throw 'Digital Fall did not correct to 0/30.' }
     Write-Output 'Native bridge authentication and progress checks passed.'
 } finally {
     if ($process) {
