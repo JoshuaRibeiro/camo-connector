@@ -4,7 +4,8 @@ const key = location.hash.slice(1);
 const byId = id => document.getElementById(id);
 const legacyLayout = new URLSearchParams(location.search).get('layout');
 
-const layouts = ['default', 'jabber', '11annah', 'field-manual', 'afterglow', 'scoreboard', 'blueprint', 'filmstrip'];
+const armouryLayouts = ['glow-accent', 'gradient-edge-sweep', 'corner-accents', 'subtle-wave', 'minimal-glow'];
+const layouts = [...armouryLayouts, 'default', 'jabber', '11annah', 'field-manual', 'afterglow', 'scoreboard', 'blueprint', 'filmstrip'];
 let previous;
 
 function render(data) {
@@ -12,11 +13,12 @@ function render(data) {
   for (const id of layouts) document.body.classList.toggle('layout-' + id, layout === id);
   byId('overlay-card').hidden = !data.weapon;
   byId('weapon').textContent = data.weapon ?? '';
+  document.body.classList.toggle('armoury', armouryLayouts.includes(layout));
   const jabber = layout === 'jabber';
   byId('jabber-class').textContent = data.category ?? '';
   const level = byId('weapon-level');
   level.hidden = !data.weapon;
-  const prefix = jabber ? '\u2197 LVL ' : 'LVL ';
+  const prefix = armouryLayouts.includes(layout) ? '\u2303 LVL ' : jabber ? '\u2197 LVL ' : 'LVL ';
   let value = '-';
   if (data.maxLevel) value = 'MAX';
   else if (data.level != null) value = data.level;
@@ -32,6 +34,7 @@ function render(data) {
   const visible = available.length || !data.waiting ? available : [{
     ...data.waiting, objective: data.waiting.unlock
   }];
+  if (armouryLayouts.includes(layout)) byId('armoury-count').textContent = visible.length;
   const rows = visible.map(row => {
     const section = document.createElement('section');
     section.className = 'overlay-unlock';
@@ -105,19 +108,27 @@ if (layouts.includes(preview)) {
     "blueprint": ["Tide", "Deep teal", "A translucent sea-green panel fades into navy.", "Mint accents", "Inset rows pair a mint rail with artwork on the right."],
     "field-manual": ["Velvet", "Smoked plum", "Rose headings sit against a soft plum gradient.", "Rose rings", "Fine rings frame the circular tiles beneath a slim divider."]
   };
-  const [weapon, first, intro, second, detail] = themes[preview];
-  render({
-    overlayLayout: preview, weapon, category: 'Layout', level: 34,
-    rows: [
-      { name: first, objective: intro, placeholder: true, count: 34, goal: 36 },
-      { name: second, objective: detail, placeholder: true, count: 0, goal: 10 }
-    ]
-  });
+  if (armouryLayouts.includes(preview)) {
+    render({
+      overlayLayout: preview, weapon: 'Cronen Osprey', category: 'Assault Rifle', level: 69,
+      rows: [{ name: 'Harmonic Break', objective: 'Complete 33 Platinum Camo Challenges',
+        artwork: '/local/artwork/harmonic-break.png', count: 29, goal: 33 }]
+    });
+  } else {
+    const [weapon, first, intro, second, detail] = themes[preview];
+    render({
+      overlayLayout: preview, weapon, category: 'Layout', level: 34,
+      rows: [
+        { name: first, objective: intro, placeholder: true, count: 34, goal: 36 },
+        { name: second, objective: detail, placeholder: true, count: 0, goal: 10 }
+      ]
+    });
+  }
   const frame = window.frameElement;
   if (frame) {
     const card = byId('overlay-card');
     new ResizeObserver(() => {
-      if (card.offsetHeight) frame.height = Math.ceil(card.getBoundingClientRect().height);
+      if (card.offsetHeight) frame.height = Math.ceil(card.getBoundingClientRect().height + (armouryLayouts.includes(preview) ? 16 : 0));
     }).observe(card);
   }
 } else {

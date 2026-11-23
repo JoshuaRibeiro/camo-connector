@@ -10,10 +10,18 @@
 </head>
 <body class="overlay">
   <section id="overlay-card" aria-live="polite" hidden>
+    <svg class="wave-defs" aria-hidden="true" width="0" height="0"><defs><pattern id="wave-pattern" patternUnits="userSpaceOnUse" width="200" height="8"><path d="M0 4 Q25 0 50 4 T100 4 T150 4 T200 4" fill="none" stroke="#5ce2c7" stroke-width="1.4"/></pattern></defs></svg>
+    <svg class="wave-line wave-top" aria-hidden="true"><rect width="100%" height="8" fill="url(#wave-pattern)"/></svg>
+    <svg class="wave-line wave-bottom" aria-hidden="true"><rect width="100%" height="8" fill="url(#wave-pattern)"/></svg>
     <div class="overlay-heading">
       <h1 id="weapon"></h1>
       <span id="jabber-class"></span>
       <span id="jabber-brand">JABBER&#8217;S ARMOURY</span>
+      <span class="armoury-icons" aria-hidden="true">
+        <svg viewBox="0 0 20 20"><path d="m10 1 8 4-8 4-8-4zm-8 6 7 4v8l-7-4zm9 4 7-4v8l-7 4z"/></svg><span id="armoury-count"></span>
+        <svg viewBox="0 0 24 24"><path d="M3 18c3-3 3-5 3-8a6 6 0 0 1 5-6V2h2v2a6 6 0 0 1 5 6c0 3 0 5 3 8v1H3zm6 2h6a3 3 0 0 1-6 0"/></svg>
+        <span class="armoury-gear">&#9881;</span>
+      </span>
       <p id="weapon-level" hidden></p>
     </div>
     <div id="unlock-rows"></div>

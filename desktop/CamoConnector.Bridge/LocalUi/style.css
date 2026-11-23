@@ -348,3 +348,60 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
   .layout-controls { position: static; opacity: 1; pointer-events: auto; padding: .4rem; background: transparent; backdrop-filter: none; }
 }
 @media (prefers-reduced-motion: reduce) { .layout-controls { transition: none; } }
+
+.armoury-caption { display:block; text-align:center; padding:.5em; font-size:.75rem; letter-spacing:.15em; text-transform:uppercase; }
+.armoury-icons { display:none; }
+.armoury #overlay-card {
+  --accent:#69e7dc; position:relative; isolation:isolate; padding:.45em .85em .6em;
+  border:1px solid #87939675; border-radius:.7em;
+  background:linear-gradient(140deg,#141b22d9,#0b1017d4); color:#f2f2f4;
+}
+.armoury .overlay-heading { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:.25em .5em; }
+.armoury #weapon { grid-column:span 2; font-size:1.25em; text-transform:uppercase; }
+.armoury #jabber-class { display:block; justify-self:end; font-size:.65em; font-weight:700; text-transform:uppercase; border-radius:2em; background:#ffffff16; padding:.2em .65em; }
+.armoury #jabber-brand { display:block; font-size:.68em; font-weight:600; }
+.armoury .armoury-icons { display:flex; align-items:center; justify-content:space-evenly; gap:.25em; color:#c9cbd1; font-size:.8em; }
+.armoury-icons svg { width:1.1em; height:1.1em; fill:currentColor; }
+.armoury-gear { font-family:"Segoe UI Symbol",sans-serif; }
+.armoury #weapon-level { font-size:.72em; margin:0; border-left:1px solid #ffffff35; padding-left:.65em; }
+.armoury .overlay-unlock { border-color:#ffffff26; align-items:center; }
+.armoury .camo-artwork { width:3.7em; height:3.7em; border-radius:.25em; }
+.armoury .overlay-unlock h2 { margin:0; font-size:.96em; }
+.armoury .overlay-unlock p { font-size:.87em; }
+.armoury .overlay-meter { font-size:.82em; }
+.armoury progress { appearance:none; height:.42em; }
+.armoury progress::-webkit-progress-bar { background:#72738266; border-radius:1em; }
+.armoury progress::-webkit-progress-value { background:var(--bar, var(--accent)); border-radius:1em; }
+.armoury #overlay-card::before,.armoury #overlay-card::after { pointer-events:none; }
+.layout-glow-accent #overlay-card { border-left:.28em solid #20e1dc; animation:armoury-pulse 4s ease-in-out infinite; }
+@keyframes armoury-pulse { 50% { box-shadow:-.22em 0 .85em #15d9d866; } }
+.layout-gradient-edge-sweep #overlay-card { --accent:#ff819b; --bar:linear-gradient(90deg,#ffb275,#ff66a6); }
+.layout-gradient-edge-sweep #overlay-card::before {
+  content:""; position:absolute; inset:-1px; padding:2px; border-radius:inherit;
+  background:conic-gradient(from var(--jabber-angle),#ee667e,#ffcaaa,#ff557e 35%,#ffebd2 38%,#944767 44%,#ff94cb 74%,#fff0ed 78%,#ee667e);
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0); mask-composite:exclude; animation:jabber-edge 12s linear infinite;
+}
+.layout-corner-accents #overlay-card { --accent:#ff967c; }
+.layout-corner-accents #overlay-card::before,.layout-corner-accents #overlay-card::after {
+  content:""; position:absolute; inset:3px; border-radius:.5em; border:3px solid var(--accent);
+  mask:linear-gradient(#000 0 0) left top / 1.15em 1.15em no-repeat,linear-gradient(#000 0 0) right bottom / 1.15em 1.15em no-repeat;
+  filter:drop-shadow(0 0 2px coral); animation:armoury-corners 6s ease-in-out infinite alternate;
+}
+.layout-corner-accents #overlay-card::after { transform:scaleX(-1); animation-direction:alternate-reverse; }
+@keyframes armoury-corners { 0%,20% {opacity:1} 80%,100% {opacity:0} }
+.layout-subtle-wave #overlay-card { --accent:#5ce2c7; border-left:.22em solid #4dc8b7; }
+.wave-defs { position:absolute; }
+.wave-line { display:none; }
+.layout-subtle-wave .wave-line { display:block; position:absolute; left:0; width:100%; height:8px; overflow:hidden; pointer-events:none; filter:drop-shadow(0 0 2px #56dfd2); }
+.wave-top { top:-4px; }
+.wave-bottom { bottom:-4px; }
+.wave-line rect { width:calc(100% + 200px); animation:armoury-wave 10s linear infinite; }
+.wave-bottom rect { animation-direction:reverse; }
+@keyframes armoury-wave { to {transform:translateX(-200px)} }
+.layout-minimal-glow #overlay-card { --accent:#c9a1f8; border-color:#b289d7; border-left:.22em solid #c3a2dd; box-shadow:0 0 .25em #bf8dfa44; animation:armoury-breathe 7s ease-in-out infinite; }
+@keyframes armoury-breathe { 50% {box-shadow:0 0 .85em #bb8bf999,inset 0 0 .3em #bb8bf92a} }
+.armoury.preview { padding:8px; }
+@media(prefers-reduced-motion:reduce) {
+  .wave-line rect,.armoury #overlay-card,.armoury #overlay-card::before,.armoury #overlay-card::after {animation:none}
+  .layout-corner-accents #overlay-card::after {opacity:0}
+}
