@@ -82,7 +82,7 @@ internal sealed partial class ConnectorWindow : Form
         Icon = (Icon)icon.Clone();
         StartPosition = FormStartPosition.CenterScreen;
         ConfigureWindowFrame();
-        ClientSize = new Size(1040, 720);
+        ClientSize = new Size(Math.Min(LogicalToDeviceUnits(1360), Screen.FromPoint(Cursor.Position).WorkingArea.Width - (Width - ClientSize.Width)), 720);
         MinimumSize = new Size(570, 420);
         update.Click += async (_, _) => await UpdateAsync();
         AddPages(CreateSetupView(), build);

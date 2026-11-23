@@ -339,8 +339,9 @@ progress { flex: 1; height: .72rem; accent-color: var(--accent); }
 .overlay-options article:is(:hover, :focus-within) .layout-controls { opacity: 1; pointer-events: auto; }
 .layout-controls :is(button, .twitch-link) {
   display: inline-grid; place-items: center; align-self: center; margin: 0; padding: 0;
-  width: 4.5rem; height: 2.5rem; border-radius: .45rem;
+  width: 6rem; height: 3.25rem; border-radius: .55rem; font-size: 1.1rem;
 }
+.layout-controls svg { width: 1.8rem; height: 1.8rem; }
 .preview-swatch { display: grid; place-items: center; background: linear-gradient(145deg,#ffffff24,#ffffff09); color: var(--accent); }
 .preview-swatch::before { content: ''; width: 25%; aspect-ratio: 1; border: 1px solid currentColor; opacity: .6; transform: rotate(45deg); }
 @media (hover: none) {
